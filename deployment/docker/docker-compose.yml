@@ -1,0 +1,119 @@
+# Docker Compose configuration for GeoAnomalyMapper (GAM)
+# Supports development (GAM_ENV=dev) and production (GAM_ENV=prod) environments
+# Usage:
+#   GAM_ENV=dev docker compose up -d  # Development with hot-reload volumes
+#   GAM_ENV=prod docker compose up -d  # Production with persistent storage
+#
+# Services:
+# - gam: GAM application service (CLI processing)
+# - postgres: PostgreSQL database for caching and metadata
+# - jupyter: JupyterLab for interactive analysis
+
+version: '3.8'
+
+x-defaults: &defaults
+  restart: unless-stopped
+  environment:
+    - GAM_ENV=${GAM_ENV:-dev}
+    - POSTGRES_DB=gam_db
+    - POSTGRES_USER=gam_user
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gam_password_dev}
+    - GAM_CONFIG_PATH=/app/config/${GAM_ENV}.yaml
+    - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+services:
+  gam:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile
+    <<: *defaults
+    command: |
+      bash -c "
+        if [ '$$GAM_ENV' = 'prod' ]; then
+          gam --config /app/config/production.yaml run --daemon
+        else
+          gam --help
+        fi
+      "
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - gam_cache:/app/cache
+    ports:
+      - "8000:8000"  # For potential API exposure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gam-network
+    healthcheck:
+      test: ["CMD-SHELL", "gam --version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+
+  postgres:
+    image: postgres:14-alpine
+    <<: *defaults
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/docker/init:/docker-entrypoint-initdb.d:ro  # Init scripts for GAM schema
+    ports:
+      - "5432:5432"  # Expose for external tools in dev
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  jupyter:
+    image: jupyter/datascience-notebook:2023-12
+    <<: *defaults
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password='' --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./gam:/home/jovyan/work/gam:ro
+      - ./docs:/home/jovyan/work/docs:ro
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - GRANT_SUDO=yes
+    depends_on:
+      - gam
+      - postgres
+    networks:
+      - gam-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+volumes:
+  postgres_data:
+    driver: local
+  gam_cache:
+    driver: local
+
+networks:
+  gam-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Production overrides (use with GAM_ENV=prod and .env.prod)
+# Add secrets management, replicas, etc. via docker-compose.override.yml or swarm mode

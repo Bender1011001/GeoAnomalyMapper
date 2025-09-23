@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gam-service
+  namespace: gam-system
+  labels:
+    app: geoanomalymapper
+    component: service
+    environment: production
+spec:
+  type: ClusterIP
+  selector:
+    app: geoanomalymapper
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8000
+    targetPort: 8000

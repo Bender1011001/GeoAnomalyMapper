@@ -1,0 +1,35 @@
+# Configuration for global processing tests
+# Earth-scale tiling, high parallel, caching for large regions
+
+pipeline:
+  modalities: ['gravity', 'magnetic', 'seismic']  # Multi for global fusion
+  resolution: 0.01  # Fine grid for global
+  use_cache: true
+  parallel_workers: 4  # High parallel for benchmarks
+  tiles: 10  # 10-degree tiles
+
+ingestion:
+  cache_dir: 'tests/global_cache'
+  retry_attempts: 3
+  timeout: 30  # Longer for global
+
+preprocessing:
+  filter_window: 7  # Robust filtering for large data
+  grid_method: 'cubic'
+  upsample_factor: 4  # Higher for global accuracy
+
+modeling:
+  inversion_type: 'full'
+  fusion_method: 'cross_gradient'  # Advanced for global
+  max_iterations: 100
+  regularization: 0.001
+
+visualization:
+  output_formats: ['png', 'csv', 'geojson']
+  map_projection: 'PlateCarree'  # For global maps
+  dpi: 300
+
+region: 'global'  # Or bbox: [-180, 180, -90, 90]
+
+logging:
+  level: 'INFO'

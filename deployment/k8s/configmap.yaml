@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gam-config
+  namespace: gam-system
+  labels:
+    app: geoanomalymapper
+    component: config
+    environment: production
+data:
+  production.yaml: |
+    # GeoAnomalyMapper Production Configuration
+    # Optimized for high-throughput geophysical data processing
+    
+    logging:
+      level: INFO
+      format: json
+      rotation:
+        daily: true
+        max_size_mb: 100
+        max_files: 30
+      handlers:
+        - file: /app/logs/gam.log
+        - console: true
+        - sentry:  # If integrated
+            dsn: ${SENTRY_DSN}
+    
+    database:
+      url: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/gam_db
+      pool:
+        size: 20
+        timeout: 30
+      migrations:
+        auto_apply: true
+    
+    ingestion:
+      cache:
+        ttl_seconds: 3600
+        directory: /app/cache/ingestion
+      retry:
+        max_attempts: 3
+        backoff_factor: 2
+      sources:
+        usgs: true
+        iris: true
+        esa: true
+        timeout: 300
+    
+    preprocessing:
+      parallel:
+        workers: 4
+        threads_per_worker: 2
+      grid:
+        resolution_deg: 0.01
+        method: bilinear
+      filters:
+        outlier_threshold: 3.0
+        smoothing_window: 5
+      units:
+        standardize: true
+    
+    modeling:
+      fusion:
+        method: bayesian
+        confidence_threshold: 0.95
+      anomaly_detection:
+        algorithm: isolation_forest
+        contamination: 0.05
+      parallel:
+        dask:
+          scheduler: distributed
+          n_workers: 8
+          memory_limit: 4GB
+      modalities:
+        gravity: true
+        magnetic: true
+        seismic: true
+        insar: true
+    
+    visualization:
+      export:
+        formats: ['geotiff', 'vtk', 'csv', 'pdf']
+        dpi: 300
+        compression: lzw
+      maps:
+        projection: EPSG:4326
+        basemap: satellite
+      reports:
+        auto_generate: true
+        template: standard
+    
+    monitoring:
+      metrics:
+        port: 9090
+        path: /metrics
+      health:
+        path: /health
+        interval: 30s
+      alerts:
+        cpu_threshold: 80
+        memory_threshold: 90
+    
+    security:
+      auth:
+        required: true
+        method: jwt
+        secret_key: ${JWT_SECRET}
+      api_keys:
+        usgs: ${USGS_API_KEY}
+        iris: ${IRIS_TOKEN}
+        esa: ${ESA_API_KEY}
+      cors:
+        allowed_origins: ['https://gam.example.com']
+    
+    performance:
+      timeout: 3600  # 1 hour per analysis
+      batch_size: 1000
+      cache_invalidation: true
+    
+    # External services
+    sentry:
+      dsn: ${SENTRY_DSN}
+    prometheus:
+      enabled: true

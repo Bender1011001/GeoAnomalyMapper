@@ -1,0 +1,177 @@
+# GeoAnomalyMapper Production Configuration
+# This file contains optimized settings for production deployments.
+# Load order: defaults -> environment -> secrets
+# Use: GAM_CONFIG_PATH=config/production/production.yaml gam run ...
+
+# Global Settings
+global:
+  environment: production
+  debug: false
+  timeout_seconds: 7200  # 2 hours for long-running global analyses
+  max_retries: 5
+  backoff_factor: 2.0
+  rate_limit_requests_per_minute: 1000
+
+# Logging Configuration
+# Structured JSON logging for production monitoring
+logging:
+  level: INFO
+  format: json
+  handlers:
+    - type: file
+      path: /var/log/gam/gam.log
+      rotation:
+        when: midnight
+        interval: 1
+        backup_count: 30
+        max_bytes: 104857600  # 100MB
+    - type: console
+      level: WARNING
+    - type: sentry  # Optional: integrate with Sentry
+      dsn: ${SENTRY_DSN:-""}
+      traces_sample_rate: 0.2
+  propagate: false
+
+# Database and Caching
+database:
+  url: postgresql://${DB_USER:-gam_user}:${DB_PASSWORD}@${DB_HOST:-postgres}:5432/${DB_NAME:-gam_db}
+  pool:
+    min_size: 5
+    max_size: 20
+    timeout: 30
+  echo: false  # Disable SQL logging in prod
+  migrations:
+    auto_run: true
+    table: alembic_version
+
+cache:
+  type: redis  # Or local filesystem for simple setups
+  url: ${REDIS_URL:-redis://localhost:6379/0}
+  expiration: 86400  # 24 hours
+  size_limit_gb: 50
+
+# Ingestion Module
+ingestion:
+  cache_ttl_seconds: 86400  # 1 day for public data
+  concurrent_fetches: 10
+  timeout_seconds: 600
+  retry_policy:
+    max_attempts: 3
+    wait_exponential_multiplier: 1000
+    wait_max_seconds: 60
+  sources:
+    usgs:
+      api_key: ${USGS_API_KEY}
+      rate_limit: 60  # requests per minute
+    iris:
+      token: ${IRIS_TOKEN}
+      enabled: true
+    esa:
+      api_key: ${ESA_API_KEY}
+      enabled: true
+  validation:
+    strict_schema: true
+    checksum: true
+
+# Preprocessing Module
+preprocessing:
+  parallel_workers: 8  # Tune based on CPU cores
+  chunk_size_mb: 512
+  grid:
+    resolution_arcseconds: 30  # ~1km global grid
+    interpolation: bilinear
+    fill_value: NaN
+  filters:
+    outlier_sigma: 3.0
+    smoothing_kernel: gaussian
+    window_size: 5
+  units:
+    standardize: true
+    target_system: SI
+
+# Modeling Module
+modeling:
+  fusion:
+    method: bayesian
+    prior_strength: 0.1
+    max_iterations: 1000
+    convergence_threshold: 1e-6
+  anomaly_detection:
+    algorithm: isolation_forest
+    contamination: 0.01
+    n_estimators: 200
+  parallel:
+    dask:
+      n_workers: 16
+      threads_per_worker: 2
+      memory_limit_gb: 8
+      dashboard_port: 8787
+  modalities:
+    gravity: enabled
+    magnetic: enabled
+    seismic: enabled
+    insar: enabled
+  mesh:
+    max_depth: 10
+    element_size_km: 5
+
+# Visualization Module
+visualization:
+  dpi: 300
+  export_formats:
+    - geotiff
+    - vtk
+    - csv
+    - pdf
+  compression: lzw
+  watermarks: true
+  interactive: false  # Disable for batch prod
+  reports:
+    template: production
+    include_metadata: true
+
+# API and Security
+api:
+  host: 0.0.0.0
+  port: 8000
+  cors:
+    allowed_origins: ["https://gam.example.com"]
+    credentials: true
+  rate_limit: 100  # requests per minute per IP
+  auth:
+    required: true
+    jwt_secret: ${JWT_SECRET}
+    token_expiry_hours: 24
+
+security:
+  https_only: true
+  encrypt_connections: true
+  validate_certificates: true
+  api_keys_required: true
+
+# Monitoring and Health
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_path: /health
+  prometheus:
+    scrape_interval: 15s
+  alerts:
+    cpu_threshold: 80
+    memory_threshold: 90
+    error_rate_threshold: 5
+
+# External Services
+external:
+  sentry_dsn: ${SENTRY_DSN:-""}
+  prometheus_pushgateway: ${PROMETHEUS_PUSHGATEWAY:-""}
+  cloud_storage:
+    provider: aws  # or gcp, azure
+    bucket_input: gam-input-data
+    bucket_output: gam-output-data
+
+# Performance Tuning
+performance:
+  batch_size: 10000
+  prefetch_factor: 2
+  use_gpu: false  # Enable if CUDA available

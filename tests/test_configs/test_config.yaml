@@ -1,0 +1,34 @@
+# Standard configuration for integration tests
+# Small bbox, single modality, no caching for fast execution
+
+pipeline:
+  modalities: ['gravity']
+  resolution: 0.1  # degrees
+  use_cache: false
+  parallel_workers: 1  # Sequential for tests
+
+ingestion:
+  cache_dir: 'tests/cache'  # Relative to project
+  retry_attempts: 1
+  timeout: 5  # seconds
+
+preprocessing:
+  filter_window: 3  # For noise reduction
+  grid_method: 'bilinear'  # Interpolation
+  upsample_factor: 1
+
+modeling:
+  inversion_type: 'simple'  # Basic for tests
+  fusion_method: 'bayesian'
+  max_iterations: 10
+  regularization: 0.1
+
+visualization:
+  output_formats: ['png', 'csv']
+  map_projection: 'WGS84'
+  dpi: 150  # For test images
+
+bbox: [29.0, 31.0, 30.0, 32.0]  # lon_min, lon_max, lat_min, lat_max
+
+logging:
+  level: 'WARNING'  # Reduce noise in tests
