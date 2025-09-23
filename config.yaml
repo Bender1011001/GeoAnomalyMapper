@@ -1,0 +1,42 @@
+# Main Configuration File for GeoAnomalyMapper (GAM)
+# Load with: import yaml; with open('config.yaml', 'r') as f: config = yaml.safe_load(f)
+# Edit values for specific runs; defaults are examples from project specification.
+# Structure mirrors modules: global settings, then data/preprocessing/modeling/visualization/core.
+# For data sources, see data_sources.yaml. Requires PyYAML (add to requirements if not installed).
+
+global:
+  version: "0.1.0"  # GAM version; sync with __init__.py
+  logging_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR (see logging.basicConfig)
+
+data:
+  bbox: [29.0, 30.0, 31.0, 32.0]  # [min_lat, max_lat, min_lon, max_lon] for region of interest
+  modalities: ["gravity", "seismic", "insar"]  # Available: gravity, magnetic, seismic, insar; use "all" for full
+  cache_dir: "data/cache"  # Local path for HDF5 caches; relative to project root
+
+preprocessing:
+  grid_res: 0.1  # Degrees for common grid (e.g., 0.1 ~11km at equator); use finer for local
+  filter_params:
+    bandpass: [0.1, 1.0]  # For seismic (ObsPy); [freqmin, freqmax] in Hz
+    gaussian_sigma: 1.0  # For noise reduction in gravity/magnetic
+  units: "SI"  # Standardize to SI units (e.g., mGal to SI for gravity)
+
+modeling:
+  inversion_type: "linear"  # Options: linear (SimPEG), eikonal (seismic), elastic (InSAR)
+  threshold: 2.0  # Z-score threshold for anomaly detection
+  mesh_start_coarse: 10.0  # Initial mesh cell size in km; refines iteratively
+  priors:
+    joint_weight: 0.5  # Bayesian fusion weight between modalities (0-1)
+    regularization: "l2"  # L1/L2 for sparsity/smoothness in inversion
+  max_iterations: 50  # For inversion convergence
+
+visualization:
+  map_type: "2d"  # Options: 2d (PyGMT), 3d (PyVista), interactive (Folium)
+  export_formats: ["geotiff", "vtk", "sql"]  # Output file types
+  color_scheme: "viridis"  # Matplotlib colormap for anomalies
+  confidence_min: 0.7  # Filter markers by confidence score
+
+core:
+  output_dir: "data/output"  # Base directory for maps, models, reports
+  parallel_workers: 4  # Joblib/Dask n_jobs; set to -1 for all cores
+  tile_size: 10  # Degrees for global tiling (e.g., 10° chunks for worldwide processing)
+  rate_limit_delay: 1.0  # Seconds between API calls to avoid bans

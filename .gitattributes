@@ -1,0 +1,6 @@
+*.gfc filter=lfs diff=lfs merge=lfs -text
+*.grd filter=lfs diff=lfs merge=lfs -text
+*.grd.gz filter=lfs diff=lfs merge=lfs -text
+*.tif filter=lfs diff=lfs merge=lfs -text
+*.exe filter=lfs diff=lfs merge=lfs -text
+*.tar.bz2 filter=lfs diff=lfs merge=lfs -text

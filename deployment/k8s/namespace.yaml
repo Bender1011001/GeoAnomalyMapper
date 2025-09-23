@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gam-system
+  labels:
+    name: gam-system
+    app: geoanomalymapper
+    environment: production
+    owner: geoanomaly-team
+  annotations:
+    description: "Namespace for GeoAnomalyMapper (GAM) production deployment"
+    monitoring: "prometheus-operator"
+---

@@ -1,0 +1,383 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "type": "string",
+      "defaultValue": "production",
+      "allowedValues": ["dev", "prod"],
+      "metadata": {
+        "description": "Deployment environment"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "East US",
+      "metadata": {
+        "description": "Azure region"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D2s_v3",
+      "metadata": {
+        "description": "VM size for GAM scale set"
+      }
+    },
+    "instanceCount": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "maxValue": 5,
+      "metadata": {
+        "description": "Number of VM instances"
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "gamadmin",
+      "metadata": {
+        "description": "Admin username for VMs"
+      }
+    },
+    "storageAccountPrefix": {
+      "type": "string",
+      "defaultValue": "gamstorage",
+      "maxLength": 11,
+      "metadata": {
+        "description": "Prefix for storage account names"
+      }
+    },
+    "functionRuntime": {
+      "type": "string",
+      "defaultValue": "python|3.12",
+      "metadata": {
+        "description": "Runtime for Azure Function"
+      }
+    }
+  },
+  "variables": {
+    "inputStorageAccountName": "[concat(parameters('storageAccountPrefix'), uniqueString(resourceGroup().id), '-input')]",
+    "outputStorageAccountName": "[concat(parameters('storageAccountPrefix'), uniqueString(resourceGroup().id), '-output')]",
+    "vnetName": "[concat(parameters('environment'), '-gam-vnet')]",
+    "nsgName": "[concat(parameters('environment'), '-gam-nsg')]",
+    "scaleSetName": "[concat(parameters('environment'), '-gam-vmss')]",
+    "functionAppName": "[concat(parameters('environment'), '-gam-function')]",
+    "startupScript": {
+      "commandToExecute": "[concat('apt-get update -y && apt-get install -y docker.io && systemctl start docker && systemctl enable docker && az acr login --name gamacr && docker pull gamacr.azurecr.io/gam:latest && docker run --rm -v /tmp:/app/data -e AZURE_STORAGE_CONNECTION_STRING=', variables('inputStorageConnectionString'), ' gamacr.azurecr.io/gam:latest gam run --config /app/config/production.yaml --input-blob ', variables('inputStorageAccountName'), ' --output-blob ', variables('outputStorageAccountName'))]"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2020-11-01",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": ["10.0.0.0/16"]
+        },
+        "subnets": [
+          {
+            "name": "default",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-11-01",
+      "name": "[variables('nsgName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "SSH",
+            "properties": {
+              "priority": 1000,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "Internet",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "22"
+            }
+          },
+          {
+            "name": "HTTP",
+            "properties": {
+              "priority": 1001,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "Internet",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "80"
+            }
+          },
+          {
+            "name": "GAMPort",
+            "properties": {
+              "priority": 1002,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "Internet",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "8000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-04-01",
+      "name": "[variables('inputStorageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "isHnsEnabled": false,
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true,
+        "isVersioningEnabled": true,
+        "allowSharedKeyAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2021-04-01",
+      "name": "[concat(variables('inputStorageAccountName'), '/default/input')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('inputStorageAccountName'))]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-04-01",
+      "name": "[variables('outputStorageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "isHnsEnabled": false,
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true,
+        "isVersioningEnabled": true,
+        "allowSharedKeyAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2021-04-01",
+      "name": "[concat(variables('outputStorageAccountName'), '/default/output')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('outputStorageAccountName'))]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachineScaleSets",
+      "apiVersion": "2021-03-01",
+      "name": "[variables('scaleSetName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('vmSize')]",
+        "tier": "Standard",
+        "capacity": "[parameters('instanceCount')]"
+      },
+      "properties": {
+        "overprovision": true,
+        "upgradePolicy": {
+          "mode": "Automatic"
+        },
+        "virtualMachineProfile": {
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "Canonical",
+              "offer": "0001-com-ubuntu-server-jammy",
+              "sku": "22_04-lts-gen2",
+              "version": "latest"
+            },
+            "osDisk": {
+              "createOption": "FromImage",
+              "caching": "ReadWrite",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
+            }
+          },
+          "osProfile": {
+            "computerNamePrefix": "[variables('scaleSetName')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]"
+          },
+          "networkProfile": {
+            "networkInterfaceConfigurations": [
+              {
+                "name": "nic-config",
+                "properties": {
+                  "primary": true,
+                  "ipConfigurations": [
+                    {
+                      "name": "ipconfig1",
+                      "properties": {
+                        "subnet": {
+                          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'default')]"
+                        },
+                        "publicIPAddressConfiguration": {
+                          "name": "public-ip-config",
+                          "properties": {
+                            "idleTimeoutInMinutes": 10
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+                  }
+                }
+              }
+            ]
+          },
+          "extensionProfile": {
+            "extensions": [
+              {
+                "name": "CustomScriptExtension",
+                "properties": {
+                  "publisher": "Microsoft.Azure.Extensions",
+                  "type": "CustomScript",
+                  "typeHandlerVersion": "2.0",
+                  "autoUpgradeMinorVersion": true,
+                  "settings": {
+                    "fileUris": [],
+                    "commandToExecute": "[variables('startupScript').commandToExecute]"
+                  },
+                  "protectedSettings": {
+                    "storageAccountName": "[variables('inputStorageAccountName')]",
+                    "storageAccountKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('inputStorageAccountName')), '2021-04-01').keys[0].value]"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('functionAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat(parameters('environment'), '-consumption-plan'))]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "[split(parameters('functionRuntime'), '|')[0]]"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('inputStorageAccountName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('inputStorageAccountName')), '2021-04-01').keys[0].value, ';EndpointSuffix=core.windows.net')]"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('inputStorageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2021-02-01",
+      "name": "[concat(parameters('environment'), '-consumption-plan')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Dynamic",
+        "tier": "Dynamic"
+      },
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.EventGrid/topics",
+      "apiVersion": "2021-10-15-preview",
+      "name": "[concat(parameters('environment'), '-gam-eventgrid')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "source": "[variables('inputStorageAccountName')]",
+        "inputSchema": "EventGridSchema"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('inputStorageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.EventGrid/subscriptions",
+      "apiVersion": "2021-10-15-preview",
+      "name": "[concat(parameters('environment'), '-gam-subscription')]",
+      "properties": {
+        "destination": {
+          "endpointType": "WebHook",
+          "properties": {
+            "endpoint": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/runtime/webhooks/EventGrid?functionName=TriggerGAM&code=$FUNCTION_KEY')]"
+          }
+        },
+        "filter": {
+          "subjectBeginsWith": "/blobServices/default/containers/input/blobPaths/",
+          "includedEventTypes": ["Microsoft.Storage.BlobCreated"]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.EventGrid/topics', concat(parameters('environment'), '-gam-eventgrid'))]",
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "inputStorageAccountName": {
+      "type": "string",
+      "value": "[variables('inputStorageAccountName')]"
+    },
+    "outputStorageAccountName": {
+      "type": "string",
+      "value": "[variables('outputStorageAccountName')]"
+    },
+    "scaleSetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Compute/virtualMachineScaleSets', variables('scaleSetName'))]"
+    },
+    "functionAppUrl": {
+      "type": "string",
+      "value": "[concat('https://', variables('functionAppName'), '.azurewebsites.net')]"
+    },
+    "vnetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+# Data Sources Configuration for GAM Ingestion Module
+# Load with: import yaml; with open('data_sources.yaml', 'r') as f: sources = yaml.safe_load(f)
+# Then use in fetchers: e.g., for gravity: requests.get(sources['gravity']['base_url'].format(bbox=bbox_str), params=sources['gravity']['default_params'])
+# For auth: Use os.getenv('VAR_NAME') for placeholders like ${VAR}; set in .env (ignored by .gitignore).
+# Public sources require no keys; private (e.g., ESA) need free account—register at respective sites.
+# Implement rate limiting in fetchers.py (e.g., time.sleep(config['core']['rate_limit_delay'])) to avoid API bans.
+# Add new modalities by extending this YAML.
+
+gravity:
+  base_url: "https://mrdata.usgs.gov/services/gravity?bbox={bbox}&format=geojson"
+  client_type: "requests"  # Use requests.get(base_url.format(...))
+  default_params: {}  # Additional query params if needed (e.g., minyear=2020)
+  auth: null  # Public USGS API; no authentication required
+
+magnetic:
+  base_url: "https://mrdata.usgs.gov/services/magnetic?bbox={bbox}&format=geojson"
+  client_type: "requests"
+  default_params: {}  # Similar to gravity; adjust for magnetic surveys
+  auth: null  # Public
+
+seismic:
+  client_type: "obspy"  # Use obspy.clients.fdsn.Client(sources['seismic']['fdsn_server'])
+  fdsn_server: "IRIS"  # FDSN web service provider
+  default_params:
+    network: "*"  # Wildcard for all networks
+    station: "*"
+    location: "*"
+    channel: "BH?"  # Broadband horizontal channels
+    starttime: "2020-01-01"  # UTCDateTime string
+    endtime: "2025-09-22"
+  auth: null  # Public FDSN; no key needed, but respect usage policies
+
+insar:
+  base_url: "https://scihub.copernicus.eu/dhus/search?q="
+  client_type: "sentinelsat"  # Use from sentinelsat import SentinelAPI; api = SentinelAPI(username, password, base_url)
+  default_params:
+    platformname: "Sentinel-1"
+    producttype: "SLC"  # Or GRD for processed
+    date: ["20200101", "20250922"]  # Start/end for query
+  auth:
+    username: "${COPERNICUS_USERNAME}"  # Set in .env; free registration at https://scihub.copernicus.eu/
+    password: "${COPERNICUS_PASSWORD}"
+  notes: "Requires free Copernicus account; use for Sentinel-1 SAR data. Alternative: direct API with requests for metadata."
