@@ -23,7 +23,7 @@ from simpeg import (
     simulation,
     utils,
 )
-from simpeg.meshes import TreeMesh
+from discretize import TreeMesh
 from simpeg.potential_fields import gravity
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
