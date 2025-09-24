@@ -17,13 +17,13 @@ from simpeg import (
     directives,
     inversion,
     maps,
-    mesh,
     objective_function,
     optimization,
     regularization,
     simulation,
     utils,
 )
+from discretize import TreeMesh
 from simpeg.potential_fields import magnetics
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
@@ -97,7 +97,7 @@ class MagneticInverter(Inverter):
     def __init__(self, mu_0: float = 4 * np.pi * 1e-7, background_sus: float = 0.0):
         self.mu_0 = mu_0
         self.background_sus = background_sus
-        self.mesh: Optional[mesh.TreeMesh] = None
+        self.mesh: Optional[TreeMesh] = None
         self.survey: Optional[simulation.Simulation3DLinear] = None
         self.inv: Optional[inversion.BaseInversion] = None
 

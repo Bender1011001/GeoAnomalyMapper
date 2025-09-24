@@ -10,9 +10,9 @@ import pyproj
 from scipy.spatial import KDTree
 
 import pygimli as pg
-from pygimli.mesh import createMesh
+from pygimli.meshtools import createMesh
 import simpeg
-from simpeg import mesh
+from discretize import TensorMesh, TreeMesh
 
 from gam.core.exceptions import GAMError
 from gam.preprocessing.data_structures import ProcessedGrid
@@ -165,7 +165,7 @@ class MeshGenerator:
             hx = np.ones(n_cells_x) * hmin
             hy = np.ones(n_cells_y) * hmin
             hz = np.ones(n_cells_z) * hmin
-            tensor_mesh = mesh.TensorMesh([hx, hy, hz], x0=[extent[0], extent[2], 0])
+            tensor_mesh = TensorMesh([hx, hy, hz], x0=[extent[0], extent[2], 0])
             self._validate_mesh_quality(tensor_mesh, **kwargs)
             logger.info(f"Created regular TensorMesh: {tensor_mesh.nC} cells")
             return tensor_mesh
@@ -173,7 +173,7 @@ class MeshGenerator:
             # TreeMesh: adaptive
             # Initial coarse
             n_base = 4
-            tree_mesh = mesh.TreeMesh(extent, hmin=hmin)
+            tree_mesh = TreeMesh(extent, hmin=hmin)
             # Refine based on data/topo
             if kwargs.get('refine_data', True):
                 tree_mesh = self._refine_data_density(tree_mesh, data.ds['lon'].values * 111000, 

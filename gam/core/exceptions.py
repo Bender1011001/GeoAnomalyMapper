@@ -88,6 +88,12 @@ class VisualizationError(GAMError):
             ctx.update(context)
         super().__init__(message, ctx, cause)
 
+class InversionConvergenceError(ModelingError):
+    """
+    Raised when inversion does not converge within tolerance or iterations.
+    """
+    def __init__(self, message: str, model_type: str = "inversion", context: Optional[Dict[str, Any]] = None, cause: Optional[Exception] = None):
+        super().__init__(message, model_type, context, cause)
 # Re-export for convenience
 __all__ = [
     'GAMError', 'PipelineError', 'IngestionError', 
