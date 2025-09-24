@@ -35,5 +35,5 @@ insar:
   api_url: "https://apihub.copernicus.eu/apihub"
   product_type: "GRD"
   polarisation: "VV"
-  username: "${ESA_USERNAME}"  # from environment
-  password: "${ESA_PASSWORD}"  # from environment
+  # Authentication: Set ESA_USERNAME and ESA_PASSWORD environment variables for secure credential management.
+  # Post-configuration update, credentials must be provided via environment variables; config fallbacks are deprecated and will fail if absent.

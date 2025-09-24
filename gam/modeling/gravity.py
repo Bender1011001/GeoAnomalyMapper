@@ -321,11 +321,85 @@ class GravityInverter(Inverter):
         return locations * 111000  # Rough deg to m
 
     def _add_terrain_correction(self, sim: simulation.Simulation3DIntegral, topo: np.ndarray) -> simulation.Simulation3DIntegral:
-        """Add terrain sources for Bouguer correction."""
-        # Create prism sources for topography (simplified)
-        # In production, use simpeg.potential_fields.gravity.sources.Prism
-        logger.info("Terrain correction applied")
-        return sim  # Placeholder; implement full
+        """
+        Add terrain correction by updating active cells and topography for the simulation.
+    
+        Expected topo array shape: (nCy, nCx) or (nCx, nCy), where nCx = len(mesh.cell_centers_x),
+        nCy = len(mesh.cell_centers_y), representing z-elevations on the horizontal cell center grid.
+        Assumes ij indexing, with y increasing north, x east.
+    
+        When optional dependencies are missing (discretize.utils.surface2ind_topo), skips correction and logs info.
+    
+        Updates simulation attributes when supported:
+        - indActive: boolean mask for cells below the terrain surface.
+        - topography: (N, 3) array of surface points (x, y, z) on the grid.
+        """
+        if self.mesh is None:
+            raise GAMError("Mesh must be initialized before applying terrain correction.")
+    
+        if not isinstance(topo, np.ndarray) or topo.ndim != 2:
+            logger.warning("Invalid topography data: must be 2D numpy array. Skipping terrain correction.")
+            return sim
+    
+        nCx = len(self.mesh.cell_centers_x)
+        nCy = len(self.mesh.cell_centers_y)
+        expected_shapes = [(nCy, nCx), (nCx, nCy)]
+        if topo.shape not in expected_shapes:
+            logger.warning(f"Topography shape {topo.shape} does not match mesh grid ({nCy}, {nCx}). Skipping.")
+            return sim
+    
+        # Normalize topo to (nCy, nCx) with ij indexing
+        if topo.shape == (nCx, nCy):
+            topo = topo.T
+    
+        try:
+            from discretize.utils import surface2ind_topo
+        except ImportError:
+            logger.info("Terrain correction skipped: optional dependencies (discretize) not available.")
+            return sim
+    
+        # Build surface grid points xyz (N, 3) where N = nCx * nCy
+        cell_centers_x = self.mesh.cell_centers_x
+        cell_centers_y = self.mesh.cell_centers_y
+        Y, X = np.meshgrid(cell_centers_y, cell_centers_x, indexing='ij')
+        xyz = np.column_stack([X.ravel(), Y.ravel(), topo.ravel()])  # x, y, z
+    
+        # For TreeMesh, interpolate topo to cell centers for surface2ind_topo
+        interp_topo = RegularGridInterpolator(
+            (cell_centers_y, cell_centers_x),  # y, x for ij
+            topo,
+            method='linear',
+            bounds_error=False,
+            fill_value=np.nan
+        )
+    
+        # Cell centers xy: gridCC[:, 0:2] is x,y
+        cell_xy = self.mesh.gridCC[:, :2]  # (nC, 2) x, y
+        cell_yx = cell_xy[:, [1, 0]]  # y, x for interp
+        h = interp_topo(cell_yx)
+    
+        # Extrapolate NaN with max topo (simple robust fill)
+        if np.any(np.isnan(h)):
+            logger.warning("Some cell centers outside topo grid; extrapolating with max elevation.")
+            h = np.nan_to_num(h, nan=np.nanmax(topo))
+    
+        # Compute active cells below surface
+        ind_active = surface2ind_topo(self.mesh, h=h, actv=None)
+    
+        # Resiliently update active cells
+        if hasattr(sim, "indActive"):
+            sim.indActive = ind_active
+        elif hasattr(sim, "set_indActive"):
+            sim.set_indActive(ind_active)
+    
+        # Resiliently set topography
+        if hasattr(sim, "topography"):
+            sim.topography = xyz
+        elif hasattr(sim, "set_topography"):
+            sim.set_topography(xyz)
+    
+        logger.info("Terrain correction applied (active cells updated).")
+        return sim
 
     def _estimate_uncertainty(self, m_rec: npt.NDArray[np.float64], inv: inversion.BaseInversion) -> npt.NDArray[np.float64]:
         """Approximate uncertainty from inversion statistics."""

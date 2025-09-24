@@ -447,11 +447,17 @@ class InSARFetcher(DataSource):
         end_date = kwargs.get('end_date', today.isoformat())
         product_type = kwargs.get('product_type', 'SLC')
 
-        # Credentials
-        username = kwargs.get('username') or os.getenv('ESA_USERNAME')
-        password = kwargs.get('password') or os.getenv('ESA_PASSWORD')
+        # Credentials (prioritize environment variables for security, fallback to config kwargs with warning)
+        config_username = kwargs.get('username')
+        config_password = kwargs.get('password')
+        username = os.getenv('ESA_USERNAME') or config_username
+        password = os.getenv('ESA_PASSWORD') or config_password
+        if config_username and not os.getenv('ESA_USERNAME'):
+            logger.warning("Using credentials from config (deprecated); prefer environment variables for security.")
+        if config_password and not os.getenv('ESA_PASSWORD'):
+            logger.warning("Using credentials from config (deprecated); prefer environment variables for security.")
         if not username or not password:
-            raise ValueError("ESA credentials required: provide username/password or set ESA_USERNAME/ESA_PASSWORD env vars")
+            raise ValueError("ESA credentials required for InSAR data: set ESA_USERNAME and ESA_PASSWORD environment variables or provide in config (deprecated).")
 
         # Cache key
         key_str = f"{self.source}_{min_lat:.6f}_{max_lat:.6f}_{min_lon:.6f}_{max_lon:.6f}_{start_date}_{end_date}_{product_type}"

@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import uuid
 import asyncio
 from datetime import datetime
+from .job_store import job_store
 from gam.core.pipeline import GAMPipeline
 from gam.core.config import GAMConfig
 from gam.core.exceptions import (
@@ -14,8 +15,6 @@ from pathlib import Path
 
 app = FastAPI(title="GeoAnomalyMapper API", version="1.0.0")
 
-# Global job storage
-jobs: Dict[str, Dict[str, Any]] = {}
 JOB_STATES = {"QUEUED", "RUNNING", "COMPLETED", "FAILED"}
 
 class AnalysisRequest(BaseModel):
@@ -44,11 +43,12 @@ class ResultsResponse(BaseModel):
 
 async def run_analysis_job(job_id: str, request: AnalysisRequest):
     """Background task to run the analysis pipeline asynchronously."""
-    job = jobs[job_id]
-    job['status'] = "RUNNING"
-    job['start_time'] = datetime.now()
-    job['progress'] = 0.0
-    job['stage'] = "Starting"
+    job_store.update_job(job_id, {
+        "status": "RUNNING",
+        "start_time": datetime.now(),
+        "progress": 0.0,
+        "stage": "Starting"
+    })
 
     try:
         # Create unique output directory for this job
@@ -71,8 +71,7 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
         bbox_tuple: Tuple[float, float, float, float] = tuple(request.bbox)
 
         # Stage 1: Ingestion
-        job['stage'] = "Ingestion"
-        job['progress'] = 20.0
+        job_store.update_job(job_id, {"stage": "Ingestion", "progress": 0.2})
         raw_data = pipeline.ingestion.fetch_multiple(
             modalities=request.modalities,
             bbox=bbox_tuple,
@@ -82,82 +81,85 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
         )
 
         # Stage 2: Preprocessing
-        job['stage'] = "Preprocessing"
-        job['progress'] = 40.0
+        job_store.update_job(job_id, {"stage": "Preprocessing", "progress": 0.4})
         processed_data = pipeline.preprocessing.process(raw_data)
 
         # Stage 3: Modeling - Inversion
-        job['stage'] = "Modeling (Inversion)"
-        job['progress'] = 60.0
+        job_store.update_job(job_id, {"stage": "Modeling (Inversion)", "progress": 0.6})
         inversion_results = pipeline.modeling.invert(processed_data)
 
         # Stage 4: Anomaly Detection
-        job['stage'] = "Anomaly Detection"
-        job['progress'] = 80.0
+        job_store.update_job(job_id, {"stage": "Anomaly Detection", "progress": 0.8})
         anomalies = pipeline.modeling.detect_anomalies(inversion_results)
 
         # Stage 5: Visualization
-        job['stage'] = "Visualization"
-        job['progress'] = 100.0
+        job_store.update_job(job_id, {"stage": "Visualization", "progress": 0.9})
         visualizations = pipeline.visualization.generate(
             processed_data, inversion_results, anomalies, output_dir=str(job_output_dir)
         )
 
+        # Store results
+        job_store.update_job(job_id, {
+            "status": "COMPLETED",
+            "progress": 1.0,
+            "stage": "Finished",
+            "results": {
+                "raw_data": raw_data,
+                "processed_data": processed_data,
+                "inversion_results": inversion_results,
+                "anomalies": anomalies,
+                "visualizations": {k: str(v) for k, v in visualizations.items()}
+            },
+            "output_files": {k: str(v) for k, v in visualizations.items()},
+            "message": f"Analysis completed successfully. Found {len(anomalies)} anomalies."
+        })
+    
         # Cleanup
         pipeline.close()
 
-        # Store results
-        job['status'] = "COMPLETED"
-        job['results'] = {
-            "raw_data": raw_data,
-            "processed_data": processed_data,
-            "inversion_results": inversion_results,
-            "anomalies": anomalies,
-            "visualizations": {k: str(v) for k, v in visualizations.items()}
-        }
-        job['output_files'] = {k: str(v) for k, v in visualizations.items()}
-        job['message'] = f"Analysis completed successfully. Found {len(anomalies)} anomalies."
-
     except IngestionError as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Ingestion failed: {str(e)}"
-        job['stage'] = "Ingestion"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Ingestion failed: {str(e)}",
+            "stage": "Ingestion"
+        })
     except PreprocessingError as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Preprocessing failed: {str(e)}"
-        job['stage'] = "Preprocessing"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Preprocessing failed: {str(e)}",
+            "stage": "Preprocessing"
+        })
     except ModelingError as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Modeling failed: {str(e)}"
-        job['stage'] = "Modeling"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Modeling failed: {str(e)}",
+            "stage": "Modeling"
+        })
     except VisualizationError as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Visualization failed: {str(e)}"
-        job['stage'] = "Visualization"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Visualization failed: {str(e)}",
+            "stage": "Visualization"
+        })
     except PipelineError as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Pipeline error: {str(e)}"
-        job['stage'] = "Pipeline"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Pipeline error: {str(e)}",
+            "stage": "Pipeline"
+        })
     except Exception as e:
-        job['status'] = "FAILED"
-        job['error_message'] = f"Unexpected error: {str(e)}"
-        job['stage'] = "Unknown"
+        job_store.update_job(job_id, {
+            "status": "FAILED",
+            "error_message": f"Unexpected error: {str(e)}",
+            "stage": "Unknown"
+        })
     finally:
         if 'pipeline' in locals():
             pipeline.close()
 
 @app.post("/analysis", response_model=AnalysisResponse)
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {
-        "status": "QUEUED",
-        "progress": 0.0,
-        "stage": "Queued",
-        "start_time": None,
-        "results": None,
-        "error_message": None,
-        "output_files": None
-    }
+    job_id = job_store.create_job()
     background_tasks.add_task(run_analysis_job, job_id, request)
     return AnalysisResponse(
         job_id=job_id,
@@ -167,9 +169,9 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
 
 @app.get("/analysis/{job_id}/status", response_model=StatusResponse)
 async def get_status(job_id: str):
-    if job_id not in jobs:
+    job = job_store.get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
     return StatusResponse(
         job_id=job_id,
         status=job["status"],
@@ -180,9 +182,9 @@ async def get_status(job_id: str):
 
 @app.get("/analysis/{job_id}/results", response_model=ResultsResponse)
 async def get_results(job_id: str):
-    if job_id not in jobs:
+    job = job_store.get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
     if job["status"] != "COMPLETED":
         raise HTTPException(status_code=425, detail="Job not completed yet")
     if job["results"] is None:
