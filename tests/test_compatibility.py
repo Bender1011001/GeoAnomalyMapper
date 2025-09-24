@@ -30,7 +30,7 @@ try:
     IMPORT_SUCCESS = True
 except ImportError as e:
     IMPORT_SUCCESS = False
-    pytest.skip(f"GAM import failed: {e}")
+    pytest.skip(f"GAM import failed: {e}", allow_module_level=True)
 
 # Optional deps
 OPTIONAL_DEPS = {

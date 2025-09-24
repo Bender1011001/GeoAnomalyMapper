@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 import xarray as xr
 from obspy import Stream, Trace
-from obspy.core.utls import Stats
+from obspy.core.utils import Stats
 import yaml
 
 from gam.ingestion.data_structures import RawData
