@@ -7,7 +7,11 @@ import click
 from pathlib import Path
 from typing import List, Tuple
 
-from .main import run_analysis
+run_analysis = None
+try:
+    from ..api.main import run_analysis
+except ImportError:
+    run_analysis = None
 from .exceptions import PipelineError, ConfigurationError
 
 import subprocess
@@ -76,6 +80,9 @@ def run(
         modalities_list: List[str] = [m.strip() for m in modalities.split(",")]
         config_path: Path | None = Path(config) if config else None
 
+        if run_analysis is None:
+            click.echo(click.style("Error: run_analysis not available; ensure API is properly installed.", fg="red"), err=True)
+            sys.exit(1)
         # Call main run function
         results = run_analysis(
             bbox_str=bbox,
