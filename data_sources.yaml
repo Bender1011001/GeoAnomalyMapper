@@ -31,13 +31,9 @@ seismic:
   auth: null  # Public FDSN; no key needed, but respect usage policies
 
 insar:
-  base_url: "https://scihub.copernicus.eu/dhus/search?q="
-  client_type: "sentinelsat"  # Use from sentinelsat import SentinelAPI; api = SentinelAPI(username, password, base_url)
-  default_params:
-    platformname: "Sentinel-1"
-    producttype: "SLC"  # Or GRD for processed
-    date: ["20200101", "20250922"]  # Start/end for query
-  auth:
-    username: "${COPERNICUS_USERNAME}"  # Set in .env; free registration at https://scihub.copernicus.eu/
-    password: "${COPERNICUS_PASSWORD}"
-  notes: "Requires free Copernicus account; use for Sentinel-1 SAR data. Alternative: direct API with requests for metadata."
+  source: "esa_copernicus"
+  api_url: "https://apihub.copernicus.eu/apihub"
+  product_type: "GRD"
+  polarisation: "VV"
+  username: "${ESA_USERNAME}"  # from environment
+  password: "${ESA_PASSWORD}"  # from environment
