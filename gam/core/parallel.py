@@ -272,3 +272,23 @@ def serial_fallback(func: Callable, *args: Any, **kwargs: Any) -> Any:
     """Fallback to serial execution."""
     logger.warning("Using serial fallback (no Dask)")
     return func(*args, **kwargs)
+
+
+def setup_dask_cluster(n_workers: int = 4) -> Client:
+    """
+    Setup and return a Dask client for the pipeline.
+
+    Initializes the global DaskCoordinator if not already done, and returns the client.
+
+    Args:
+        n_workers: Number of workers for local cluster.
+
+    Returns:
+        Dask Client instance.
+    """
+    global dask_coordinator
+    if dask_coordinator.client is None:
+        # Force init with updated n_workers if needed
+        dask_coordinator.n_workers = n_workers
+        dask_coordinator._init_from_config()
+    return dask_coordinator.client

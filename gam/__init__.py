@@ -92,7 +92,14 @@ from .modeling import (
     GravityInverter, MagneticInverter, SeismicInverter, InSARInverter,
     JointInverter, AnomalyDetector, MeshGenerator
 )
-from .visualization import VisualizationManager  # Assuming manager.py exports this
+try:
+    from .visualization import VisualizationManager
+except Exception as e:
+    if "GMT" in str(e):
+        VisualizationManager = None
+        log.warning("VisualizationManager not available due to missing GMT/PyGMT; visualization features disabled.")
+    else:
+        raise
 
 # Core utilities (config, exceptions, etc.)
 from .core.config import GAMConfig

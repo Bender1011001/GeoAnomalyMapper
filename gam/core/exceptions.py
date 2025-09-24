@@ -94,8 +94,27 @@ class InversionConvergenceError(ModelingError):
     """
     def __init__(self, message: str, model_type: str = "inversion", context: Optional[Dict[str, Any]] = None, cause: Optional[Exception] = None):
         super().__init__(message, model_type, context, cause)
+
+
+class ParallelProcessingError(GAMError):
+    """Raised for parallel processing errors (e.g., Dask task failures, cluster issues)."""
+    def __init__(self, message: str, task_id: str = "unknown", context: Optional[Dict[str, Any]] = None, cause: Optional[Exception] = None):
+        ctx = {"task_id": task_id}
+        if context:
+            ctx.update(context)
+        super().__init__(message, ctx, cause)
+
+
 # Re-export for convenience
 __all__ = [
-    'GAMError', 'PipelineError', 'IngestionError', 
-    'PreprocessingError', 'ModelingError', 'VisualizationError'
+    'GAMError', 'PipelineError', 'IngestionError',
+    'PreprocessingError', 'ModelingError', 'VisualizationError',
+    'ParallelProcessingError'
 ]
+class ConfigurationError(GAMError):
+    """Raised for configuration loading or validation errors."""
+    def __init__(self, message: str, key: str = "unknown", context: Optional[Dict[str, Any]] = None, cause: Optional[Exception] = None):
+        ctx = {"key": key}
+        if context:
+            ctx.update(context)
+        super().__init__(message, ctx, cause)

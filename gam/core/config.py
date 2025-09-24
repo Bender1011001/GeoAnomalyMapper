@@ -26,11 +26,20 @@ class ModalityConfig(BaseModel):
     preprocessing: Dict[str, Any] = field(default_factory=dict)
     modeling: Dict[str, Any] = field(default_factory=dict)
 
+
+@pydantic_dataclass
+class ParallelConfig:
+    """Configuration for parallel processing."""
+    backend: str = 'local'
+    n_workers: int = 4
+    memory_limit: Optional[str] = None  # e.g., '2GB'
+
+
 @pydantic_dataclass
 class GAMConfig:
     """
     Main configuration for GeoAnomalyMapper pipeline.
-
+    
     Loads from config.yaml with defaults for modalities, processing params, and paths.
     Validates required fields and types for safe pipeline execution.
     """
@@ -46,8 +55,7 @@ class GAMConfig:
     bbox: Optional[List[float]] = None  # [min_lat, max_lat, min_lon, max_lon]
     output_dir: str = './results'
     cache_dir: str = './cache'
-    use_parallel: bool = True
-    n_workers: int = 4
+    parallel: ParallelConfig = field(default_factory=ParallelConfig)
 
     # Data sources
     data_sources_path: str = 'data_sources.yaml'
@@ -70,10 +78,10 @@ class GAMConfig:
     def from_yaml(cls, config_path: Union[str, Path]) -> 'GAMConfig':
         """
         Load configuration from YAML file.
-
+        
         Args:
             config_path: Path to config.yaml.
-
+        
         Returns:
             GAMConfig instance with loaded and validated settings.
         """
@@ -107,10 +115,13 @@ class GAMConfig:
                 modalities[mod_name] = ModalityConfig(**mod_data)
             config_dict['modalities'] = modalities
 
+        # Handle nested ParallelConfig
+        if 'parallel' in data:
+            config_dict['parallel'] = ParallelConfig(**data['parallel'])
+
         config = cls(**config_dict)
         log.info(f"Configuration loaded from {config_path}")
         return config
-
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary for serialization."""
         return asdict(self)
@@ -138,3 +149,50 @@ def validate_config(config: GAMConfig) -> bool:
         raise ValueError("Invalid bbox format")
     log.info("Configuration validation passed")
     return True
+
+
+class ConfigManager:
+    """Singleton manager for GAM configuration.
+
+    Holds the current GAMConfig instance and provides access methods.
+    Initializes with defaults if no config file provided.
+    """
+    _instance = None
+
+    def __new__(cls) -> 'ConfigManager':
+        if cls._instance is None:
+            cls._instance = super(ConfigManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, 'initialized'):
+            self.current_config: Optional[GAMConfig] = None
+            self.initialized = True
+            self.load_default()
+
+    def load_default(self) -> None:
+        """Load default configuration."""
+        self.current_config = GAMConfig()
+
+    def load_from_file(self, config_path: Union[str, Path]) -> GAMConfig:
+        """Load configuration from file and set as current."""
+        self.current_config = GAMConfig.from_yaml(config_path)
+        validate_config(self.current_config)
+        log.info("Configuration loaded and validated")
+        return self.current_config
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get config value by dotted key (e.g., 'parallel.n_workers')."""
+        if not self.current_config:
+            raise ValueError("No current config loaded")
+        keys = key.split('.')
+        value = self.current_config
+        for k in keys:
+            value = getattr(value, k, None)
+            if value is None:
+                return default
+        return value
+
+
+# Global config manager instance
+config_manager = ConfigManager()
