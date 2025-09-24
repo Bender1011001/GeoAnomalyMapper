@@ -11,12 +11,22 @@ from requests.exceptions import Timeout, RequestException
 
 from obspy.clients.fdsn import Client as FDSNClient
 from obspy import UTCDateTime
+from sentinelsat import SentinelAPI, make_path_filter
+from shapely.geometry import box
+import zipfile
+import tempfile
+import shutil
+import hashlib
+from datetime import timedelta, date
+import rasterio
+from rasterio.windows import Window
 
 from .base import DataSource
 from .data_structures import RawData
 from .exceptions import (
     retry_fetch, rate_limit, DataFetchError, APITimeoutError
 )
+from .cache_manager import HDF5CacheManager
 
 
 logger = logging.getLogger(__name__)
@@ -346,11 +356,12 @@ class SeismicFetcher(DataSource):
 
 class InSARFetcher(DataSource):
     r"""
-    Placeholder fetcher for ESA Sentinel-1 InSAR data via SciHub API.
+    Fetcher for ESA Sentinel-1 InSAR data using Copernicus SciHub API.
 
-    This is a placeholder implementation. Full integration requires ESA API key
-    and handling of SAR product downloads (GRD/SLC). Once implemented, will
-    query for interferograms or DEMs within bbox.
+    Queries and downloads Sentinel-1 SLC products, extracts wrapped LOS displacement
+    from phase data as a basic proxy. Full interferometric processing (pair selection,
+    unwrapping) deferred to modeling stage. Integrates caching to avoid redundant
+    downloads. Supports bbox, date range filtering, VV polarization.
 
     Parameters
     ----------
@@ -359,66 +370,212 @@ class InSARFetcher(DataSource):
     Attributes
     ----------
     api_url : str
-        Base URL for Copernicus SciHub (DHuS API).
-    api_key : str or None
-        ESA API key from environment.
+        Base URL for Copernicus API Hub.
+    cache : HDF5CacheManager
+        Cache instance for storing processed data.
+    source : str
+        Data source name.
+    timeout : float
+        Download timeout in seconds (300s for large files).
+    wavelength : float
+        Sentinel-1 C-band wavelength in meters.
 
     Methods
     -------
     fetch_data(bbox, **kwargs)
-        Placeholder; raises NotImplementedError.
+        Fetch InSAR displacement data.
 
     Notes
     -----
-    API: https://scihub.copernicus.eu/dhus/search (OpenSearch format)
-    Requires authentication: Basic auth with username/password or API key.
-    Products are large; download and process with GDAL/snaphu.
-    Kwargs: 'start_date', 'end_date', 'product_type' (e.g., 'SLC').
-    Rate limited to API quotas.
+    API: https://apihub.copernicus.eu/apihub/ (SentinelAPI client)
+    Requires free Copernicus account (username/password via kwargs or env: ESA_USERNAME, ESA_PASSWORD).
+    Downloads SLC (~1-10GB); subsamples for efficiency. Returns wrapped LOS displacement
+    in meters (phase * lambda / 4pi); not unwrapped/true displacement.
+    Coords: Approximate WGS84 from raster transform (valid for small bbox).
+    Rate limited; retries on failure. Products filtered by bbox intersection, date, SLC/VV.
+    For GRD (amplitude only), set product_type='GRD' in kwargs (no phase).
 
-    Setup Instructions
-    -----------------
-    1. Register at https://scihub.copernicus.eu/ for account.
-    2. Set environment variable: export ESA_API_KEY='your_username:your_password'
-    3. Install: pip install requests sentinelsat (alternative client)
-    4. Full impl: Use sentinelsat to query/download, extract phase/displacement to xarray.
+    Setup
+    -----
+    1. Register at https://scihub.copernicus.eu/
+    2. Set env: export ESA_USERNAME='user' ESA_PASSWORD='pass'
+    3. Install: pip install .[geophysics] (includes sentinelsat, rasterio)
+    4. Usage: fetcher.fetch_data(bbox, start_date='2024-01-01', username='user', password='pass')
 
     Examples
     --------
     >>> fetcher = InSARFetcher()
-    >>> # data = fetcher.fetch_data((29.0, 31.0, 30.0, 32.0), start_date='2023-01-01')
+    >>> data = fetcher.fetch_data((29.0, 29.5, 31.0, 31.5), start_date='2024-01-01')
     """
 
     def __init__(self):
-        self.api_url = "https://scihub.copernicus.eu/dhus"
-        self.api_key = os.getenv('ESA_API_KEY')
-        if not self.api_key:
-            logger.warning("ESA_API_KEY not set; InSAR fetcher will not work")
+        self.api_url = "https://apihub.copernicus.eu/apihub/"
+        self.cache = HDF5CacheManager()
+        self.source = "ESA Sentinel-1"
+        self.timeout = 300.0
+        self.wavelength = 0.05546576  # C-band in meters
 
+    @retry_fetch(max_attempts=3)
+    @rate_limit(10)  # ESA quota ~10/min
     def fetch_data(self, bbox: Tuple[float, float, float, float], **kwargs) -> RawData:
         r"""
-        Placeholder for fetching InSAR data.
+        Fetch InSAR displacement data from ESA Sentinel-1.
 
-        Parameters
-        ----------
-        bbox : Tuple[float, float, float, float]
-            (min_lat, max_lat, min_lon, max_lon)
-        **kwargs : dict
-            Query params (e.g., dates, product_type)
+        Args:
+            bbox: (lat_min, lat_max, lon_min, lon_max)
+            start_date: ISO format date string (default: 30 days ago)
+            end_date: ISO format date string (default: today)
+            username: ESA Copernicus Hub username
+            password: ESA Copernicus Hub password
+            product_type: 'SLC' or 'GRD' (default: 'SLC' for phase)
 
-        Returns
-        -------
-        RawData
-            Not implemented.
+        Returns:
+            RawData object with InSAR displacement measurements (wrapped LOS in m)
 
-        Raises
-        ------
-        NotImplementedError
-            Always raised; implement per setup instructions.
+        Raises:
+            ValueError: Invalid bbox or missing credentials
+            DataFetchError: No products, download failure, processing error
+            APITimeoutError: Query/download timeout
         """
-        raise NotImplementedError(
-            "InSARFetcher is a placeholder. Set ESA_API_KEY and implement "
-            "query/download using sentinelsat or requests to SciHub API. "
-            "Expected values: xarray.Dataset of displacement/phase. "
-            "See class docstring for setup."
-        )
+        min_lat, max_lat, min_lon, max_lon = bbox
+        if not (min_lat < max_lat and min_lon < max_lon):
+            raise ValueError("Invalid bbox: min < max required")
+
+        # Date handling
+        today = date.today()
+        start_date = kwargs.get('start_date', (today - timedelta(days=30)).isoformat())
+        end_date = kwargs.get('end_date', today.isoformat())
+        product_type = kwargs.get('product_type', 'SLC')
+
+        # Credentials
+        username = kwargs.get('username') or os.getenv('ESA_USERNAME')
+        password = kwargs.get('password') or os.getenv('ESA_PASSWORD')
+        if not username or not password:
+            raise ValueError("ESA credentials required: provide username/password or set ESA_USERNAME/ESA_PASSWORD env vars")
+
+        # Cache key
+        key_str = f"{self.source}_{min_lat:.6f}_{max_lat:.6f}_{min_lon:.6f}_{max_lon:.6f}_{start_date}_{end_date}_{product_type}"
+        key = hashlib.md5(key_str.encode('utf-8')).hexdigest()
+
+        # Check cache
+        cached_data = self.cache.load_data(key)
+        if cached_data:
+            logger.info(f"Loaded cached InSAR data for key: {key}")
+            return cached_data
+
+        # Query API
+        api = SentinelAPI(username, password, self.api_url)
+        footprint = box(min_lon, min_lat, max_lon, max_lat).wkt
+        try:
+            products = api.query(
+                footprint,
+                date=(start_date, end_date),
+                platformname='Sentinel-1',
+                producttype=product_type,
+                polarisationmode='VV'
+            )
+            if not products:
+                raise DataFetchError(self.source, f"No {product_type} products found for bbox/date range")
+            # Select most recent
+            product_id = max(products, key=lambda k: products[k]['beginposition'])
+            product = products[product_id]
+        except Exception as e:
+            raise DataFetchError(self.source, f"Query failed: {str(e)}")
+
+        # Download
+        temp_dir = tempfile.mkdtemp()
+        try:
+            api.download(
+                [product_id],
+                directory_path=temp_dir,
+                checksum=True,
+                timeout=self.timeout
+            )
+            zip_path = os.path.join(temp_dir, f"{product_id}.zip")
+            if not os.path.exists(zip_path):
+                raise DataFetchError(self.source, "Download zip not found")
+
+            # Extract
+            extract_dir = tempfile.mkdtemp()
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(extract_dir)
+
+            # Find VV TIFF in measurement
+            tiff_path = None
+            for root, dirs, files in os.walk(extract_dir):
+                if 'measurement' in root:
+                    for file in files:
+                        if file.endswith('.tiff') and 'vv' in file.lower():
+                            tiff_path = os.path.join(root, file)
+                            break
+                    if tiff_path:
+                        break
+            if not tiff_path:
+                raise DataFetchError(self.source, "VV TIFF not found in SAFE archive")
+
+            # Process with rasterio
+            with rasterio.open(tiff_path) as src:
+                # Subsample for efficiency (1/20 size)
+                width = src.width // 20
+                height = src.height // 20
+                window = Window(0, 0, width, height)
+                data = src.read(1, window=window, masked=True)
+                if product_type == 'SLC':
+                    # Complex to phase, then LOS displacement (wrapped)
+                    phase = np.angle(data)
+                    disp = (phase * self.wavelength / (4 * np.pi)).filled(0)
+                else:  # GRD: amplitude as proxy (normalize to 0-1, scale to mm for consistency)
+                    amp = data.filled(0)
+                    disp = (amp / np.max(amp) * 1000).astype(np.float32)  # mm proxy
+
+                # Generate coords
+                rows, cols = np.meshgrid(np.arange(height), np.arange(width), indexing='ij')
+                lons, lats = rasterio.transform.xy(src.window_transform(window), rows.flatten(), cols.flatten())
+
+                # Filter to bbox
+                mask = (
+                    (np.array(lats) >= min_lat) & (np.array(lats) <= max_lat) &
+                    (np.array(lons) >= min_lon) & (np.array(lons) <= max_lon)
+                )
+                if not np.any(mask):
+                    raise DataFetchError(self.source, "No data points within bbox after filtering")
+
+                values = disp.flatten()[mask]
+                lats_filtered = np.array(lats)[mask]
+                lons_filtered = np.array(lons)[mask]
+
+            # Metadata
+            metadata = {
+                'source': self.source,
+                'timestamp': datetime.now(),
+                'bbox': bbox,
+                'parameters': {
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'product_type': product_type,
+                    'product_id': product_id
+                },
+                'lat': lats_filtered.tolist(),
+                'lon': lons_filtered.tolist(),
+                'acquisition_dates': [product['beginposition'], product['endposition']],
+                'processing_level': product_type,
+                'pass_direction': product['orbitdirection'],
+                'units': 'm' if product_type == 'SLC' else 'mm (amplitude proxy)',
+                'crs': 'EPSG:4326',
+                'note': 'Wrapped LOS displacement from single SLC phase (SLC) or amplitude proxy (GRD); full interferometry required for absolute displacement'
+            }
+
+            raw_data = RawData(metadata, values)
+            raw_data.validate()
+            self.cache.save_data(raw_data)
+            logger.info(f"Fetched InSAR data: {len(values)} points for bbox {bbox}, product {product_id}")
+            return raw_data
+
+        except requests.exceptions.Timeout:
+            raise APITimeoutError(self.source, self.timeout)
+        except Exception as e:
+            raise DataFetchError(self.source, f"Processing failed: {str(e)}")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            if 'extract_dir' in locals():
+                shutil.rmtree(extract_dir, ignore_errors=True)
