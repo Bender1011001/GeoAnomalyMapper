@@ -17,28 +17,7 @@ from urllib.parse import urljoin
 from typing import Dict, Optional, Tuple, List, Any
 from pathlib import Path
 
-import streamlit as st
-import folium
-from streamlit_folium import st_folium
-import folium.plugins
-from branca.element import Figure, Html, MacroElement
-import pandas as pd
-import numpy as np
-from scipy import interpolate
-import pyvista as pv
-from stpyvista import st_plotter as render_plotter
-from matplotlib import cm
-
-from .presets import get_all_presets, get_preset
-
-# Add GAM to path if running from project root
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-# API Configuration
-API_BASE_URL = os.getenv("GAM_API_URL", "http://localhost:8000")  # Configurable via GAM_API_URL env var for production deployment (fallback for local dev)
-API_TIMEOUT = 30  # seconds
-
-# Configure logging
+# Configure logging first
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -48,6 +27,49 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+import streamlit as st
+import folium
+from streamlit_folium import st_folium
+import folium.plugins
+from folium.plugins import HeatMap
+from branca.element import Figure, Html, MacroElement
+import pandas as pd
+import numpy as np
+from scipy import interpolate
+import pyvista as pv
+try:
+    import stpyvista.stpyvista as st_plotter
+    render_plotter = st_plotter.stpyvista
+except ImportError as e:
+    try:
+        # Try alternative import path
+        from stpyvista import stpyvista
+        render_plotter = stpyvista
+    except ImportError:
+        logger.warning(f"Failed to import stpyvista (error: {e}). 3D visualization features disabled. Install/upgrade stpyvista in your active environment for full support.")
+        render_plotter = None
+from matplotlib import cm
+
+try:
+    from .presets import get_all_presets, get_preset
+except ImportError:
+    # Handle case when running directly with Streamlit
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from presets import get_all_presets, get_preset
+
+# Global render_plotter for 3D viz (set in import block above)
+
+# Add GAM to path if running from project root
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from gam.core.exceptions import PipelineError, ConfigurationError
+from gam.api.main import run_analysis
+
+# API Configuration
+API_TIMEOUT = 30  # seconds
 
 
 def extract_anomalies(results_data: dict) -> list:
@@ -149,7 +171,8 @@ def create_anomaly_map(results_data: dict, bbox: tuple) -> folium.Map:
     
     for anomaly in anomalies:
         color = type_colors.get(anomaly['type'], 'gray')
-        size = max(8, int(anomaly['confidence'] * 20))  # Scale size by confidence
+        # Standardize marker size to reduce visual noise
+        marker_radius = 10  # fixed radius for consistency
         
         # Create popup HTML
         popup_html = f"""
@@ -166,30 +189,36 @@ def create_anomaly_map(results_data: dict, bbox: tuple) -> folium.Map:
         
         folium.CircleMarker(
             location=[anomaly['lat'], anomaly['lon']],
-            radius=size,
+            radius=marker_radius,
             popup=popup,
             color=color,
             fill=True,
             fillColor=color,
             fillOpacity=0.7,
-            weight=2
+            weight=1
         ).add_to(m)
     
     # Add layer control
     folium.LayerControl().add_to(m)
     
-    # Add simple legend
+    # Subtle single legend (reduced visual noise)
     legend_html = '''
-    <div style="position: fixed;
-                bottom: 50px; left: 50px; width: 150px; height: 120px;
-                background-color: white; border:2px solid grey; z-index:9999;
-                font-size:14px; padding: 10px">
-    <h4>Anomaly Types</h4>
-    <p><i class="fa fa-circle" style="color:blue"></i> Gravity</p>
-    <p><i class="fa fa-circle" style="color:orange"></i> Magnetic</p>
-    <p><i class="fa fa-circle" style="color:green"></i> InSAR</p>
-    <p><i class="fa fa-circle" style="color:purple"></i> Seismic</p>
-    <p><i class="fa fa-circle" style="color:red"></i> Fusion</p>
+    <div style="
+        position: fixed;
+        bottom: 12px; left: 12px; z-index: 9999;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    ">
+      <div style="font-weight:600; margin-bottom:6px;">Anomaly Types</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:blue;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Gravity</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:orange;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Magnetic</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:green;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>InSAR</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:purple;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Seismic</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:red;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Fusion</div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -232,21 +261,36 @@ def create_anomaly_heatmap(results_data: dict, bbox: tuple) -> folium.Map:
         weight = (anomaly['confidence'] * anomaly['intensity']) / (max_conf * max_intensity) if max_conf * max_intensity > 0 else 0
         heat_data.append([anomaly['lat'], anomaly['lon'], weight])
     
-    # Add heatmap
-    HeatMap(heat_data, gradient={0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'},
-            min_opacity=0.4, radius=15, blur=15).add_to(m)
+    # Add heatmap with perceptual Viridis gradient to improve contrast
+    viridis_colors = [cm.viridis(x) for x in np.linspace(0, 1, 6)]
+    def _rgba_to_hex(rgba):
+        r, g, b = [int(255 * c) for c in rgba[:3]]
+        return f'#{r:02x}{g:02x}{b:02x}'
+    viridis_gradient = {i/5: _rgba_to_hex(c) for i, c in enumerate(viridis_colors)}
+    HeatMap(heat_data, gradient=viridis_gradient, min_opacity=0.4, radius=15, blur=15).add_to(m)
     
     # Add layer control
     folium.LayerControl().add_to(m)
     
-    # Legend for heatmap
+    # Subtle single legend for heatmap (Viridis)
     heatmap_legend = '''
-    <div style="position: fixed;
-                bottom: 50px; right: 50px; width: 120px; height: 100px;
-                background-color: white; border:2px solid grey; z-index:9999;
-                font-size:12px; padding: 10px">
-    <h4>Heatmap Intensity</h4>
-    <p>Low <span style="background:linear-gradient(to right, blue, red); display:block; height:10px;"></span> High</p>
+    <div style="
+        position: fixed;
+        bottom: 12px; right: 12px; z-index: 9999;
+        background: rgba(255,255,255,0.85);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        min-width: 180px;
+    ">
+      <div style="font-weight:600; margin-bottom:6px;">Heat Intensity</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>Low</span>
+        <span style="flex:1;height:10px;display:block;background:linear-gradient(to right,#440154,#3b528b,#21918c,#5ec962,#fde725);border:1px solid rgba(0,0,0,0.1);"></span>
+        <span>High</span>
+      </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(heatmap_legend))
@@ -310,27 +354,38 @@ def create_anomaly_clusters(results_data: dict, bbox: tuple) -> folium.Map:
         """
         popup = folium.Popup(Html(popup_html, script=True), max_width=300)
         
-        folium.Marker(
+        folium.CircleMarker(
             location=[anomaly['lat'], anomaly['lon']],
+            radius=10,
             popup=popup,
-            icon=folium.Icon(color=color, icon='cloud')
+            color=color,
+            fill=True,
+            fillColor=color,
+            fillOpacity=0.7,
+            weight=1
         ).add_to(marker_cluster)
     
     # Add layer control
     folium.LayerControl().add_to(m)
     
-    # Legend same as individual map
+    # Subtle single legend (same as individual map)
     legend_html = '''
-    <div style="position: fixed;
-                bottom: 50px; left: 50px; width: 150px; height: 120px;
-                background-color: white; border:2px solid grey; z-index:9999;
-                font-size:14px; padding: 10px">
-    <h4>Anomaly Types</h4>
-    <p><i class="fa fa-circle" style="color:blue"></i> Gravity</p>
-    <p><i class="fa fa-circle" style="color:orange"></i> Magnetic</p>
-    <p><i class="fa fa-circle" style="color:green"></i> InSAR</p>
-    <p><i class="fa fa-circle" style="color:purple"></i> Seismic</p>
-    <p><i class="fa fa-circle" style="color:red"></i> Fusion</p>
+    <div style="
+        position: fixed;
+        bottom: 12px; left: 12px; z-index: 9999;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    ">
+      <div style="font-weight:600; margin-bottom:6px;">Anomaly Types</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:blue;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Gravity</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:orange;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Magnetic</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:green;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>InSAR</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:purple;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Seismic</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:red;margin-right:6px;border:1px solid rgba(0,0,0,0.1);"></span>Fusion</div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -535,8 +590,12 @@ def create_3d_isosurface_viewer(results_data: dict, bbox: tuple, threshold: floa
 
 def check_api_connection() -> bool:
     """Check if FastAPI backend is available."""
+    api_url = st.session_state.api_base_url
+    logger.info(f"Checking API connection to: {api_url}")
+    full_url = urljoin(api_url, "/")
+    logger.info(f"Full URL for check: {full_url}")
     try:
-        response = requests.get(urljoin(API_BASE_URL, "/"), timeout=5)
+        response = requests.get(full_url, timeout=5)
         response.raise_for_status()
         logger.info("API connection successful")
         return True
@@ -567,6 +626,10 @@ def start_analysis_job(
     Returns:
         job_id if successful, None otherwise
     """
+    api_url = st.session_state.api_base_url
+    logger.info(f"Starting analysis job using API base URL: {api_url}")
+    full_url = urljoin(api_url, "/analysis")
+    logger.info(f"Full POST URL for analysis: {full_url}")
     try:
         # Prepare request matching AnalysisRequest schema
         request_data = {
@@ -579,10 +642,11 @@ def start_analysis_job(
         logger.info(f"Starting job with bbox={bbox}, modalities={modalities}")
 
         response = requests.post(
-            urljoin(API_BASE_URL, "/analysis"),
+            full_url,
             json=request_data,
             timeout=API_TIMEOUT
         )
+        logger.info(f"API response status: {response.status_code}")
         response.raise_for_status()
         job_id = response.json()["job_id"]
         logger.info(f"Job started successfully: {job_id}")
@@ -601,9 +665,10 @@ def start_analysis_job(
 
 def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get the current status of a job."""
+    api_url = st.session_state.api_base_url
     try:
         response = requests.get(
-            urljoin(API_BASE_URL, f"/analysis/{job_id}/status"),
+            urljoin(api_url, f"/analysis/{job_id}/status"),
             timeout=API_TIMEOUT
         )
         response.raise_for_status()
@@ -629,9 +694,10 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
 
 def get_job_results(job_id: str) -> Optional[Dict[str, Any]]:
     """Get the results of a completed job."""
+    api_url = st.session_state.api_base_url
     try:
         response = requests.get(
-            urljoin(API_BASE_URL, f"/analysis/{job_id}/results"),
+            urljoin(api_url, f"/analysis/{job_id}/results"),
             timeout=API_TIMEOUT
         )
         if response.status_code == 425:
@@ -667,10 +733,11 @@ def initialize_session_state():
         'job_status': None,
         'job_progress': 0.0,
         'job_results': None,
-        'api_available': check_api_connection(),
+        'api_available': False,  # Will be set after URL config
         'is_running': False,
         'job_history': [],
         'last_poll_time': 0,
+        'job_start_time': None,  # For timeout enforcement
         'pipeline': None,  # For potential fallback
         'results': None,   # Legacy
         'status': "Ready",
@@ -678,44 +745,52 @@ def initialize_session_state():
         'modalities': [],
         'selected_preset': 'Custom Configuration',
         'preset_applied': False,
-        'preset_defaults': {}
+        'preset_defaults': {},
+        'api_base_url': os.getenv("GAM_API_URL", "http://localhost:8000")
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    # Initial API check after URL set
+    st.session_state.api_available = check_api_connection()
 
 
 def poll_job_status():
-    """Poll job status and update session state. Returns True if still running."""
+    """Fetch job status once and update session state.
+
+    Returns:
+        bool: True if job is still running, False otherwise.
+    """
     if not st.session_state.current_job_id or not st.session_state.is_running:
         return False
 
     job_id = st.session_state.current_job_id
     status_data = get_job_status(job_id)
     if not status_data:
+        # Treat missing status as terminal; avoid looping forever
         st.session_state.is_running = False
+        st.session_state.job_status = "UNKNOWN"
         return False
 
-    st.session_state.job_status = status_data['status']
-    st.session_state.job_progress = status_data['progress']
-    st.session_state.status = status_data['stage']  # For display
+    st.session_state.job_status = status_data.get('status')
+    st.session_state.job_progress = status_data.get('progress', 0.0)
+    st.session_state.status = status_data.get('stage', st.session_state.status)
 
-    if status_data['status'] == 'COMPLETED':
+    if st.session_state.job_status == 'COMPLETED':
         results = get_job_results(job_id)
         if results:
             st.session_state.job_results = results
-            st.session_state.is_running = False
-            # Add to history
-            if job_id not in st.session_state.job_history:
-                st.session_state.job_history.append(job_id)
-            st.rerun()
+        st.session_state.is_running = False
+        if job_id not in st.session_state.job_history:
+            st.session_state.job_history.append(job_id)
         return False
-    elif status_data['status'] == 'FAILED':
+
+    if st.session_state.job_status == 'FAILED':
         st.session_state.is_running = False
         st.error(f"Job failed: {status_data.get('message', 'Unknown error')}")
         return False
 
-    return True  # Still running
+    return True
 
 
 def retry_job_start():
@@ -748,154 +823,328 @@ def main():
     # Initialize session state
     initialize_session_state()
 
+    # Inject modern CSS theme (non-intrusive styling only)
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bg: #0B0F14;
+            --panel: #111827;
+            --text: #E5E7EB;
+            --muted: #9CA3AF;
+            --primary: #60A5FA;
+            --primary-600: #2563EB;
+            --border: rgba(255,255,255,0.08);
+
+            --spacing-1: 4px;
+            --spacing-2: 8px;
+            --spacing-3: 12px;
+            --spacing-4: 16px;
+            --spacing-5: 20px;
+            --spacing-6: 24px;
+            --spacing-8: 32px;
+
+            --font-base: 16px;
+            --line-height-base: 1.5;
+
+            --radius-card: 16px;
+            --radius-control: 8px;
+
+            --shadow-subtle: 0 1px 0 0 rgba(255,255,255,0.04), 0 0 0 1px rgba(0,0,0,0.6);
+            --transition: all 150ms ease-out;
+        }
+        html, body, .stApp {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: var(--font-base);
+            line-height: var(--line-height-base);
+            letter-spacing: -0.01em;
+        }
+        .block-container {
+            padding-top: var(--spacing-6);
+            padding-bottom: var(--spacing-6);
+        }
+        .page-shell {
+            max-width: 1280px;
+        }
+        /* Smooth transitions for dynamic UI elements */
+        [data-testid="stMetric"] {
+            transition: var(--transition);
+        }
+        [data-testid="stProgress"] {
+            transition: var(--transition);
+        }
+        .stButton > button {
+            transition: var(--transition);
+        }
+            margin: 0 auto;
+            padding: var(--spacing-6);
+        }
+        .card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: var(--spacing-5);
+            box-shadow: var(--shadow-subtle);
+        }
+        /* Buttons */
+        .stButton > button {
+            height: 40px;
+            padding: 0 1rem;
+            border-radius: var(--radius-control);
+            border: 1px solid transparent;
+            background-color: var(--primary);
+            color: rgba(0,0,0,0.9);
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        .stButton > button:hover:not(:disabled) {
+            background-color: var(--primary-600);
+            color: #FFF;
+        }
+        .stButton > button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        /* Inputs */
+        input[type="text"], input[type="number"], input[type="search"], textarea, select {
+            height: 40px;
+            border-radius: var(--radius-control);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            padding: 0 12px;
+            color: var(--text);
+            outline: none;
+            transition: var(--transition);
+        }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="search"]:focus, textarea:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(96,165,250,0.35);
+        }
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] { gap: 0.4rem; }
+        .stTabs [data-baseweb="tab"] {
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px 10px 0 0;
+            border: 1px solid var(--border);
+        }
+        /* Metrics */
+        [data-testid="stMetricDelta"] { font-weight: 600; }
+        /* Map container */
+        .map-container {
+            padding: var(--spacing-4);
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-subtle);
+        }
+        /* Headers */
+        h1, h2, h3 { letter-spacing: 0.2px; color: var(--text); }
+        /* Sidebar spacing */
+        [data-testid="stSidebar"] > div { padding-top: 0.5rem; }
+        /* Responsive tweaks */
+        @media (max-width: 768px) {
+            .page-shell { padding: var(--spacing-4); }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # API Connectivity Check and Warning
     if not st.session_state.api_available:
-        st.warning("""
-        🚨 **Backend API not available.** 
-        Start the FastAPI server: `uvicorn gam.api.main:app --reload` (port 8000)
+        st.warning(f"""
+        🚨 **Backend API not available at {st.session_state.api_base_url}.**
+        Start the FastAPI server on the specified port or update the API URL above.
         Async features disabled. Contact admin for sync fallback.
         """)
         st.session_state.is_running = False
-        # Optionally implement sync fallback here, but per task, just warn
 
-    # Sidebar: Parameter selection
-    st.sidebar.header("📍 Analysis Parameters")
+    # Sidebar: Essential controls only
+    st.sidebar.header("⚙️ Controls")
 
-    # Preset Selection
-    preset_options = ['Custom Configuration'] + list(get_all_presets().keys())
-    selected_preset = st.sidebar.selectbox(
-        "Analysis Preset",
-        options=preset_options,
-        index=0 if st.session_state.get('selected_preset') == 'Custom Configuration' else preset_options.index(st.session_state['selected_preset']),
-        help="Select a preset for common use cases or 'Custom Configuration' for manual setup."
+    # API URL Configuration (keep in sidebar)
+    api_url_input = st.sidebar.text_input(
+        "API Base URL",
+        value=st.session_state.api_base_url,
+        key="api_url_input",
+        help="Override the API endpoint (e.g., http://localhost:8001 for custom ports)"
     )
-    st.session_state.selected_preset = selected_preset
-
-    if selected_preset != 'Custom Configuration':
-        preset_config = get_preset(selected_preset)
-        if preset_config:
-            st.session_state.preset_applied = True
-            st.session_state.preset_defaults = preset_config
-            st.sidebar.info(f"**{preset_config['description']}**")
-            
-            with st.sidebar.expander("Preset Details", expanded=True):
-                st.markdown("**Typical Use Cases:**")
-                for case in preset_config['typical_use_cases']:
-                    st.markdown(f"• {case}")
-                st.info(f"**Recommended BBox Size:** {preset_config['typical_bbox_size']}")
-                st.info(f"**Analysis Focus:** {preset_config['analysis_focus']}")
-                st.markdown("**Note:** You can override any parameters below for customization.")
-        else:
-            st.session_state.preset_applied = False
-            st.sidebar.warning("Preset not found. Using custom configuration.")
-    else:
-        st.session_state.preset_applied = False
-        st.session_state.preset_defaults = {}
-
-    if selected_preset != st.session_state.get('last_preset', ''):
-        st.session_state.last_preset = selected_preset
+    if api_url_input != st.session_state.api_base_url:
+        st.session_state.api_base_url = api_url_input
+        st.session_state.api_available = check_api_connection()
         st.rerun()
 
-    # Interactive map for bbox selection (unchanged)
-    st.sidebar.subheader("🗺️ Region Selection")
-    m = folium.Map(
-        location=[30.0, 31.2],  # Giza default
-        zoom_start=8,
-        tiles="OpenStreetMap"
-    )
-    draw = folium.plugins.Draw(
-        export=False,
-        position='topleft',
-        draw_options={
-            'rectangle': {'shapeOptions': {'color': '#ff7800', 'weight': 2, 'fillOpacity': 0.3}},
-            'polyline': False, 'polygon': False, 'circle': False, 'marker': False, 'circlemarker': False
-        }
-    )
-    m.add_child(draw)
-    map_data = st_folium(m, width=300, height=250, key="bbox_map")
+    # PageShell wrapper
+    st.markdown('<div class="page-shell">', unsafe_allow_html=True)
+    # Tabs for clean workflow separation
+    tab_params, tab_analysis, tab_results = st.tabs([
+        "📁 Upload & Parameters",
+        "🚀 Analysis",
+        "📊 Results & Visualization"
+    ])
 
-    if map_data and 'last_active_drawing' in map_data:
-        drawing = map_data['last_active_drawing']
-        if drawing['geometry']['type'] == 'Rectangle':
-            bounds = drawing['geometry']['coordinates'][0]
-            min_lat, min_lon = min(bounds[0][0], bounds[1][0]), min(bounds[0][1], bounds[1][1])
-            max_lat, max_lon = max(bounds[0][0], bounds[1][0]), max(bounds[0][1], bounds[1][1])
-            bbox_str = f"{min_lon:.1f},{min_lat:.1f},{max_lon:.1f},{max_lat:.1f}"
+    # -------------------- Tab 1: Upload & Parameters --------------------
+    with tab_params:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        # Two-column layout: left (presets & region), right (parameters)
+        left, right = st.columns([1.1, 1])
+
+        with left:
+            st.subheader("📦 Presets")
+            preset_options = ['Custom Configuration'] + list(get_all_presets().keys())
+            selected_preset = st.selectbox(
+                "Analysis Preset",
+                options=preset_options,
+                index=0 if st.session_state.get('selected_preset') == 'Custom Configuration'
+                    else preset_options.index(st.session_state['selected_preset']),
+                help="Select a preset for common use cases or 'Custom Configuration' for manual setup."
+            )
+            st.session_state.selected_preset = selected_preset
+
+            if selected_preset != 'Custom Configuration':
+                preset_config = get_preset(selected_preset)
+                if preset_config:
+                    st.session_state.preset_applied = True
+                    st.session_state.preset_defaults = preset_config
+                    st.info(f"**{preset_config['description']}**")
+
+                    with st.expander("Preset Details", expanded=True):
+                        st.markdown("**Typical Use Cases:**")
+                        for case in preset_config['typical_use_cases']:
+                            st.markdown(f"• {case}")
+                        st.info(f"**Recommended BBox Size:** {preset_config['typical_bbox_size']}")
+                        st.info(f"**Analysis Focus:** {preset_config['analysis_focus']}")
+                        st.markdown("**Note:** You can override any parameters on the right.")
+                else:
+                    st.session_state.preset_applied = False
+                    st.warning("Preset not found. Using custom configuration.")
+            else:
+                st.session_state.preset_applied = False
+                st.session_state.preset_defaults = {}
+
+            if selected_preset != st.session_state.get('last_preset', ''):
+                st.session_state.last_preset = selected_preset
+                st.rerun()
+
+            st.subheader("🗺️ Region Selection")
+            with st.container():
+                m = folium.Map(
+                    location=[30.0, 31.2],  # Giza default
+                    zoom_start=8,
+                    tiles="OpenStreetMap"
+                )
+                draw = folium.plugins.Draw(
+                    export=False,
+                    position='topleft',
+                    draw_options={
+                        'rectangle': {'shapeOptions': {'color': '#ff7800', 'weight': 2, 'fillOpacity': 0.3}},
+                        'polyline': False, 'polygon': False, 'circle': False, 'marker': False, 'circlemarker': False
+                    }
+                )
+                m.add_child(draw)
+                st.markdown('<div class="map-container">', unsafe_allow_html=True)
+                map_data = st_folium(m, height=600, key="bbox_map", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            if map_data and 'last_active_drawing' in map_data:
+                drawing = map_data['last_active_drawing']
+                if drawing and drawing.get('geometry') and drawing['geometry'].get('type') == 'Rectangle':
+                    bounds = drawing['geometry']['coordinates'][0]
+                    min_lat, min_lon = min(bounds[0][0], bounds[1][0]), min(bounds[0][1], bounds[1][1])
+                    max_lat, max_lon = max(bounds[0][0], bounds[1][0]), max(bounds[0][1], bounds[1][1])
+                    bbox_str = f"{min_lon:.1f},{min_lat:.1f},{max_lon:.1f},{max_lat:.1f}"
+                    st.session_state.bbox_str = bbox_str
+                    st.success(f"Selected: {bbox_str}")
+
+            # Fallback bbox input
+            bbox_str = st.session_state.get('bbox_str', st.text_input(
+                "Bounding Box",
+                value="29.0,29.5,31.5,31.0",
+                help="min_lon,min_lat,max_lon,max_lat"
+            ))
             st.session_state.bbox_str = bbox_str
-            st.sidebar.success(f"Selected: {bbox_str}")
 
-    # Fallback bbox input
-    bbox_str = st.session_state.get('bbox_str', st.sidebar.text_input(
-        "Bounding Box",
-        value="29.0,29.5,31.5,31.0",
-        help="min_lon,min_lat,max_lon,max_lat"
-    ))
-    st.session_state.bbox_str = bbox_str
+            # Parse bbox
+            bbox = None
+            try:
+                bbox_parts = [float(p.strip()) for p in bbox_str.split(',')]
+                if len(bbox_parts) != 4:
+                    raise ValueError("Must have 4 values")
+                min_lon, min_lat, max_lon, max_lat = bbox_parts
+                bbox = (min_lon, min_lat, max_lon, max_lat)
+                st.session_state.bbox = bbox
+            except ValueError as e:
+                st.error(f"Invalid bbox: {e}")
 
-    # Parse bbox
-    bbox = None
-    try:
-        bbox_parts = [float(p.strip()) for p in bbox_str.split(',')]
-        if len(bbox_parts) != 4:
-            raise ValueError("Must have 4 values")
-        min_lon, min_lat, max_lon, max_lat = bbox_parts
-        bbox = (min_lon, min_lat, max_lon, max_lat)
-        st.session_state.bbox = bbox
-    except ValueError as e:
-        st.sidebar.error(f"Invalid bbox: {e}")
+        with right:
+            st.subheader("⚙️ Parameters")
+            # Modalities
+            preset_modalities_str = ','.join(
+                st.session_state.preset_defaults.get('default_modalities', ['gravity', 'magnetic'])
+            ) if st.session_state.preset_applied else "gravity,magnetic"
 
-    # Modalities
-    preset_modalities_str = ','.join(st.session_state.preset_defaults.get('default_modalities', ['gravity', 'magnetic'])) if st.session_state.preset_applied else "gravity,magnetic"
-    default_modal_str = st.sidebar.text_input(
-        "Modalities",
-        value=preset_modalities_str,
-        help="Comma-separated list of modalities (e.g., gravity,magnetic,insar,seismic)"
-    )
-    
-    # Override indicator
-    if st.session_state.preset_applied:
-        user_modalities = [m.strip() for m in default_modal_str.split(',') if m.strip()]
-        preset_mods = st.session_state.preset_defaults.get('default_modalities', [])
-        if set(user_modalities) != set(preset_mods):
-            st.sidebar.warning("🔧 Manual override: Modalities differ from preset recommendation")
-    
-    try:
-        selected_modalities = [m.strip() for m in default_modal_str.split(',') if m.strip()]
-        if not selected_modalities:
-            selected_modalities = ['gravity', 'magnetic']
-        st.session_state.modalities = selected_modalities
-    except:
-        selected_modalities = ['gravity', 'magnetic']
+            default_modal_str = st.text_input(
+                "Modalities",
+                value=preset_modalities_str,
+                help="Comma-separated list (e.g., gravity,magnetic,insar,seismic)"
+            )
 
-    # Resolution (logged, not passed to API per schema)
-    resolution = st.sidebar.slider(
-        "Grid Resolution (meters)",
-        min_value=100.0, max_value=5000.0, value=1000.0, step=100.0
-    )
+            # Override indicator
+            if st.session_state.preset_applied:
+                user_modalities = [m.strip() for m in default_modal_str.split(',') if m.strip()]
+                preset_mods = st.session_state.preset_defaults.get('default_modalities', [])
+                if set(user_modalities) != set(preset_mods):
+                    st.warning("🔧 Manual override: Modalities differ from preset recommendation")
 
-    # Output directory
-    output_dir = st.sidebar.text_input(
-        "Output Directory", value="results/dashboard"
-    )
+            try:
+                selected_modalities = [m.strip() for m in default_modal_str.split(',') if m.strip()]
+                if not selected_modalities:
+                    selected_modalities = ['gravity', 'magnetic']
+                st.session_state.modalities = selected_modalities
+            except:
+                selected_modalities = ['gravity', 'magnetic']
 
-    # Config file
-    config_path = st.sidebar.text_input(
-        "Config File", value="config.yaml"
-    ) if config_path != "config.yaml" else None
+            # Resolution (logged, not passed to API per schema)
+            resolution = st.slider(
+                "Grid Resolution (meters)",
+                min_value=100.0, max_value=5000.0, value=1000.0, step=100.0
+            )
 
-    # Verbose
-    verbose = st.sidebar.checkbox("Verbose Logging", value=False)
+            # Output directory
+            output_dir = st.text_input("Output Directory", value="results/dashboard")
 
-    # Job History in Sidebar
+            # Config file
+            config_file_input = st.text_input("Config File", value="config.yaml")
+            config_path = config_file_input if config_file_input != "config.yaml" else None
+
+            # Verbose
+            verbose = st.checkbox("Verbose Logging", value=False)
+
+            run_synchronously = st.checkbox("Run Synchronously (CLI-like, no API needed)", key="run_synchronously")
+            if run_synchronously:
+                st.warning("Sync mode blocks the UI until the analysis is complete. It is best used for small regions.")
+
+            with st.expander("Notes", expanded=False):
+                st.info("Use the sidebar 'Run Analysis' to start processing. Tabs separate configuration, progress, and results for clarity.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+    # Compute disabled state after parameters are defined
+    disabled = st.session_state.is_running or (not st.session_state.get('run_synchronously', False) and not st.session_state.api_available) or st.session_state.get('bbox') is None
+
+    # Job History in Sidebar (keep)
     with st.sidebar.expander("📋 Job History", expanded=False):
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         if st.session_state.job_history:
-            for job_id in st.session_state.job_history[-5:]:  # Last 5
+            for job_id in st.session_state.job_history[-5:]:
                 status_color = {"COMPLETED": "green", "FAILED": "red", "RUNNING": "orange"}.get(
                     st.session_state.job_status if job_id == st.session_state.current_job_id else "unknown", "gray"
                 )
                 st.markdown(f"**{job_id[:8]}...** : {status_color}")
                 if st.button(f"View Results {job_id[:8]}", key=f"view_{job_id}"):
-                    # Fetch and display results for historical job
                     results = get_job_results(job_id)
                     if results:
                         st.session_state.job_results = results
@@ -904,101 +1153,201 @@ def main():
         else:
             st.info("No completed jobs yet.")
 
-    # Run Button with Disable
-    disabled = st.session_state.is_running or not st.session_state.api_available or bbox is None
+        st.markdown('</div>', unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.info("**GeoAnomalyMapper v1.0.0**")
+    # Run Button (kept in sidebar)
     if st.sidebar.button("🚀 Run Analysis", type="primary", disabled=disabled):
-        if not st.session_state.api_available:
-            st.error("Cannot start job: API not available.")
-            st.stop()
+        if st.session_state.get('run_synchronously', False):
+            # Synchronous execution mimicking CLI
+            try:
+                bbox_tuple = st.session_state.get('bbox')
+                if not bbox_tuple:
+                    st.error("No bounding box selected for analysis.")
+                    st.stop()
 
-        job_id = start_analysis_job(
-            bbox=bbox,
-            modalities=selected_modalities,
-            resolution=resolution,
-            output_dir=output_dir,
-            config_path=config_path,
-            verbose=verbose
-        )
-        if job_id:
-            st.session_state.current_job_id = job_id
-            st.session_state.is_running = True
-            st.session_state.job_status = "QUEUED"
-            st.session_state.job_progress = 0.0
-            st.success(f"Analysis started! Job ID: {job_id}")
-            st.rerun()
+                bbox_str = f"{bbox_tuple[0]:.6f},{bbox_tuple[1]:.6f},{bbox_tuple[2]:.6f},{bbox_tuple[3]:.6f}"
+                output_path = Path(output_dir)
+                config_p = config_file_input if config_file_input and config_file_input != "config.yaml" else None
 
-    # Polling Loop for Progress
+                results = run_analysis(
+                    bbox_str=bbox_str,
+                    modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
+                    output_dir=output_path,
+                    config_path=config_p,
+                    verbose=verbose
+                )
+
+                # Collect output files for download
+                output_files = {}
+                for file_path in output_path.rglob('*'):
+                    if file_path.is_file():
+                        output_files[file_path.name] = str(file_path)
+
+                st.session_state.job_results = {'results': results, 'output_files': output_files}
+                job_id = f"sync_{int(time.time())}"
+                st.session_state.current_job_id = job_id
+                st.session_state.is_running = False
+                st.session_state.job_status = "COMPLETED"
+                st.session_state.job_progress = 1.0
+                # Sync jobs don't go to API history
+                st.success(f"Synchronous analysis completed successfully!")
+                st.rerun()
+
+            except (PipelineError, ConfigurationError) as e:
+                error_msg = f"Synchronous analysis failed: {str(e)}"
+                st.error(error_msg)
+                logger.error(error_msg)
+                st.session_state.is_running = False
+                st.session_state.job_status = "FAILED"
+
+            except Exception as e:
+                error_msg = f"Unexpected error in synchronous analysis: {str(e)}"
+                st.error(error_msg)
+                logger.error(error_msg, exc_info=True)
+                st.session_state.is_running = False
+                st.session_state.job_status = "FAILED"
+
+        else:
+            # Asynchronous execution via API
+            job_id = start_analysis_job(
+                bbox=st.session_state.get('bbox'),
+                modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
+                resolution=resolution,
+                output_dir=output_dir,
+                config_path=config_path,
+                verbose=verbose
+            )
+            if job_id:
+                st.session_state.current_job_id = job_id
+                st.session_state.is_running = True
+                st.session_state.job_status = "QUEUED"
+                st.session_state.job_progress = 0.0
+                st.session_state.job_start_time = time.time()  # Start timeout clock
+                st.success(f"Analysis started! Job ID: {job_id}")
+                st.rerun()
+
+    # Optimized polling: timer-based refresh every 5s without blocking sleep
     if st.session_state.is_running and st.session_state.api_available:
         current_time = time.time()
-        if current_time - st.session_state.last_poll_time >= 2:
-            if poll_job_status():
+        # Enforce 300s timeout
+        if st.session_state.job_start_time and (current_time - st.session_state.job_start_time > 300):
+            st.session_state.job_status = "FAILED"
+            st.session_state.is_running = False
+            st.session_state.job_progress = 0.0
+            st.error("Job timed out after 5 minutes. Please retry.")
+            st.session_state.job_start_time = None
+        elif current_time - st.session_state.last_poll_time >= 5:
+            if poll_job_status():  # Still running after poll
                 st.session_state.last_poll_time = current_time
-                time.sleep(2)  # Wait before next poll
-                st.rerun()
+                st.rerun()  # Trigger refresh to update placeholders
             else:
                 st.session_state.last_poll_time = current_time
+                # No rerun needed; terminal state will show on next interaction
 
-    # Retry Button if Failed
+    # Retry Button if Failed (keep in sidebar)
     if st.session_state.job_status == "FAILED" and not st.session_state.is_running:
         if st.sidebar.button("🔄 Retry Analysis", disabled=disabled):
             retry_job_start()
 
-    # Main Content Area
-    if st.session_state.current_job_id and st.session_state.api_available:
-        st.header("📊 Job Progress")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            status_color = {
-                "QUEUED": "orange", "RUNNING": "blue", "COMPLETED": "green", "FAILED": "red"
-            }.get(st.session_state.job_status, "gray")
-            st.metric("Status", st.session_state.job_status, delta=None, delta_color=status_color)
-        with col2:
-            st.metric("Progress", f"{st.session_state.job_progress * 100:.1f}%")
-            progress_bar = st.progress(st.session_state.job_progress)
-        with col3:
-            st.metric("Current Stage", st.session_state.status or "N/A")
+    # -------------------- Tab 2: Analysis --------------------
+    with tab_analysis:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        if st.session_state.current_job_id and st.session_state.api_available:
+            st.header("📊 Job Progress")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                status_placeholder = st.empty()
+                status_placeholder.metric("Status", st.session_state.job_status, delta=None)
+            with col2:
+                progress_metric_placeholder = st.empty()
+                progress_bar_placeholder = st.empty()
+                progress_metric_placeholder.metric("Progress", f"{st.session_state.job_progress * 100:.1f}%")
+                progress_bar_placeholder.progress(st.session_state.job_progress)
+            with col3:
+                stage_placeholder = st.empty()
+                stage_placeholder.metric("Current Stage", st.session_state.status or "N/A")
+            with col4:
+                st.empty()
 
-        if st.session_state.job_progress > 0:
-            st.info(f"Job ID: {st.session_state.current_job_id} | Estimated time remaining: ~{(1 - st.session_state.job_progress) * 10} min (approx)")
+            if st.session_state.job_progress > 0:
+                st.info(f"Job ID: {st.session_state.current_job_id} | Estimated time remaining: ~{(1 - st.session_state.job_progress) * 10:.1f} min (approx)")
+        else:
+            st.info("Use the sidebar to start an analysis. Progress will appear here.")
 
-    # Results Display
-    if st.session_state.job_results:
-        st.header("✅ Analysis Results")
-        results = st.session_state.job_results
+        st.markdown('</div>', unsafe_allow_html=True)
+    # -------------------- Tab 3: Results & Visualization --------------------
+    with tab_results:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        if st.session_state.job_results:
+            st.header("✅ Analysis Results")
+            results = st.session_state.job_results
 
-        # Key Metrics
-        col1, col2 = st.columns(2)
-        with col1:
-            anomaly_count = len(results.get('results', {}).get('anomalies', []))
-            st.metric("Anomaly Count", anomaly_count)
-        with col2:
-            # Processing time not directly available; approximate from history if needed
-            st.metric("Status", "Completed")
+            # Key Metrics
+            col1, col2 = st.columns(2)
+            with col1:
+                anomaly_count = len(results.get('results', {}).get('anomalies', []))
+                st.metric("Anomaly Count", anomaly_count)
+            with col2:
+                st.metric("Status", "Completed")
 
-        st.subheader("Output Files")
-        output_files = results.get('output_files', {})
-        for file_name, file_path in output_files.items():
-            if os.path.exists(file_path):
-                with open(file_path, "rb") as file:
-                    st.download_button(
-                        label=f"Download {file_name}",
-                        data=file.read(),
-                        file_name=file_name,
-                        mime="application/octet-stream"
-                    )
+            # Downloads
+            st.subheader("📦 Output Files")
+            output_files = results.get('output_files', {})
+            for file_name, file_path in output_files.items():
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as file:
+                        st.download_button(
+                            label=f"Download {file_name}",
+                            data=file.read(),
+                            file_name=file_name,
+                            mime="application/octet-stream",
+                            use_container_width=True
+                        )
+                else:
+                    st.warning(f"File {file_name} not found at {file_path}")
+
+            # Interactive Map Viewer (UI only; uses existing functions)
+            bbox = st.session_state.get('bbox')
+            if bbox:
+                st.subheader("🗺️ Interactive Map")
+                map_mode = st.radio("Map mode", options=["Markers", "Heatmap", "Clusters"], horizontal=True, index=0)
+                try:
+                    if map_mode == "Markers":
+                        fmap = create_anomaly_map(results, bbox)
+                    elif map_mode == "Heatmap":
+                        fmap = create_anomaly_heatmap(results, bbox)
+                    else:
+                        fmap = create_anomaly_clusters(results, bbox)
+                    st.markdown('<div class="map-container">', unsafe_allow_html=True)
+                    st_folium(fmap, height=600, use_container_width=True, key=f"results_map_{map_mode}")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                except Exception as e:
+                    st.warning(f"Map rendering issue: {e}")
             else:
-                st.warning(f"File {file_name} not found at {file_path}")
+                st.info("BBox not available for map rendering.")
 
-        # Raw Results
-        with st.expander("View Raw Results"):
-            st.json(results['results'])
+            # Raw Results
+            with st.expander("View Raw Results"):
+                st.json(results.get('results', {}))
 
-    elif st.session_state.results:  # Legacy sync results
-        st.header("📊 Legacy Results")
-        st.json(st.session_state.results)
-    else:
-        st.info("Run an analysis to see results here.")
+            # 3D Visualization (conditional on stpyvista)
+            if render_plotter is not None and bbox:
+                st.subheader("🧊 3D Anomaly Visualization")
+                with st.spinner("Generating 3D view..."):
+                    plotter = create_3d_volume_viewer(st.session_state.job_results, bbox)
+                    render_plotter(plotter, key="3d_volume")
+            elif render_plotter is None:
+                st.info("🔧 3D visualization disabled: stpyvista not available. Install via `pip install stpyvista` for interactive 3D views.")
 
+        elif st.session_state.results:  # Legacy sync results
+            st.header("📊 Legacy Results")
+            st.json(st.session_state.results)
+        else:
+            st.info("Run an analysis to see results here.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     # Footer
     st.markdown("---")
     st.markdown(
