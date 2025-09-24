@@ -2,10 +2,20 @@ from setuptools import setup, find_packages
 import os
 from pathlib import Path
 
-# Read requirements
+# Read requirements for core deps only (exclude optional sections)
 with open("requirements.txt", "r") as f:
     lines = f.readlines()
-    install_requires = [line.strip() for line in lines if line.strip() and not line.startswith("#") and not "gdal" in line.lower() and not any(test in line.lower() for test in ["pytest", "black", "flake8", "coverage", "sphinx"])]
+    install_requires = []
+    in_optional = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("# Optional:"):
+            in_optional = True
+            continue
+        if in_optional and not stripped.startswith("#"):
+            continue
+        if stripped and not stripped.startswith("#") and not "gdal" in stripped.lower() and not any(test in stripped.lower() for test in ["pytest", "black", "flake8", "coverage", "sphinx", "obspy", "streamlit", "pygmt", "pyvista", "fastapi", "uvicorn"]):
+            install_requires.append(stripped)
 
 # Extras for optional features and dev
 extras_require = {
@@ -28,9 +38,39 @@ extras_require = {
         "streamlit-folium>=0.17.0",
         "fastapi>=0.104.0",
         "uvicorn>=0.24.0",
+        "itkwidgets>=0.13.0",
+        "pyvistaqt>=0.11.0",
+        "stpyvista>=0.1.0",
+    ],
+    "gui": [
+        "streamlit>=1.28.0",
+        "streamlit-folium>=0.17.0",
+        "fastapi>=0.104.0",
+        "uvicorn>=0.24.0",
+        "pygmt>=0.12.0",
         "pyvista>=0.44.0",
+        "folium>=0.17.0",
         "itkwidgets>=0.13.0",
         "vtk>=9.3.0",
+        "pyvistaqt>=0.11.0",
+        "stpyvista>=0.1.0",
+    ],
+    "all": [
+        "simpeg>=0.21.0",
+        "obspy>=1.4.1",
+        "mintpy>=1.6.0",
+        "pygimli>=1.5.0",
+        "sentinelsat>=1.0.0",
+        "pygmt>=0.12.0",
+        "pyvista>=0.44.0",
+        "folium>=0.17.0",
+        "rasterio>=1.3.10",
+        "vtk>=9.3.0",
+        "streamlit>=1.28.0",
+        "streamlit-folium>=0.17.0",
+        "fastapi>=0.104.0",
+        "uvicorn>=0.24.0",
+        "itkwidgets>=0.13.0",
         "pyvistaqt>=0.11.0",
         "stpyvista>=0.1.0",
     ],

@@ -97,7 +97,7 @@ try:
 except Exception as e:
     if "GMT" in str(e):
         VisualizationManager = None
-        log.warning("VisualizationManager not available due to missing GMT/PyGMT; visualization features disabled.")
+        log.warning(f"VisualizationManager not available due to missing GMT/PyGMT: {str(e)}; visualization features disabled.")
     else:
         raise
 
