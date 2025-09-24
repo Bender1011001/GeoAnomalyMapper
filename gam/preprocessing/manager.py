@@ -19,7 +19,7 @@ from gam.preprocessing.filters import (
     NoiseFilter, BandpassFilter, OutlierFilter, SpatialFilter
 )
 from gam.preprocessing.gridding import RegularGridder, CoordinateAligner
-from gam.preprocessing.units import unit_converter
+from gam.preprocessing.units import converter as unit_converter
 
 
 logger = logging.getLogger(__name__)
