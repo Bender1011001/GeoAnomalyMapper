@@ -56,6 +56,8 @@ from .exceptions import (
     DataFetchError, CacheError, APITimeoutError
 )
 
+from .fetchers import retry_fetch
+
 __all__ = [
     'IngestionManager', 'RawData', 'HDF5CacheManager',
     'GravityFetcher', 'SeismicFetcher', 'MagneticFetcher', 'InSARFetcher',

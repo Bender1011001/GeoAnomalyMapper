@@ -18,7 +18,10 @@ from .config import GAMConfig
 from .exceptions import PipelineError
 from ..ingestion.manager import IngestionManager
 from ..preprocessing.manager import PreprocessingManager
-from ..modeling.manager import ModelingManager
+# Lazy import to avoid circular dependency
+def _get_modeling_manager():
+    from ..modeling.manager import ModelingManager
+    return ModelingManager
 from ..visualization.manager import VisualizationManager
 from .utils import validate_bbox
 from .parallel import setup_dask_cluster
@@ -126,7 +129,8 @@ class GAMPipeline:
 
             # Stage 3: Modeling
             log.info("Starting modeling stage")
-            inversion_results = self.modeling.invert(processed_data)
+            modeling_manager = _get_modeling_manager()(config=self.config)
+            inversion_results = modeling_manager.invert(processed_data)
 
             # Stage 4: Anomaly Detection & Fusion
             log.info("Starting anomaly detection")

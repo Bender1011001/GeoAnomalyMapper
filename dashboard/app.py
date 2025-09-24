@@ -25,7 +25,7 @@ import pandas as pd
 import numpy as np
 from scipy import interpolate
 import pyvista as pv
-from stpyvista import render_plotter
+from stpyvista import st_plotter as render_plotter
 from matplotlib import cm
 
 from .presets import get_all_presets, get_preset

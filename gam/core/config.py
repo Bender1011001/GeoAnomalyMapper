@@ -122,3 +122,19 @@ class GAMConfig:
         with open(path, 'w') as f:
             yaml.dump(self.to_dict(), f, default_flow_style=False)
         log.info(f"Configuration saved to {path}")
+
+
+def load_config(config_path: Union[str, Path]) -> GAMConfig:
+    """Load and validate configuration from YAML file."""
+    return GAMConfig.from_yaml(config_path)
+
+
+def validate_config(config: GAMConfig) -> bool:
+    """Validate the loaded configuration."""
+    # Basic validation: check required fields
+    if not config.modalities:
+        raise ValueError("No modalities configured")
+    if config.bbox and len(config.bbox) != 4:
+        raise ValueError("Invalid bbox format")
+    log.info("Configuration validation passed")
+    return True
