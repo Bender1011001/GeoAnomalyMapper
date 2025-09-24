@@ -1,4 +1,6 @@
 from setuptools import setup, find_packages
+import os
+from pathlib import Path
 
 # Read requirements
 with open("requirements.txt", "r") as f:
@@ -12,6 +14,7 @@ extras_require = {
         "obspy>=1.4.1",
         "mintpy>=1.6.0",
         "pygimli>=1.5.0",
+        "sentinelsat>=1.0.0",
     ],
     "visualization": [
         "pygmt>=0.12.0",
@@ -19,6 +22,17 @@ extras_require = {
         "folium>=0.17.0",
         "rasterio>=1.3.10",
         "vtk>=9.3.0",
+    ],
+    "dashboard": [
+        "streamlit>=1.28.0",
+        "streamlit-folium>=0.17.0",
+        "fastapi>=0.104.0",
+        "uvicorn>=0.24.0",
+        "pyvista>=0.44.0",
+        "itkwidgets>=0.13.0",
+        "vtk>=9.3.0",
+        "pyvistaqt>=0.11.0",
+        "stpyvista>=0.1.0",
     ],
     "dev": [
         "pytest>=8.3.0",
@@ -32,32 +46,19 @@ extras_require = {
     ],
 }
 
+# Read README for long_description
+this_directory = Path(__file__).parent
+with open(this_directory / "README.md", encoding="utf-8") as f:
+    long_description = f.read()
+
 setup(
     name="GeoAnomalyMapper",
     version="0.1.0",
     author="GeoAnomalyMapper Team",
-    author_email="team@example.com",  # Update with real
+    author_email="team@example.com",  # Update with real contact
     description="Geophysical data fusion for subsurface anomaly detection.",
-    long_description="""
-GeoAnomalyMapper (GAM) is an open-source Python package for integrating and analyzing geophysical datasets to detect subsurface anomalies. It supports gravity, magnetic, seismic, and InSAR data fusion through modular pipelines for ingestion, preprocessing, inversion modeling, and visualization.
-
-Key features:
-- Automated data fetching from USGS, IRIS, ESA with caching.
-- Multi-modal inversion and Bayesian fusion.
-- Parallel processing with Dask for global-scale analysis.
-- Interactive 2D/3D visualizations and exports (GeoTIFF, VTK, CSV).
-
-Installation:
-pip install GeoAnomalyMapper[geophysics,visualization]
-
-Usage:
-from gam import GAMPipeline
-pipeline = GAMPipeline()
-results = pipeline.run_analysis(bbox=(29,31,30,32), modalities=['gravity'])
-
-See README.md for full documentation and examples.
-""",
-    long_description_content_type="text/plain",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url="https://github.com/GeoAnomalyMapper/GAM",  # Update to real repo
     project_urls={
         "Documentation": "https://geoanomalymapper.readthedocs.io",
@@ -71,18 +72,24 @@ See README.md for full documentation and examples.
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
+        "Environment :: Console",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Typing :: Typed",
+        "Natural Language :: English",
         "Topic :: Scientific/Engineering :: GIS",
         "Topic :: Scientific/Engineering :: Physics",
         "Topic :: Scientific/Engineering :: Geoscience",
-        "Topic :: Software Development :: Testing",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Framework :: Matplotlib",
+        "Framework :: Jupyter",
     ],
-    keywords="geophysics, anomaly detection, inversion, data fusion, seismic, gravity, InSAR, GIS",
+    keywords="geophysics, anomaly detection, inversion, data fusion, seismic, gravity, InSAR, GIS, subsurface, earth science",
     license="MIT",
     license_files=["LICENSE"],
     entry_points={

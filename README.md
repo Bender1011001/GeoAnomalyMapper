@@ -11,8 +11,9 @@
 
 GeoAnomalyMapper (GAM) is an open-source Python toolkit designed for fusing publicly available geophysical datasets—including gravity, magnetic, seismic, and InSAR—to detect and map deep subsurface anomalies on a global scale. GAM leverages advanced data fusion and inversion techniques to construct probabilistic 3D subsurface models, starting from coarse resolutions and iteratively refining them as more data modalities are integrated.
 
-The core purpose of GAM is to democratize access to geophysical anomaly detection, enabling users to identify potential underground features such as voids, faults, mineral deposits, or archaeological structures without requiring expensive proprietary surveys. Key capabilities include:
+The core purpose of GAM is to democratize access to geophysical anomaly detection, enabling users—even those without coding expertise—to identify potential underground features such as voids, faults, mineral deposits, or archaeological structures without requiring expensive proprietary surveys. A standout feature is the intuitive **Streamlit web dashboard**, powered by a FastAPI backend, which provides a browser-based GUI for interactive analysis.
 
+Key capabilities include:
 - Automated ingestion from global public data sources (e.g., USGS, IRIS, ESA).
 - Multi-modal data fusion using Bayesian methods for robust anomaly scoring.
 - Scalable processing from local regions to global coverage via parallel tiling.
@@ -32,24 +33,60 @@ For a detailed system architecture, refer to the [Architecture Documentation](do
 ![Example Anomaly Map](docs/images/giza_anomaly_map.png)
 *Figure 2: Sample 2D anomaly map for the Giza region, highlighting potential subsurface voids.*
 
-## Key Features and Benefits
+## 🚀 Quick Start - Web Dashboard
 
-- **Multi-Modal Data Fusion**: Seamlessly integrate gravity, magnetic, seismic, and InSAR data for comprehensive subsurface analysis, reducing false positives through joint inversion.
-- **Global Scalability**: Process entire continents or the globe using Dask-based parallel tiling, with efficient memory management for large datasets.
-- **User-Friendly Interface**: Command-line (CLI) tools, Python API, and Jupyter notebooks for flexible usage across skill levels.
-- **Extensible Design**: Plugin system for adding new data sources, inversion algorithms, and visualization formats.
-- **Robust Performance**: Comprehensive testing (95%+ coverage), CI/CD integration, and performance benchmarks for reliable results.
-- **Open Science Focus**: All code, data pipelines, and outputs are designed for reproducibility and collaboration.
+Get started in seconds with the intuitive web dashboard—no coding required! The GUI makes GAM accessible to non-technical users like archaeologists and environmental scientists.
 
-Benefits include cost savings (no proprietary data needed), accelerated discovery in geosciences, and community-driven improvements through open-source contributions.
+1. Install GAM via pip:
+   ```bash
+   pip install geoanomalymapper
+   ```
+
+2. Launch the full system with one command:
+   ```bash
+   gam start
+   ```
+
+   This starts the FastAPI backend and Streamlit frontend concurrently. Your default browser will automatically open to the dashboard at **http://localhost:8501**.
+
+3. In the dashboard:
+   - Select an analysis preset (e.g., Archaeological Survey).
+   - Draw a bounding box on the interactive map to define your region of interest.
+   - Click "Run Analysis" to start processing with real-time progress updates.
+   - View interactive 2D maps, 3D visualizations, and export results.
+
+The dashboard handles data fetching, processing, and visualization seamlessly. For small regions, you'll see results in minutes!
+
+![Dashboard Screenshot](docs/images/dashboard_overview.png)
+*Figure 3: GAM Web Dashboard - Interactive map and preset selection interface.*
+
+## 🎛️ Dashboard Features
+
+The Streamlit dashboard is GAM's flagship interface, designed for ease of use and powerful functionality. Key features include:
+
+- **Interactive Maps**: Use Folium-powered maps to draw bounding boxes or select regions directly—no coordinates needed.
+- **Analysis Presets**: Pre-configured workflows for common use cases:
+  - Archaeological Survey: Optimized for detecting subsurface voids and structures.
+  - Environmental Monitoring: Focuses on fault lines and subsidence patterns.
+  - Resource Exploration: Targets mineral deposits and hydrocarbon indicators.
+  - Custom: Advanced users can tweak parameters.
+- **Real-time Progress Tracking**: Watch data ingestion, processing, and anomaly detection unfold with live updates and progress bars.
+- **2D Visualizations**: Interactive maps with markers, heatmaps, and clusters showing anomaly probabilities and fused data layers.
+- **3D Visualizations**: PyVista-based volume rendering for subsurface models, allowing rotation, slicing, and depth exploration.
+- **Export Capabilities**: Download results in CSV (tabular data), GeoTIFF (raster maps), VTK (3D meshes), and PDF reports.
+- **Job History and Result Management**: Save, load, and compare previous analyses; manage multiple jobs in a session.
+
+The workflow is simple: Select preset → Draw region → Run analysis → Explore and export results. All processing runs on your local machine, with options for parallel computation.
+
+For a guided tour, check the [Dashboard User Guide](docs/user/dashboard_guide.md).
 
 ## Installation Instructions
 
-GAM supports multiple installation methods tailored to different user types. We recommend Python 3.10+ and a virtual environment.
+GAM supports multiple installation methods. We recommend Python 3.10+ and a virtual environment. The dashboard requires no additional setup beyond the core installation.
 
-### For End-Users (Quick Setup via PyPI)
+### For End-Users (Quick Setup via PyPI - GUI Ready)
 
-Ideal for researchers or analysts running pre-built analyses.
+Ideal for researchers or analysts using the web dashboard.
 
 1. Create a virtual environment:
    ```bash
@@ -57,14 +94,15 @@ Ideal for researchers or analysts running pre-built analyses.
    source gam_env/bin/activate  # On Windows: gam_env\Scripts\activate
    ```
 
-2. Install via pip:
+2. Install via pip (includes Streamlit and FastAPI dependencies):
    ```bash
-   pip install geoanomalymapper
+   pip install geoanomalymapper[gui]
    ```
 
-3. Verify installation:
+3. Verify and start the GUI:
    ```bash
    gam --version
+   gam start  # Opens dashboard at http://localhost:8501
    ```
 
 ### For Developers and Contributors (From Source)
@@ -82,27 +120,28 @@ For those modifying code or extending functionality.
    conda create -n gam-dev python=3.12
    conda activate gam-dev
    pip install -r requirements-dev.txt  # Includes testing tools
+   pip install -e .[gui]  # Editable install with GUI support
    ```
 
-3. Install in editable mode:
+3. Start development dashboard:
    ```bash
-   pip install -e .
+   gam start --dev  # Enables hot-reload
    ```
 
 ### For Researchers (Conda Environment with Full Dependencies)
 
-For heavy geospatial processing.
+For heavy geospatial processing with GUI.
 
 1. Install Miniconda if needed, then:
    ```bash
    conda create -n gam-research -c conda-forge python=3.12 gdal obspy simpeg
    conda activate gam-research
-   pip install geoanomalymapper
+   pip install geoanomalymapper[gui]
    ```
 
 **System Requirements**:
 - **OS**: Linux/macOS (preferred); Windows via WSL.
-- **Hardware**: 16GB+ RAM, multi-core CPU; GPU optional for advanced inversions.
+- **Hardware**: 16GB+ RAM, multi-core CPU; GPU optional for 3D rendering.
 - **Storage**: 100GB+ for global data (use external drives or cloud caching).
 - **Dependencies**: See [requirements.txt](requirements.txt) for full list. Common issues: GDAL (use `conda install -c conda-forge gdal` if pip fails).
 
@@ -110,9 +149,21 @@ For troubleshooting, see [Installation Guide](docs/user/installation.md).
 
 ## Quick Start Guide
 
-Get started with GAM in minutes.
+### Using the Web Dashboard (Recommended)
 
-### Basic CLI Usage (Giza Pyramids Example)
+Follow the [Quick Start - Web Dashboard](#🚀-quick-start---web-dashboard) section above. The GUI abstracts complex steps, making it ideal for non-technical users.
+
+Example Workflow (Archaeological Survey):
+1. Launch: `gam start`
+2. Select "Archaeological Survey" preset.
+3. Draw a box around the Giza Pyramids on the map.
+4. Run analysis—watch real-time progress.
+5. Explore 2D heatmap of anomalies and 3D subsurface model.
+6. Export CSV of detected voids and GeoTIFF map.
+
+### Basic CLI Usage (Advanced Users)
+
+For scripted or automated workflows.
 
 1. Configure your run (optional; defaults work for small regions):
    Edit [config.yaml](config.yaml) or use CLI flags.
@@ -128,7 +179,7 @@ Get started with GAM in minutes.
    - Open `results/giza/anomaly_map.png` for a 2D visualization.
    - Explore `results/giza/anomalies.csv` for detected features.
 
-### Python API Example
+### Python API Example (Programmatic Use)
 
 ```python
 import yaml
@@ -156,18 +207,51 @@ For interactive tutorials, see [Quickstart Notebook](docs/tutorials/01_basic_ana
 
 ### Global Processing
 
-For worldwide analysis:
+For worldwide analysis via CLI:
 ```bash
 gam run --global --modalities all --tile-size 10 --parallel-workers 8 --output global_results/
 ```
 
-This tiles the Earth into 10° chunks and processes in parallel.
+This tiles the Earth into 10° chunks and processes in parallel. In the dashboard, use the "Global Mode" option for similar functionality.
 
 For more examples, see [User Guide](docs/user/user_guide.md) and [Tutorials](docs/tutorials/).
 
+## Examples & Use Cases
+
+### GUI-Based Examples
+
+1. **Archaeological Survey (Giza Pyramids)**:
+   - Preset: Archaeological
+   - Region: Draw around Giza (29.9°N, 31.1°E)
+   - Results: 2D map with void markers; 3D model showing potential chambers.
+   - Export: CSV coordinates for field teams.
+
+2. **Environmental Monitoring (California Fault Lines)**:
+   - Preset: Environmental
+   - Region: San Andreas area
+   - Results: Heatmap of subsidence; real-time InSAR fusion.
+   - Export: GeoTIFF for GIS integration.
+
+3. **Resource Exploration (Offshore Oil)**:
+   - Preset: Resource Exploration
+   - Region: Gulf of Mexico basin
+   - Results: 3D gravity anomaly volumes; cluster analysis.
+   - Export: VTK for seismic software.
+
+These examples demonstrate the complete workflow in the dashboard. For CLI equivalents, see the [Examples Documentation](docs/examples/).
+
+## CLI Documentation (Advanced)
+
+For power users needing automation:
+
+- `gam run [OPTIONS]`: Core analysis command.
+- `gam start [OPTIONS]`: Launch dashboard (primary entrypoint).
+- `gam config [OPTIONS]`: Manage configurations.
+- Full reference: [CLI Guide](docs/user/cli_reference.md).
+
 ## Detailed Documentation
 
-- **[User Documentation](docs/user/)**: Installation, quickstart, CLI reference, and workflows.
+- **[User Documentation](docs/user/)**: Dashboard guide, installation, quickstart, and workflows.
 - **[Developer Documentation](docs/developer/)**: API reference, architecture, contributing guidelines.
 - **[Configuration Guide](docs/configuration/)**: Full config options and data sources.
 - **[Examples & Use Cases](docs/examples/)**: Real-world applications in archaeology, exploration, etc.
@@ -200,7 +284,6 @@ BibTeX:
 ## Contributing
 
 We welcome contributions! See our [Contributing Guide](docs/developer/contributing.md) for details on:
-
 - Setting up the development environment.
 - Code style (PEP 8, Black formatter).
 - Writing tests (pytest) and documentation.
@@ -219,5 +302,4 @@ Before starting, discuss major changes via an issue. Follow our [Code of Conduct
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
 *Version 1.0.0 - Full implementation complete. For roadmap, see [ROADMAP.md](docs/ROADMAP.md).*

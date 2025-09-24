@@ -1,0 +1,37 @@
+# Include root files
+include LICENSE
+include README.md
+include requirements.txt
+include config.yaml
+include data_sources.yaml
+
+# Include documentation
+recursive-include docs *
+
+# Include deployment files
+recursive-include deployment *
+
+# Include monitoring configs
+recursive-include monitoring *
+
+# Include notebooks
+recursive-include notebooks *
+
+# Include scripts
+recursive-include scripts *
+
+# Include security scripts
+recursive-include security *
+
+# Include release scripts
+recursive-include release *
+
+# Exclude unnecessary files
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .pytest_cache
+global-exclude .git
+global-exclude .venv
+global-exclude tests
+global-exclude GeoAnomalyMapper.egg-info
+global-exclude *.egg-info
