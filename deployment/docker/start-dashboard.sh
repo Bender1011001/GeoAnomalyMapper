@@ -11,6 +11,7 @@ export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export GAM_API_URL="${GAM_API_URL:-http://localhost:8000}"
 export STREAMLIT_SERVER_PORT="${STREAMLIT_SERVER_PORT:-8501}"
 export STREAMLIT_SERVER_ADDRESS="${STREAMLIT_SERVER_ADDRESS:-0.0.0.0}"
+log "Starting dashboard with API_URL from environment: $GAM_API_URL"
 
 # Function to log messages
 log() {
@@ -21,18 +22,6 @@ log() {
 mkdir -p /app/results
 chmod 755 /app/results
 
-# Patch API_BASE_URL in dashboard/app.py to use environment variable
-# Replace hardcoded "http://localhost:8000" with dynamic value
-if grep -q "http://localhost:8000" /app/dashboard/app.py; then
-    log "Patching API_BASE_URL in dashboard/app.py to use GAM_API_URL: $GAM_API_URL"
-    sed -i "s|API_BASE_URL = \"http://localhost:8000\"|API_BASE_URL = os.getenv('GAM_API_URL', 'http://localhost:8000')|" /app/dashboard/app.py
-    # Also import os at top if not present (check and add)
-    if ! grep -q "import os" /app/dashboard/app.py; then
-        sed -i '13i import os' /app/dashboard/app.py
-    fi
-else
-    log "API_BASE_URL already configured or not hardcoded"
-fi
 
 # Mode-specific configuration
 if [ "$GAM_ENV" = "development" ] || [ "$GAM_ENV" = "dev" ]; then
@@ -40,7 +29,7 @@ if [ "$GAM_ENV" = "development" ] || [ "$GAM_ENV" = "dev" ]; then
     STREAMLIT_ARGS="--server.runOnSave true --logger.level debug --theme.base light"
 else
     log "Starting in production mode"
-    STREAMLIT_ARGS="--server.headless true --logger.level $LOG_LEVEL --theme.base dark --server.enableCORS false --server.enableXsrfProtection false"
+    STREAMLIT_ARGS="--server.headless true --logger.level $LOG_LEVEL --theme.base dark --server.enableCORS false"
 fi
 
 # Graceful shutdown trap

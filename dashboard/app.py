@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import requests
+from urllib.parse import urljoin
 from typing import Dict, Optional, Tuple, List, Any
 from pathlib import Path
 
@@ -34,7 +35,7 @@ from .presets import get_all_presets, get_preset
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # API Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("GAM_API_URL", "http://localhost:8000")  # Configurable via GAM_API_URL env var for production deployment (fallback for local dev)
 API_TIMEOUT = 30  # seconds
 
 # Configure logging
@@ -535,7 +536,7 @@ def create_3d_isosurface_viewer(results_data: dict, bbox: tuple, threshold: floa
 def check_api_connection() -> bool:
     """Check if FastAPI backend is available."""
     try:
-        response = requests.get(f"{API_BASE_URL}/", timeout=5)
+        response = requests.get(urljoin(API_BASE_URL, "/"), timeout=5)
         response.raise_for_status()
         logger.info("API connection successful")
         return True
@@ -578,7 +579,7 @@ def start_analysis_job(
         logger.info(f"Starting job with bbox={bbox}, modalities={modalities}")
 
         response = requests.post(
-            f"{API_BASE_URL}/analysis",
+            urljoin(API_BASE_URL, "/analysis"),
             json=request_data,
             timeout=API_TIMEOUT
         )
@@ -602,7 +603,7 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get the current status of a job."""
     try:
         response = requests.get(
-            f"{API_BASE_URL}/analysis/{job_id}/status",
+            urljoin(API_BASE_URL, f"/analysis/{job_id}/status"),
             timeout=API_TIMEOUT
         )
         response.raise_for_status()
@@ -630,7 +631,7 @@ def get_job_results(job_id: str) -> Optional[Dict[str, Any]]:
     """Get the results of a completed job."""
     try:
         response = requests.get(
-            f"{API_BASE_URL}/analysis/{job_id}/results",
+            urljoin(API_BASE_URL, f"/analysis/{job_id}/results"),
             timeout=API_TIMEOUT
         )
         if response.status_code == 425:

@@ -7,6 +7,7 @@ Provides the high-level GAMPipeline class for end-to-end anomaly mapping.
 """
 
 import logging
+import warnings
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,13 +17,6 @@ from dask.distributed import Client
 
 from .config import GAMConfig
 from .exceptions import PipelineError
-from ..ingestion.manager import IngestionManager
-from ..preprocessing.manager import PreprocessingManager
-# Lazy import to avoid circular dependency
-def _get_modeling_manager():
-    from ..modeling.manager import ModelingManager
-    return ModelingManager
-from ..visualization.manager import VisualizationManager
 from .utils import validate_bbox
 from .parallel import setup_dask_cluster
 
@@ -51,7 +45,11 @@ class GAMPipeline:
         config: Optional[GAMConfig] = None,
         use_dask: bool = True,
         n_workers: int = 4,
-        cache_dir: Optional[Path] = None
+        cache_dir: Optional[Path] = None,
+        ingestion_manager: Optional['IngestionManager'] = None,
+        preprocessing_manager: Optional['PreprocessingManager'] = None,
+        modeling_manager: Optional['ModelingManager'] = None,
+        visualization_manager: Optional['VisualizationManager'] = None
     ):
         """
         Initialize the pipeline.
@@ -62,8 +60,14 @@ class GAMPipeline:
             use_dask: Enable Dask for parallel processing.
             n_workers: Number of Dask workers.
             cache_dir: Directory for data caching.
+            ingestion_manager: Injected IngestionManager (optional; defaults to new instance).
+            preprocessing_manager: Injected PreprocessingManager (optional; defaults to new instance).
+            modeling_manager: Injected ModelingManager (optional; defaults to new instance).
+            visualization_manager: Injected VisualizationManager (optional; defaults to new instance).
         """
-        self.config = config or GAMConfig.from_yaml(config_path)
+        if config is None:
+            config = GAMConfig.from_yaml(config_path) if config_path else GAMConfig()
+        self.config = config
         self.use_dask = use_dask
         self.client: Optional[Client] = None
         self.cache_dir = cache_dir or Path("./cache")
@@ -73,13 +77,40 @@ class GAMPipeline:
             self.client = setup_dask_cluster(n_workers=n_workers)
             log.info(f"Dask client initialized with {n_workers} workers")
 
-        # Initialize managers
-        self.ingestion = IngestionManager(cache_dir=self.cache_dir)
-        self.preprocessing = PreprocessingManager(config=self.config)
-        self.modeling = ModelingManager(config=self.config)
-        self.visualization = VisualizationManager(config=self.config)
+        # Initialize managers with dependency injection
+        any_injected = False
+        if ingestion_manager is None:
+            self.ingestion = IngestionManager(cache_dir=self.cache_dir)
+        else:
+            self.ingestion = ingestion_manager
+            any_injected = True
 
-        log.info("GAMPipeline initialized")
+        if preprocessing_manager is None:
+            self.preprocessing = PreprocessingManager(config=self.config)
+        else:
+            self.preprocessing = preprocessing_manager
+            any_injected = True
+
+        if modeling_manager is None:
+            self.modeling = ModelingManager(config=self.config)
+        else:
+            self.modeling = modeling_manager
+            any_injected = True
+
+        if visualization_manager is None:
+            self.visualization = VisualizationManager(config=self.config)
+        else:
+            self.visualization = visualization_manager
+            any_injected = True
+
+        if not any_injected:
+            warnings.warn(
+                "Default manager creation is deprecated; inject managers for better modularity.",
+                DeprecationWarning
+            )
+            log.info("GAMPipeline initialized with default managers")
+        else:
+            log.info("GAMPipeline initialized with injected managers")
 
     def run_analysis(
         self,
@@ -129,8 +160,7 @@ class GAMPipeline:
 
             # Stage 3: Modeling
             log.info("Starting modeling stage")
-            modeling_manager = _get_modeling_manager()(config=self.config)
-            inversion_results = modeling_manager.invert(processed_data)
+            inversion_results = self.modeling.invert(processed_data)
 
             # Stage 4: Anomaly Detection & Fusion
             log.info("Starting anomaly detection")
