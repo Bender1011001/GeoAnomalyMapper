@@ -17,7 +17,7 @@ dask[complete]>=2024.8.0
 joblib>=1.4.0
 
 # Database and storage
-sqlalchemy>=2.0.0
+sqlalchemy>=1.4.0,<2.0.0
 h5py>=3.11.0
 
 # Geospatial (core, GDAL system dep recommended via conda)
@@ -46,3 +46,14 @@ sentinelsat>=1.0.0
 # coverage>=7.6.0
 # sphinx>=7.4.0
 # psutil>=6.0.0
+
+# Dashboard (pip install .[dashboard])
+streamlit>=1.28.0
+streamlit-folium>=0.17.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pyvista>=0.44.0  # 3D visualization
+itkwidgets>=1.0.0  # Jupyter/Streamlit 3D integration
+vtk>=9.3.0  # 3D rendering backend
+pyvistaqt>=0.11.0  # Qt backend support for PyVista
+stpyvista>=0.1.0  # Streamlit component for interactive PyVista rendering

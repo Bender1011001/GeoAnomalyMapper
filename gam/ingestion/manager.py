@@ -2,7 +2,7 @@
 """Main ingestion manager coordinating fetchers and caching for GAM."""
 
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -10,6 +10,7 @@ from .cache_manager import HDF5CacheManager
 from .fetchers import GravityFetcher, SeismicFetcher, MagneticFetcher, InSARFetcher
 from .data_structures import RawData
 from .exceptions import DataFetchError
+from .base import DataSource
 
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,6 @@ import logging
 
 try:
     from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_log
-    from tenacity._utils import get_logger
 except ImportError:
     raise ImportError("tenacity library is required for retry decorators. Install with: pip install tenacity")
 
@@ -194,7 +193,7 @@ def retry_fetch(max_attempts: int = 3, min_wait: float = 4.0, max_wait: float = 
     ...     pass
     """
 
-    tenacity_logger = get_logger(__name__)
+    tenacity_logger = logger
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)

@@ -33,14 +33,6 @@ import pandas as pd
 import h5py
 from unittest.mock import MagicMock, patch
 
-# GAM imports (assume installed in test env)
-from gam import (
-    GAMPipeline, IngestionManager, PreprocessingManager, ModelingManager, VisualizationManager,
-    RawData, ProcessedGrid, InversionResults, AnomalyOutput, HDF5CacheManager
-)
-from gam.core.config import GAMConfig
-from gam.ingestion.exceptions import DataFetchError
-
 # Set numpy seed for deterministic synthetic data
 np.random.seed(42)
 
@@ -55,12 +47,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="session")
-def test_bbox() -> tuple:
+def test_bbox():
     """Standard test bounding box (small region for quick processing)."""
     return (29.0, 31.0, 30.0, 32.0)  # lon_min, lon_max, lat_min, lat_max
 
 @pytest.fixture(scope="function")
-def synthetic_raw_data(request) -> RawData:
+def synthetic_raw_data(request):
+    from gam.ingestion.data_structures import RawData
     """
     Parametrized fixture for synthetic RawData across modalities.
     
@@ -115,7 +108,8 @@ def synthetic_raw_data(request) -> RawData:
     return RawData(values=dataset, metadata=metadata)
 
 @pytest.fixture(scope="function")
-def synthetic_raw_data_multi() -> Dict[str, RawData]:
+def synthetic_raw_data_multi():
+    from gam.ingestion.data_structures import RawData
     """Multi-modality synthetic data for fusion tests."""
     modalities = ['gravity', 'magnetic']
     data = {}
@@ -125,7 +119,7 @@ def synthetic_raw_data_multi() -> Dict[str, RawData]:
     return data
 
 @pytest.fixture(scope="function")
-def tmp_output_dir(tmp_path: Path) -> Path:
+def tmp_output_dir(tmp_path):
     """Temporary directory for test outputs (maps, exports)."""
     out_dir = tmp_path / "outputs"
     out_dir.mkdir()
@@ -133,7 +127,7 @@ def tmp_output_dir(tmp_path: Path) -> Path:
     # Cleanup not needed as tmp_path handles it
 
 @pytest.fixture(scope="session")
-def test_config() -> Dict[str, Any]:
+def test_config():
     """Standard test configuration as dict (mimics loaded YAML)."""
     return {
         'pipeline': {
@@ -162,7 +156,7 @@ def test_config() -> Dict[str, Any]:
     }
 
 @pytest.fixture(scope="session")
-def minimal_config() -> Dict[str, Any]:
+def minimal_config():
     """Minimal config for basic/single-modality tests."""
     base = test_config()
     base['pipeline']['modalities'] = ['gravity']
@@ -170,7 +164,7 @@ def minimal_config() -> Dict[str, Any]:
     return base
 
 @pytest.fixture(scope="session")
-def performance_config() -> Dict[str, Any]:
+def performance_config():
     """Config optimized for performance benchmarks (larger data, parallel)."""
     base = test_config()
     base['pipeline']['parallel_workers'] = 2
@@ -179,6 +173,7 @@ def performance_config() -> Dict[str, Any]:
 
 @pytest.fixture(scope="function")
 def mock_external_apis(monkeypatch):
+    from gam.ingestion.exceptions import DataFetchError
     """Mock external API calls to return synthetic data, avoiding network."""
     def mock_get(url, *args, **kwargs):
         if 'usgs' in url.lower():
@@ -210,14 +205,17 @@ def mock_external_apis(monkeypatch):
     yield
 
 @pytest.fixture(scope="function")
-def tmp_cache_dir(tmp_path: Path) -> Path:
+def tmp_cache_dir(tmp_path):
     """Temporary cache directory for HDF5 caching tests."""
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     yield cache_dir
 
 @pytest.fixture(scope="function")
-def mock_cache_manager(tmp_cache_dir: Path, monkeypatch):
+def mock_cache_manager(tmp_cache_dir, monkeypatch):
+    from gam.ingestion.cache_manager import HDF5CacheManager
+    from gam.ingestion.data_structures import RawData
+    import xarray as xr
     """Mock HDF5CacheManager to use tmp dir and return synthetic cached data."""
     def create_mock_manager():
         manager = HDF5CacheManager(cache_dir=str(tmp_cache_dir))
@@ -249,7 +247,7 @@ def mock_cache_manager(tmp_cache_dir: Path, monkeypatch):
     yield mock_mgr
 
 @pytest.fixture(scope="function")
-def sqlite_db(tmp_path: Path) -> sqlite3.Connection:
+def sqlite_db(tmp_path):
     """In-memory or tmp SQLite DB for testing exports/caching persistence."""
     db_path = tmp_path / "test_gam.db"
     conn = sqlite3.connect(db_path)

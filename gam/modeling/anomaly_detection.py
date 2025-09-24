@@ -13,7 +13,6 @@ from sklearn.cluster import DBSCAN
 from sklearn.neighbors import LocalOutlierFactor
 
 from gam.core.exceptions import GAMError
-from gam.modeling.anomaly_detection import AnomalyOutput  # Wait, circular; use from data_structures
 from gam.modeling.data_structures import AnomalyOutput
 from gam.preprocessing.data_structures import ProcessedGrid  # For coords if needed
 

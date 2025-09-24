@@ -1,0 +1,93 @@
+# Multi-stage Dockerfile for GAM Streamlit Dashboard
+# Optimized for production deployment with interactive 3D visualization
+
+# Stage 1: Builder
+FROM python:3.12-slim-bookworm AS builder
+
+# Install system dependencies for geospatial, visualization, and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    libspatialindex-dev \
+    libnetcdf-dev \
+    libhdf5-dev \
+    libpq-dev \
+    libssl-dev \
+    libffi-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Create and activate virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Upgrade pip and install build dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install Python dependencies including visualization extras
+WORKDIR /tmp/build
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir .[geophysics,visualization,dashboard]
+
+# Copy source code
+COPY . /app
+WORKDIR /app
+RUN pip install --no-cache-dir -e .
+
+# Stage 2: Runtime
+FROM python:3.12-slim-bookworm AS runtime
+
+# Install runtime system dependencies for geospatial and rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgdal31 \
+    libgeos-c1v5 \
+    libproj19 \
+    libspatialindex6v5 \
+    libnetcdf19 \
+    libhdf5-103 \
+    libpq5 \
+    libssl3 \
+    libffi8 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ca-certificates \
+    curl \
+    gdal-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+ENV VIRTUAL_ENV=/opt/venv
+COPY --from=builder /opt/venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Create non-root user
+RUN groupadd --gid 1000 gam && useradd --uid 1000 --gid 1000 -m gam
+RUN mkdir -p /app/results && chown -R gam:gam /app
+
+USER gam
+WORKDIR /app
+
+# Copy source code
+COPY --from=builder --chown=gam:gam /app .
+
+# Expose port
+EXPOSE 8501
+
+# Health check: Verify Streamlit is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8501/healthz || exit 1
+
+# Default command (overridden by docker-compose or scripts)
+CMD ["sh", "deployment/docker/start-dashboard.sh"]

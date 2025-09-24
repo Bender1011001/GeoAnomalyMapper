@@ -17,13 +17,13 @@ from simpeg import (
     directives,
     inversion,
     maps,
-    mesh,
     objective_function,
     optimization,
     regularization,
     simulation,
     utils,
 )
+from simpeg.meshes import TreeMesh
 from simpeg.potential_fields import gravity
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
@@ -96,7 +96,7 @@ class GravityInverter(Inverter):
     def __init__(self, base_density: float = 2000.0, g: float = 6.67e-11):
         self.base_density = base_density
         self.g = g
-        self.mesh: Optional[mesh.TreeMesh] = None
+        self.mesh: Optional[TreeMesh] = None
         self.survey: Optional[simulation.Gravity] = None
         self.inv: Optional[inversion.BaseInversion] = None
 
