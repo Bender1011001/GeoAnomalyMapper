@@ -16,6 +16,7 @@ import requests
 from urllib.parse import urljoin
 from typing import Dict, Optional, Tuple, List, Any
 from pathlib import Path
+import socket
 
 # Configure logging first
 logging.basicConfig(
@@ -70,6 +71,12 @@ from gam.api.main import run_analysis
 
 # API Configuration
 API_TIMEOUT = 30  # seconds
+
+
+def is_port_in_use(port: int) -> bool:
+    """Check if a port is in use on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
 
 def extract_anomalies(results_data: dict) -> list:
@@ -746,7 +753,9 @@ def initialize_session_state():
         'selected_preset': 'Custom Configuration',
         'preset_applied': False,
         'preset_defaults': {},
-        'api_base_url': os.getenv("GAM_API_URL", "http://localhost:8000")
+        'api_base_url': os.getenv("GAM_API_URL", "http://localhost:8000"),
+        'api_port': 8000,
+        'dashboard_port': 8501
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -978,6 +987,41 @@ def main():
         st.session_state.api_available = check_api_connection()
         st.rerun()
 
+    api_port = st.sidebar.number_input(
+        "API Port",
+        value=st.session_state.api_port,
+        min_value=1,
+        max_value=65535,
+        key="api_port_input",
+        help="Port for the FastAPI backend (default: 8000)"
+    )
+    dashboard_port = st.sidebar.number_input(
+        "Dashboard Port",
+        value=st.session_state.dashboard_port,
+        min_value=1,
+        max_value=65535,
+        key="dashboard_port_input",
+        help="Port for the Streamlit dashboard (default: 8501)"
+    )
+
+    if api_port != st.session_state.api_port:
+        st.session_state.api_port = api_port
+        st.session_state.api_base_url = f"http://localhost:{api_port}"
+        st.session_state.api_available = check_api_connection()
+        st.rerun()
+
+    if st.sidebar.button("Check Ports"):
+        api_in_use = is_port_in_use(api_port)
+        dashboard_in_use = is_port_in_use(dashboard_port)
+        if api_in_use:
+            st.sidebar.error(f"API Port {api_port}: In use")
+        else:
+            st.sidebar.success(f"API Port {api_port}: Available")
+        if dashboard_in_use:
+            st.sidebar.error(f"Dashboard Port {dashboard_port}: In use")
+        else:
+            st.sidebar.success(f"Dashboard Port {dashboard_port}: Available")
+
     # PageShell wrapper
     st.markdown('<div class="page-shell">', unsafe_allow_html=True)
     # Tabs for clean workflow separation
@@ -1154,78 +1198,78 @@ def main():
             st.info("No completed jobs yet.")
 
         st.markdown('</div>', unsafe_allow_html=True)
-st.sidebar.markdown("---")
-st.sidebar.info("**GeoAnomalyMapper v1.0.0**")
-    # Run Button (kept in sidebar)
+   st.sidebar.markdown("---")
+   st.sidebar.info("**GeoAnomalyMapper v1.0.0**")
+   # Run Button (kept in sidebar)
     if st.sidebar.button("🚀 Run Analysis", type="primary", disabled=disabled):
-        if st.session_state.get('run_synchronously', False):
-            # Synchronous execution mimicking CLI
-            try:
-                bbox_tuple = st.session_state.get('bbox')
-                if not bbox_tuple:
-                    st.error("No bounding box selected for analysis.")
-                    st.stop()
+    if st.session_state.get('run_synchronously', False):
+        # Synchronous execution mimicking CLI
+        try:
+            bbox_tuple = st.session_state.get('bbox')
+            if not bbox_tuple:
+                st.error("No bounding box selected for analysis.")
+                st.stop()
 
-                bbox_str = f"{bbox_tuple[0]:.6f},{bbox_tuple[1]:.6f},{bbox_tuple[2]:.6f},{bbox_tuple[3]:.6f}"
-                output_path = Path(output_dir)
-                config_p = config_file_input if config_file_input and config_file_input != "config.yaml" else None
+            bbox_str = f"{bbox_tuple[0]:.6f},{bbox_tuple[1]:.6f},{bbox_tuple[2]:.6f},{bbox_tuple[3]:.6f}"
+            output_path = Path(output_dir)
+            config_p = config_file_input if config_file_input and config_file_input != "config.yaml" else None
 
-                results = run_analysis(
-                    bbox_str=bbox_str,
-                    modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
-                    output_dir=output_path,
-                    config_path=config_p,
-                    verbose=verbose
-                )
-
-                # Collect output files for download
-                output_files = {}
-                for file_path in output_path.rglob('*'):
-                    if file_path.is_file():
-                        output_files[file_path.name] = str(file_path)
-
-                st.session_state.job_results = {'results': results, 'output_files': output_files}
-                job_id = f"sync_{int(time.time())}"
-                st.session_state.current_job_id = job_id
-                st.session_state.is_running = False
-                st.session_state.job_status = "COMPLETED"
-                st.session_state.job_progress = 1.0
-                # Sync jobs don't go to API history
-                st.success(f"Synchronous analysis completed successfully!")
-                st.rerun()
-
-            except (PipelineError, ConfigurationError) as e:
-                error_msg = f"Synchronous analysis failed: {str(e)}"
-                st.error(error_msg)
-                logger.error(error_msg)
-                st.session_state.is_running = False
-                st.session_state.job_status = "FAILED"
-
-            except Exception as e:
-                error_msg = f"Unexpected error in synchronous analysis: {str(e)}"
-                st.error(error_msg)
-                logger.error(error_msg, exc_info=True)
-                st.session_state.is_running = False
-                st.session_state.job_status = "FAILED"
-
-        else:
-            # Asynchronous execution via API
-            job_id = start_analysis_job(
-                bbox=st.session_state.get('bbox'),
+            results = run_analysis(
+                bbox_str=bbox_str,
                 modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
-                resolution=resolution,
-                output_dir=output_dir,
-                config_path=config_path,
+                output_dir=output_path,
+                config_path=config_p,
                 verbose=verbose
             )
-            if job_id:
-                st.session_state.current_job_id = job_id
-                st.session_state.is_running = True
-                st.session_state.job_status = "QUEUED"
-                st.session_state.job_progress = 0.0
-                st.session_state.job_start_time = time.time()  # Start timeout clock
-                st.success(f"Analysis started! Job ID: {job_id}")
-                st.rerun()
+
+            # Collect output files for download
+            output_files = {}
+            for file_path in output_path.rglob('*'):
+                if file_path.is_file():
+                    output_files[file_path.name] = str(file_path)
+
+            st.session_state.job_results = {'results': results, 'output_files': output_files}
+            job_id = f"sync_{int(time.time())}"
+            st.session_state.current_job_id = job_id
+            st.session_state.is_running = False
+            st.session_state.job_status = "COMPLETED"
+            st.session_state.job_progress = 1.0
+            # Sync jobs don't go to API history
+            st.success(f"Synchronous analysis completed successfully!")
+            st.rerun()
+
+        except (PipelineError, ConfigurationError) as e:
+            error_msg = f"Synchronous analysis failed: {str(e)}"
+            st.error(error_msg)
+            logger.error(error_msg)
+            st.session_state.is_running = False
+            st.session_state.job_status = "FAILED"
+
+        except Exception as e:
+            error_msg = f"Unexpected error in synchronous analysis: {str(e)}"
+            st.error(error_msg)
+            logger.error(error_msg, exc_info=True)
+            st.session_state.is_running = False
+            st.session_state.job_status = "FAILED"
+
+    else:
+        # Asynchronous execution via API
+        job_id = start_analysis_job(
+            bbox=st.session_state.get('bbox'),
+            modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
+            resolution=resolution,
+            output_dir=output_dir,
+            config_path=config_path,
+            verbose=verbose
+        )
+        if job_id:
+            st.session_state.current_job_id = job_id
+            st.session_state.is_running = True
+            st.session_state.job_status = "QUEUED"
+            st.session_state.job_progress = 0.0
+            st.session_state.job_start_time = time.time()  # Start timeout clock
+            st.success(f"Analysis started! Job ID: {job_id}")
+            st.rerun()
 
     # Optimized polling: timer-based refresh every 5s without blocking sleep
     if st.session_state.is_running and st.session_state.api_available:
