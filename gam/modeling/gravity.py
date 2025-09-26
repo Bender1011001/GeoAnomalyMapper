@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import numpy.typing as npt
+import rasterio
 from scipy.interpolate import RegularGridInterpolator
 
 import simpeg
@@ -25,6 +26,9 @@ from simpeg import (
 )
 from discretize import TreeMesh
 from simpeg.potential_fields import gravity
+
+from gam.core.utils import transform_coordinates, reverse_transform_coordinates
+from gam.core.config import get_config
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
 from gam.modeling.base import Inverter
@@ -148,6 +152,8 @@ class GravityInverter(Inverter):
             mask = ~np.isnan(observed)
             observed = observed[mask]
 
+        config = get_config()
+
         # Generate mesh
         mesh_config = kwargs.get('mesh_config', {'type': 'tree', 'hmin': 10.0, 'hmax': 1000.0})
         mesh_gen = MeshGenerator()
@@ -160,6 +166,12 @@ class GravityInverter(Inverter):
         source_field = gravity.sources.UniformBackgroundField(receiver_list=receiver_list)
         self.survey = simpeg.survey.Survey(source_field, receiver_list)
 
+        terrain_correction = kwargs.get('terrain_correction', bool(config.get('modeling', {}).get('gravity', {}).get('dem_path')) or 'topography' in data.ds.attrs)
+        if terrain_correction:
+            correction = self._compute_terrain_correction(data)
+            observed -= correction
+            logger.info("Terrain correction subtracted from observed gravity data.")
+
         simulation_obj = gravity.simulation.Simulation3DIntegral(
             survey=self.survey,
             mesh=self.mesh,
@@ -167,25 +179,32 @@ class GravityInverter(Inverter):
             indActive=active_cells,
         )
 
-        # Terrain correction if available
-        terrain_correction = kwargs.get('terrain_correction', 'topography' in data.ds.attrs)
-        if terrain_correction and 'topography' in data.ds.attrs:
-            topo = data.ds.attrs['topography']  # Assume np.ndarray of elevations
-            simulation_obj = self._add_terrain_correction(simulation_obj, topo)
+        observed_si = observed * 1e-5  # Convert mGal to m/s² for SimPEG consistency
+
+        # Observed data now terrain-corrected if applicable; forward uses flat datum
 
         # Data misfit
-        dmisfit = data_misfit.L2DataMisfit(simulation=simulation_obj, data=d.Data(dobs=observed))
-        # Relative error 5% or 0.1 mGal
-        dmisfit.relative_error = np.ones(len(observed)) * 0.05
-        dmisfit.absolute_error = np.ones(len(observed)) * 0.1
+        dmisfit = data_misfit.L2DataMisfit(simulation=simulation_obj, data=d.Data(dobs=observed_si))
+        # Relative error 5% or 0.1 mGal equivalent
+        dmisfit.relative_error = np.ones(len(observed_si)) * 0.05
+        dmisfit.absolute_error = np.ones(len(observed_si)) * (0.1 * 1e-5)
 
         # Regularization
         reg_params = kwargs.get('regularization', {'alpha_s': 1e-4, 'alpha_x': 1, 'alpha_y': 1, 'alpha_z': 1})
-        reg = regularization.WeightedLeastSquares(
-            mesh=self.mesh,
-            indActive=active_cells,
-            mapping=maps.IdentityMap(self.mesh),
-        )
+        reg_type = kwargs.get('regularization_type', config.get('modeling', {}).get('gravity', {}).get('regularization', 'l2'))
+        mapping = maps.IdentityMap(self.mesh)
+        if reg_type == 'l2':
+            reg = regularization.WeightedLeastSquares(
+                mesh=self.mesh,
+                indActive=active_cells,
+                mapping=mapping,
+            )
+        else:
+            reg = regularization.Sparse(
+                mesh=self.mesh,
+                indActive=active_cells,
+                mapping=mapping,
+            )
         reg.alpha_s = reg_params['alpha_s']
         reg.alpha_x = reg_params['alpha_x']
         reg.alpha_y = reg_params['alpha_y']
@@ -219,6 +238,10 @@ class GravityInverter(Inverter):
             directives.UpdateSensitivityWeights(),
             directives.UpdatePreconditioner(),
         ]
+        if reg_type == 'l1':
+            self.inv.directiveList.append(
+                directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1)
+            )
 
         # Run inversion
         m_rec = self.inv.run(m0)
@@ -249,6 +272,7 @@ class GravityInverter(Inverter):
                 'regularization': reg_params,
                 'max_iterations': kwargs.get('max_iterations', 20),
                 'terrain_correction': terrain_correction,
+                'regularization_type': reg_type,
             },
         }
 
@@ -299,16 +323,21 @@ class GravityInverter(Inverter):
         """Define active cells based on data extent and padding."""
         # Pad 10% for boundary effects
         pad = 0.1
-        xmin, xmax = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
-        ymin, ymax = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
+        lons_min, lons_max = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
+        lats_min, lats_max = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
+        # Approximate center for transformation
+        lon_center = (lons_min + lons_max) / 2
+        lat_center = (lats_min + lats_max) / 2
+        xmin, _ = transform_coordinates([lons_min], [lat_center])
+        xmax, _ = transform_coordinates([lons_max], [lat_center])
+        _, ymin = transform_coordinates([lon_center], [lats_min])
+        _, ymax = transform_coordinates([lon_center], [lats_max])
         zmin, zmax = 0, 5000  # Default depth range in meters
 
-        # Convert lat/lon to UTM/meters if needed (simplified; use pyproj in production)
-        # For demo, assume degrees ~ meters at equator
-        active = self.mesh.gridCC[:, 0] > xmin
-        active &= self.mesh.gridCC[:, 0] < xmax
-        active &= self.mesh.gridCC[:, 1] > ymin
-        active &= self.mesh.gridCC[:, 1] < ymax
+        active = self.mesh.gridCC[:, 0] > xmin[0]
+        active &= self.mesh.gridCC[:, 0] < xmax[0]
+        active &= self.mesh.gridCC[:, 1] > ymin[0]
+        active &= self.mesh.gridCC[:, 1] < ymax[0]
         active &= self.mesh.gridCC[:, 2] > -zmax
         active &= self.mesh.gridCC[:, 2] < -zmin
         return active
@@ -316,90 +345,122 @@ class GravityInverter(Inverter):
     def _get_locations(self, data: ProcessedGrid) -> npt.NDArray[np.float64]:
         """Extract observation locations from grid centers."""
         lons, lats = np.meshgrid(data.ds['lon'].values, data.ds['lat'].values)
-        locations = np.column_stack([lons.ravel(), lats.ravel(), np.zeros(len(lons.ravel()))])  # z=0
-        # Convert to meters (placeholder; implement full proj)
-        return locations * 111000  # Rough deg to m
+        lons_flat, lats_flat = lons.ravel(), lats.ravel()
+        x, y = transform_coordinates(lons_flat, lats_flat)
+        locations = np.column_stack([x, y, np.zeros(len(lons_flat))])  # z=0
+        return locations
 
-    def _add_terrain_correction(self, sim: simulation.Simulation3DIntegral, topo: np.ndarray) -> simulation.Simulation3DIntegral:
+    def _compute_terrain_correction(self, data: ProcessedGrid) -> npt.NDArray[np.float64]:
         """
-        Add terrain correction by updating active cells and topography for the simulation.
-    
-        Expected topo array shape: (nCy, nCx) or (nCx, nCy), where nCx = len(mesh.cell_centers_x),
-        nCy = len(mesh.cell_centers_y), representing z-elevations on the horizontal cell center grid.
-        Assumes ij indexing, with y increasing north, x east.
-    
-        When optional dependencies are missing (discretize.utils.surface2ind_topo), skips correction and logs info.
-    
-        Updates simulation attributes when supported:
-        - indActive: boolean mask for cells below the terrain surface.
-        - topography: (N, 3) array of surface points (x, y, z) on the grid.
+        Prism-based terrain correction using SimPEG.
+
+        Ingests a Digital Elevation Model (DEM) for the region via rasterio from
+        config['modeling']['gravity']['dem_path'] or uses existing data.attrs['topography'].
+        Uses prism-based calculation to compute the gravitational effect of topography
+        (cells above z=0 datum, below surface) at observation locations. Returns values
+        to subtract from observed gravity data for residual anomaly inversion on flat datum.
+
+        Leverages SimPEG's Simulation3DIntegral for efficient prism integration.
+        Assumes DEM in GeoTIFF format with CRS matching data (EPSG:4326 lat/lon).
+        Interpolates DEM to mesh cell centers via coordinate transform.
+
+        References:
+        - SimPEG documentation: potential_fields.gravity.Simulation3DIntegral
+        - Prism gravity formula: Nagy et al. (2000), "The gravitational potential and its derivatives..."
+        - Terrain correction in geophysics: standard Bouguer correction extension.
+
+        Returns
+        -------
+        np.ndarray
+            Terrain correction array (mGal, length matches observations).
         """
-        if self.mesh is None:
-            raise GAMError("Mesh must be initialized before applying terrain correction.")
-    
-        if not isinstance(topo, np.ndarray) or topo.ndim != 2:
-            logger.warning("Invalid topography data: must be 2D numpy array. Skipping terrain correction.")
-            return sim
-    
-        nCx = len(self.mesh.cell_centers_x)
-        nCy = len(self.mesh.cell_centers_y)
-        expected_shapes = [(nCy, nCx), (nCx, nCy)]
-        if topo.shape not in expected_shapes:
-            logger.warning(f"Topography shape {topo.shape} does not match mesh grid ({nCy}, {nCx}). Skipping.")
-            return sim
-    
-        # Normalize topo to (nCy, nCx) with ij indexing
-        if topo.shape == (nCx, nCy):
-            topo = topo.T
-    
-        try:
-            from discretize.utils import surface2ind_topo
-        except ImportError:
-            logger.info("Terrain correction skipped: optional dependencies (discretize) not available.")
-            return sim
-    
-        # Build surface grid points xyz (N, 3) where N = nCx * nCy
-        cell_centers_x = self.mesh.cell_centers_x
-        cell_centers_y = self.mesh.cell_centers_y
-        Y, X = np.meshgrid(cell_centers_y, cell_centers_x, indexing='ij')
-        xyz = np.column_stack([X.ravel(), Y.ravel(), topo.ravel()])  # x, y, z
-    
-        # For TreeMesh, interpolate topo to cell centers for surface2ind_topo
+        config = get_config()
+        dem_path = config.get('modeling', {}).get('gravity', {}).get('dem_path')
+
+        topo = data.ds.attrs.get('topography')
+        if topo is None and dem_path:
+            try:
+                with rasterio.open(dem_path) as src:
+                    elev = src.read(1)
+                    # Assume 2D array matching data grid shape (n_lat, n_lon)
+                    if elev.ndim == 2 and elev.shape == (len(data.ds['lat']), len(data.ds['lon'])):
+                        topo = elev
+                    else:
+                        logger.warning(f"DEM shape {elev.shape} does not match data grid {(len(data.ds['lat']), len(data.ds['lon']))}; skipping load.")
+                        topo = None
+            except ImportError:
+                logger.warning("rasterio not installed; cannot load DEM. Install with 'pip install rasterio'.")
+                topo = None
+            except Exception as e:
+                logger.warning(f"Failed to load DEM from {dem_path}: {e}")
+                topo = None
+
+        if topo is None:
+            logger.warning("No valid topography data; returning zero correction.")
+            n_obs = len(self.survey.receiver_list[0].locations)
+            return np.zeros(n_obs)
+
+        # Determine UTM zone from data mean longitude
+        mean_lon = data.ds['lon'].mean()
+        utm_zone = int((mean_lon + 180) / 6) + 31
+        if mean_lon < 0:
+            utm_zone -= 1
+
+        # Transform mesh cell centers (x, y) back to (lon, lat)
+        cell_xy = self.mesh.gridCC[:, :2]  # (nC, 2) x, y in UTM
+        lons_cell, lats_cell = reverse_transform_coordinates(cell_xy[:, 0], cell_xy[:, 1], source_crs=f"EPSG:326{utm_zone}")
+
+        # Create interpolator for topo on lat/lon grid (ij indexing: lat rows, lon cols)
         interp_topo = RegularGridInterpolator(
-            (cell_centers_y, cell_centers_x),  # y, x for ij
+            (data.ds['lat'].values, data.ds['lon'].values),
             topo,
             method='linear',
             bounds_error=False,
-            fill_value=np.nan
+            fill_value=0.0  # Default to sea level
         )
-    
-        # Cell centers xy: gridCC[:, 0:2] is x,y
-        cell_xy = self.mesh.gridCC[:, :2]  # (nC, 2) x, y
-        cell_yx = cell_xy[:, [1, 0]]  # y, x for interp
-        h = interp_topo(cell_yx)
-    
-        # Extrapolate NaN with max topo (simple robust fill)
-        if np.any(np.isnan(h)):
-            logger.warning("Some cell centers outside topo grid; extrapolating with max elevation.")
-            h = np.nan_to_num(h, nan=np.nanmax(topo))
-    
-        # Compute active cells below surface
-        ind_active = surface2ind_topo(self.mesh, h=h, actv=None)
-    
-        # Resiliently update active cells
-        if hasattr(sim, "indActive"):
-            sim.indActive = ind_active
-        elif hasattr(sim, "set_indActive"):
-            sim.set_indActive(ind_active)
-    
-        # Resiliently set topography
-        if hasattr(sim, "topography"):
-            sim.topography = xyz
-        elif hasattr(sim, "set_topography"):
-            sim.set_topography(xyz)
-    
-        logger.info("Terrain correction applied (active cells updated).")
-        return sim
+
+        # Interpolate heights to cell centers
+        h = interp_topo((lats_cell, lons_cell))
+
+        # Handle any NaN (extrapolate to 0)
+        h = np.nan_to_num(h, nan=0.0)
+
+        # Identify terrain cells: below topo surface AND above datum (z > 0)
+        try:
+            from discretize.utils import surface2ind_topo
+            ind_below_topo = surface2ind_topo(self.mesh, h=h, actv=None)
+        except ImportError:
+            logger.warning("discretize.utils.surface2ind_topo not available; skipping.")
+            n_obs = len(self.survey.receiver_list[0].locations)
+            return np.zeros(n_obs)
+
+        ind_terrain = ind_below_topo & (self.mesh.gridCC[:, 2] > 0)
+        n_terrain = np.sum(ind_terrain)
+
+        if n_terrain == 0:
+            logger.info("No terrain cells above datum; zero correction.")
+            n_obs = len(self.survey.receiver_list[0].locations)
+            return np.zeros(n_obs)
+
+        # Terrain simulation: prisms with base density
+        sim_terrain = gravity.simulation.Simulation3DIntegral(
+            survey=self.survey,
+            mesh=self.mesh,
+            rhoMap=maps.IdentityMap(self.mesh),
+            indActive=ind_terrain,
+        )
+
+        # Uniform density model for terrain prisms
+        m_terrain = np.full(n_terrain, self.base_density)
+
+        # Compute vertical gravity effect (gz)
+        correction = sim_terrain.dpred(m_terrain)
+
+        # Scale to mGal (SimPEG outputs in m/s²)
+        correction *= 1e5
+
+        logger.info(f"Terrain correction computed: {n_terrain} prisms, range [{correction.min():.2f}, {correction.max():.2f}] mGal")
+        return correction
 
     def _estimate_uncertainty(self, m_rec: npt.NDArray[np.float64], inv: inversion.BaseInversion) -> npt.NDArray[np.float64]:
         """Approximate uncertainty from inversion statistics."""

@@ -8,7 +8,7 @@ Provides the high-level GAMPipeline class for end-to-end anomaly mapping.
 
 import logging
 import warnings
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,7 +119,8 @@ class GAMPipeline:
         output_dir: str = "./results",
         use_cache: bool = True,
         global_mode: bool = False,
-        tiles: int = 10
+        tiles: int = 10,
+        progress_callback: Optional[Callable[[str, float], None]] = None
     ) -> PipelineResults:
         """
         Run the full anomaly detection pipeline.
@@ -143,49 +144,56 @@ class GAMPipeline:
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
 
-        try:
-            # Stage 1: Ingestion
-            log.info("Starting ingestion stage")
-            raw_data = self.ingestion.fetch_multiple(
-                modalities=modalities,
-                bbox=bbox,
-                use_cache=use_cache,
-                global_mode=global_mode,
-                tiles=tiles
-            )
+        # Stage 1: Ingestion
+        log.info("Starting ingestion stage")
+        if progress_callback:
+            progress_callback("Ingestion", 0.2)
+        raw_data = self.ingestion.fetch_multiple(
+            modalities=modalities,
+            bbox=bbox,
+            use_cache=use_cache,
+            global_mode=global_mode,
+            tiles=tiles
+        )
 
-            # Stage 2: Preprocessing
-            log.info("Starting preprocessing stage")
-            processed_data = self.preprocessing.process(raw_data)
+        # Stage 2: Preprocessing
+        log.info("Starting preprocessing stage")
+        if progress_callback:
+            progress_callback("Preprocessing", 0.4)
+        processed_data = self.preprocessing.process(raw_data)
 
-            # Stage 3: Modeling
-            log.info("Starting modeling stage")
-            inversion_results = self.modeling.invert(processed_data)
+        # Stage 3: Modeling
+        log.info("Starting modeling stage")
+        if progress_callback:
+            progress_callback("Modeling (Inversion)", 0.6)
+        inversion_results = self.modeling.invert(processed_data)
 
-            # Stage 4: Anomaly Detection & Fusion
-            log.info("Starting anomaly detection")
-            anomalies = self.modeling.detect_anomalies(inversion_results)
+        # Stage 4: Anomaly Detection & Fusion
+        log.info("Starting anomaly detection")
+        if progress_callback:
+            progress_callback("Anomaly Detection", 0.8)
+        anomalies = self.modeling.detect_anomalies(inversion_results)
 
-            # Stage 5: Visualization
-            log.info("Starting visualization stage")
-            visualizations = self.visualization.generate(
-                processed_data, inversion_results, anomalies, output_dir=output_dir
-            )
+        # Stage 5: Visualization
+        log.info("Starting visualization stage")
+        if progress_callback:
+            progress_callback("Visualization", 0.9)
+        visualizations = self.visualization.generate(
+            processed_data, inversion_results, anomalies, output_dir=output_dir
+        )
+        if progress_callback:
+            progress_callback("Finished", 1.0)
 
-            results = PipelineResults(
-                raw_data=raw_data,
-                processed_data=processed_data,
-                inversion_results=inversion_results,
-                anomalies=anomalies,
-                visualizations=visualizations
-            )
+        results = PipelineResults(
+            raw_data=raw_data,
+            processed_data=processed_data,
+            inversion_results=inversion_results,
+            anomalies=anomalies,
+            visualizations=visualizations
+        )
 
-            log.info(f"Pipeline completed successfully. Detected {len(anomalies)} anomalies.")
-            return results
-
-        except Exception as e:
-            log.error(f"Pipeline failed: {e}")
-            raise PipelineError(f"Pipeline execution failed: {str(e)}") from e
+        log.info(f"Pipeline completed successfully. Detected {len(anomalies)} anomalies.")
+        return results
 
     def close(self):
         """Close Dask client if active."""

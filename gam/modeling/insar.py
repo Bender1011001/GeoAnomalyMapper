@@ -16,6 +16,8 @@ from gam.modeling.data_structures import InversionResults
 from gam.modeling.mesh import MeshGenerator  # Assumed available
 from gam.preprocessing.data_structures import ProcessedGrid
 
+from gam.core.utils import transform_coordinates, reverse_transform_coordinates
+
 PYCOULOMB_AVAILABLE = False
 try:
     from PyCoulomb import coulomb_collections as cc
@@ -277,8 +279,10 @@ class InSARInverter(Inverter):
         if not np.any(mask):
             raise GAMError("No valid LOS data")
         los_disp = los_disp[mask]
-        obs_xy = np.column_stack([data.ds['lon'][mask].ravel() * 111000,  # deg to m approx
-                                  data.ds['lat'][mask].ravel() * 111000 * np.cos(np.deg2rad(data.ds['lon'].mean()))])
+        lons_masked = data.ds['lon'][mask].ravel()
+        lats_masked = data.ds['lat'][mask].ravel()
+        obs_x, obs_y = transform_coordinates(lons_masked, lats_masked)
+        obs_xy = np.column_stack([obs_x, obs_y])
         
         # Radar geometry
         inc = kwargs.get('inc', data.ds.attrs.get('incidence', 0.3))  # rad
@@ -349,17 +353,40 @@ class InSARInverter(Inverter):
 
         # 3D model (delta at source)
         model_3d = np.zeros((len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth'])))
-        # Find grid index for source
-        src_x_idx = np.argmin(np.abs(data.ds['lon'].values * 111000 - params[0]))
-        src_y_idx = np.argmin(np.abs(data.ds['lat'].values * 111000 * np.cos(np.deg2rad(data.ds['lon'].mean())) - params[1]))
+        # Compute grid spacings in meters
+        lat_mean = data.ds['lat'].mean().values
+        lon_mean = data.ds['lon'].mean().values
+        dlon = data.ds['lon'].diff().mean().values
+        dlat = data.ds['lat'].diff().mean().values
+        dz = data.ds['depth'].diff().mean().values
+
+        # dx for lon
+        x1, _ = transform_coordinates([lon_mean - dlon / 2], [lat_mean])
+        x2, _ = transform_coordinates([lon_mean + dlon / 2], [lat_mean])
+        dx = abs(x2[0] - x1[0])
+
+        # dy for lat
+        _, y1 = transform_coordinates([lon_mean], [lat_mean - dlat / 2])
+        _, y2 = transform_coordinates([lon_mean], [lat_mean + dlat / 2])
+        dy = abs(y2[0] - y1[0])
+
+        cell_volume = dx * dy * abs(dz)
+
+        # Find grid index for source (transform grid to meters)
+        lons_grid = data.ds['lon'].values
+        lats_grid_x = np.full_like(lons_grid, lat_mean)
+        x_grid, _ = transform_coordinates(lons_grid, lats_grid_x)
+        src_x_idx = np.argmin(np.abs(x_grid - params[0]))
+
+        lats_grid = data.ds['lat'].values
+        lons_grid_y = np.full_like(lats_grid, lon_mean)
+        _, y_grid = transform_coordinates(lons_grid_y, lats_grid)
+        src_y_idx = np.argmin(np.abs(y_grid - params[1]))
+
         src_z_idx = np.argmin(np.abs(data.ds['depth'].values - params[2]))
-        model_3d[src_y_idx, src_x_idx, src_z_idx] = dv / np.prod([data.ds['lat'].diff().mean(), 
-                                                                  data.ds['lon'].diff().mean() * 111000, 
-                                                                  data.ds['depth'].diff().mean()])  # Density
+        model_3d[src_y_idx, src_x_idx, src_z_idx] = dv / cell_volume  # Density
         unc_3d = np.zeros_like(model_3d)
-        unc_3d[src_y_idx, src_x_idx, src_z_idx] = unc_params[3] / np.prod([data.ds['lat'].diff().mean(), 
-                                                                           data.ds['lon'].diff().mean() * 111000, 
-                                                                           data.ds['depth'].diff().mean()])
+        unc_3d[src_y_idx, src_x_idx, src_z_idx] = unc_params[3] / cell_volume
 
         metadata = {
             'converged': res.cost <= 1.5 * len(los_disp),

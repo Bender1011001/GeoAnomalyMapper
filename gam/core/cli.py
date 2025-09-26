@@ -7,11 +7,8 @@ import click
 from pathlib import Path
 from typing import List, Tuple
 
-run_analysis = None
-try:
-    from ..api.main import run_analysis
-except ImportError:
-    run_analysis = None
+from .pipeline import GAMPipeline
+from .config import GAMConfig
 from .exceptions import PipelineError, ConfigurationError
 
 import subprocess
@@ -72,7 +69,7 @@ def run(
     verbose: bool,
 ) -> None:
     """Run GeoAnomalyMapper analysis for the specified bounding box.
-
+    
     Example: gam run --bbox "29.0,29.5,31.5,31.0" --modalities gravity --output-dir ./giza_analysis --verbose
     """
     try:
@@ -80,24 +77,38 @@ def run(
         modalities_list: List[str] = [m.strip() for m in modalities.split(",")]
         config_path: Path | None = Path(config) if config else None
 
-        if run_analysis is None:
-            click.echo(click.style("Error: run_analysis not available; ensure API is properly installed.", fg="red"), err=True)
-            sys.exit(1)
-        # Call main run function
-        results = run_analysis(
-            bbox_str=bbox,
-            modalities=modalities_list,
-            output_dir=output_path,
-            config_path=config_path,
-            verbose=verbose,
+        # Parse bbox
+        bbox_parts = [float(p.strip()) for p in bbox.split(",")]
+        if len(bbox_parts) != 4:
+            raise ValueError("Bounding box must be in format 'min_lon,min_lat,max_lon,max_lat'")
+        bbox_tuple: Tuple[float, float, float, float] = tuple(bbox_parts)
+
+        # Load config
+        config_obj = GAMConfig.from_yaml(config_path) if config_path else GAMConfig()
+
+        # Create pipeline instance
+        pipeline = GAMPipeline(
+            config=config_obj,
+            use_dask=config_obj.use_parallel,
+            n_workers=config_obj.n_workers,
+            cache_dir=Path(config_obj.cache_dir)
         )
+
+        # Run the full pipeline
+        results = pipeline.run_analysis(
+            bbox=bbox_tuple,
+            modalities=modalities_list,
+            output_dir=str(output_path),
+            use_cache=True,
+            global_mode=False,
+            tiles=10
+        )
+
+        pipeline.close()
 
         click.echo(f"Analysis completed successfully!")
         click.echo(f"Results saved to: {output_path}")
-        if results.get("anomalies"):
-            click.echo(f"Detected {len(results['anomalies'])} potential anomalies.")
-        if results.get("report"):
-            click.echo(f"Report generated: {results['report']['path']}")
+        click.echo(f"Detected {len(results.anomalies)} potential anomalies.")
 
     except (PipelineError, ConfigurationError, ValueError) as e:
         click.echo(click.style(f"Error: {str(e)}", fg="red"), err=True)

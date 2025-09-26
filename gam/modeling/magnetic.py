@@ -26,6 +26,8 @@ from simpeg import (
 from discretize import TreeMesh
 from simpeg.potential_fields import magnetics
 
+from gam.core.utils import transform_coordinates
+
 from gam.core.exceptions import GAMError, InversionConvergenceError
 from gam.modeling.base import Inverter
 from gam.modeling.data_structures import InversionResults
@@ -300,14 +302,21 @@ class MagneticInverter(Inverter):
     def _get_active_cells(self, data: ProcessedGrid) -> npt.NDArray[np.bool_]:
         """Active cells based on data extent."""
         pad = 0.1
-        xmin, xmax = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
-        ymin, ymax = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
+        lons_min, lons_max = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
+        lats_min, lats_max = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
+        # Approximate center for transformation
+        lon_center = (lons_min + lons_max) / 2
+        lat_center = (lats_min + lats_max) / 2
+        xmin, _ = transform_coordinates([lons_min], [lat_center])
+        xmax, _ = transform_coordinates([lons_max], [lat_center])
+        _, ymin = transform_coordinates([lon_center], [lats_min])
+        _, ymax = transform_coordinates([lon_center], [lats_max])
         zmin, zmax = 0, 3000  # Magnetic depth range
 
-        active = self.mesh.gridCC[:, 0] > xmin
-        active &= self.mesh.gridCC[:, 0] < xmax
-        active &= self.mesh.gridCC[:, 1] > ymin
-        active &= self.mesh.gridCC[:, 1] < ymax
+        active = self.mesh.gridCC[:, 0] > xmin[0]
+        active &= self.mesh.gridCC[:, 0] < xmax[0]
+        active &= self.mesh.gridCC[:, 1] > ymin[0]
+        active &= self.mesh.gridCC[:, 1] < ymax[0]
         active &= self.mesh.gridCC[:, 2] > -zmax
         active &= self.mesh.gridCC[:, 2] < -zmin
         return active
@@ -315,8 +324,10 @@ class MagneticInverter(Inverter):
     def _get_locations(self, data: ProcessedGrid) -> npt.NDArray[np.float64]:
         """Observation locations."""
         lons, lats = np.meshgrid(data.ds['lon'].values, data.ds['lat'].values)
-        locations = np.column_stack([lons.ravel(), lats.ravel(), np.zeros(len(lons.ravel()))])
-        return locations * 111000  # Approx deg to m
+        lons_flat, lats_flat = lons.ravel(), lats.ravel()
+        x, y = transform_coordinates(lons_flat, lats_flat)
+        locations = np.column_stack([x, y, np.zeros(len(lons_flat))])
+        return locations
 
     def _estimate_uncertainty(self, m_rec: npt.NDArray[np.float64], inv: inversion.BaseInversion) -> npt.NDArray[np.float64]:
         """Uncertainty from Hessian diagonal."""
