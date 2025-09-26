@@ -162,7 +162,7 @@ After installation:
    ```yaml
    sources:
      gravity:
-       base_url: "https://earthquake.usgs.gov/ws/geonames/v1/"
+       base_url: "https://mrdata.usgs.gov/services/gravity"
        auth: null
    ```
 

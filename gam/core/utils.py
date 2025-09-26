@@ -168,12 +168,78 @@ from pyproj import Transformer, CRS
 
 
 def transform_coordinates(lons, lats, source_crs='EPSG:4326', target_crs='EPSG:32633'):
-    """Transforms coordinates from a source to a target CRS."""
+    """
+    Transforms geographic coordinates (lon, lat) from source CRS to target CRS using PyProj.
+
+    Supports array inputs for batch transformation. Default: WGS84 (EPSG:4326) to UTM Zone 33N
+    (EPSG:32633; adjust zone based on longitude). Ensures always_xy=True for (x,y) order.
+
+    Args:
+        lons: Longitude(s) in degrees (float or np.ndarray).
+        lats: Latitude(s) in degrees (float or np.ndarray; same shape as lons).
+        source_crs: Source coordinate reference system (str, default: 'EPSG:4326').
+        target_crs: Target coordinate reference system (str, default: 'EPSG:32633').
+
+    Returns:
+        Tuple of (x, y) coordinates in target CRS (np.ndarray if input arrays).
+
+    Raises:
+        ValueError: If CRS invalid or shapes mismatch.
+
+    Examples:
+        >>> import numpy as np
+        >>> lons = np.array([0.0, 10.0])
+        >>> lats = np.array([51.5, 51.5])
+        >>> x, y = transform_coordinates(lons, lats)
+        >>> print(x[0])  # Approx 0 in UTM easting
+
+    Notes:
+        - For dynamic UTM: Compute zone = int((mean_lon + 180) / 6) + 31; target_crs=f'EPSG:326{zone}'.
+        - Dependencies: pyproj >=3.0.0.
+        - Reference: PyProj documentation for Transformer.
+    """
+    if not hasattr(lons, '__len__') or not hasattr(lats, '__len__'):
+        lons = np.array([lons])
+        lats = np.array([lats])
+    elif len(lons) != len(lats):
+        raise ValueError("lons and lats must have same length")
     transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
     x, y = transformer.transform(lons, lats)
     return x, y
 def reverse_transform_coordinates(xs, ys, source_crs='EPSG:32633', target_crs='EPSG:4326'):
-    """Transforms coordinates from target to source CRS (inverse)."""
+    """
+    Reverse transforms projected coordinates (x, y) back to geographic (lon, lat).
+
+    Inverse of transform_coordinates. Default: UTM Zone 33N (EPSG:32633) to WGS84 (EPSG:4326).
+
+    Args:
+        xs: Easting(s) in target CRS (float or np.ndarray).
+        ys: Northing(s) in target CRS (float or np.ndarray; same shape as xs).
+        source_crs: Source (projected) CRS (str, default: 'EPSG:32633').
+        target_crs: Target (geographic) CRS (str, default: 'EPSG:4326').
+
+    Returns:
+        Tuple of (lons, lats) in degrees (np.ndarray if input arrays).
+
+    Raises:
+        ValueError: If CRS invalid or shapes mismatch.
+
+    Examples:
+        >>> xs = np.array([500000.0])
+        >>> ys = np.array([5700000.0])
+        >>> lons, lats = reverse_transform_coordinates(xs, ys)
+        >>> print(lons[0])  # Approx 0.0 degrees lon
+
+    Notes:
+        - Matches forward transform; use same zone for consistency.
+        - Dependencies: pyproj >=3.0.0.
+        - Reference: PyProj Transformer for inverse projections.
+    """
+    if not hasattr(xs, '__len__') or not hasattr(ys, '__len__'):
+        xs = np.array([xs])
+        ys = np.array([ys])
+    elif len(xs) != len(ys):
+        raise ValueError("xs and ys must have same length")
     from pyproj import Transformer, CRS
     transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
     lons, lats = transformer.transform(xs, ys)
