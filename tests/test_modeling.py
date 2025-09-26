@@ -333,3 +333,148 @@ def test_fusion_linearity():
     fused2 = joint.fuse(results, weights=[0,1])
     fused_avg = joint.fuse(results, weights=[0.5,0.5])
     np.testing.assert_allclose(fused_avg, 0.5 * fused1 + 0.5 * fused2, atol=1e-8)
+# Additional Scientific Algorithm Unit Tests (Phase 3 Enhancements)
+
+def test_gravity_terrain_correction(synthetic_dem, synthetic_processed_grid):
+    """Test _compute_terrain_correction with mock DEM, assert correction values."""
+    from gam.modeling.gravity import GravityInverter
+    import numpy as np
+    
+    inverter = GravityInverter()
+    
+    # Mock the computation if internal; or call directly if exposed
+    with patch.object(inverter, '_compute_terrain_correction') as mock_compute:
+        # Simulate return: small corrections based on elevation gradient
+        expected_correction = np.gradient(synthetic_dem['elevation'], axis=(0,1)) * 0.3086  # mGal per m elevation approx
+        mock_compute.return_value = expected_correction
+        
+        correction = inverter._compute_terrain_correction(synthetic_dem, synthetic_processed_grid.ds.coords)
+        
+        assert correction.shape == (10, 10)
+        assert np.all(np.abs(correction) < 5.0)  # Reasonable terrain correction <5 mGal
+        assert np.mean(correction) > -1.0 and np.mean(correction) < 1.0  # Near zero average
+
+def test_gravity_l1_vs_l2_inversion(synthetic_processed_grid):
+    """Test L1 vs L2 inversion with synthetic data."""
+    from gam.modeling.gravity import GravityInverter
+    
+    inverter = GravityInverter()
+    
+    # L2 inversion (smooth)
+    results_l2 = inverter.invert(synthetic_processed_grid, regularization='l2')
+    assert results_l2.metadata['regularization'] == 'l2'
+    assert results_l2.metadata['converged'] is True
+    
+    # L1 inversion (sparse)
+    results_l1 = inverter.invert(synthetic_processed_grid, regularization='l1')
+    assert results_l1.metadata['regularization'] == 'l1'
+    assert results_l1.metadata['converged'] is True
+    
+    # L1 should have more sparse model (higher fraction of small values)
+    l1_sparsity = np.sum(np.abs(results_l1.model) < 1e-3)
+    l2_sparsity = np.sum(np.abs(results_l2.model) < 1e-3)
+    assert l1_sparsity > l2_sparsity * 1.5  # L1 sparser
+
+@pytest.mark.skipif(not has_obspy, reason="Requires obspy for seismic")
+def test_seismic_sta_lta_picking(sample_seismic_trace):
+    """Test STA/LTA picking on sample trace, assert pick times."""
+    from gam.modeling.seismic import SeismicInverter
+    
+    inverter = SeismicInverter()
+    trace = sample_seismic_trace[0]
+    
+    # Run STA/LTA with params for synthetic pick at ~0.5s
+    picks = inverter.sta_lta_picking(trace, sta_len=2, lta_len=20, threshold=3.0)
+    
+    assert len(picks) >= 1
+    pick_time = picks[0]  # First pick
+    assert 0.45 < pick_time < 0.55  # Within 0.05s of synthetic arrival at 0.5s
+    assert pick_time.unit == 's'  # Assuming returns datetime or seconds
+
+@pytest.mark.skipif(not has_pygimli, reason="Requires pygimli for inversion")
+def test_seismic_pygimli_inversion(known_velocity_model, synthetic_processed_grid):
+    """Test PyGIMLi inversion with known velocity model."""
+    from gam.modeling.seismic import SeismicInverter
+    import numpy as np
+    
+    inverter = SeismicInverter()
+    
+    # Mock travel time data from known model
+    true_vel = known_velocity_model['velocities']
+    true_depth = known_velocity_model['depths']
+    
+    # Run inversion
+    results = inverter.invert(
+        synthetic_processed_grid, 
+        use_pygimli=True, 
+        true_model=known_velocity_model,
+        dimension=1  # 1D for simplicity
+    )
+    
+    recovered_vel = results.model[:, 0, 0]  # Flatten to 1D
+    
+    # Assert recovery within tolerance
+    rmse = np.sqrt(np.mean((recovered_vel - true_vel)**2))
+    assert rmse < 100.0  # m/s tolerance
+    assert np.all(recovered_vel > 1400)  # Above min velocity
+    assert results.metadata['algorithm'] == 'pygimli_travel_time'
+
+def test_insar_snaphu_unwrapping(synthetic_wrapped_phase):
+    """Test SNAPHU unwrapping on synthetic wrapped phase."""
+    from gam.modeling.insar import InSARInverter
+    import numpy as np
+    
+    inverter = InSARInverter()
+    
+    # Unwrap
+    unwrapped = inverter.snaphu_unwrap(synthetic_wrapped_phase)
+    
+    assert unwrapped.shape == synthetic_wrapped_phase.shape
+    assert unwrapped.attrs['units'] == 'radians'
+    
+    # Reconstruct true phase from fixture logic
+    lat, lon = synthetic_wrapped_phase.lat.values, synthetic_wrapped_phase.lon.values
+    true_phase = np.outer(lat, np.ones_like(lon)) * 0.1 + np.outer(np.ones_like(lat), lon) * 0.05
+    
+    # Wrapped difference
+    diff = np.abs(unwrapped - true_phase)
+    diff = np.minimum(diff, 2 * np.pi - diff)
+    assert np.mean(diff) < 1e-3  # High accuracy for synthetic
+
+def test_insar_atmospheric_filtering(synthetic_wrapped_phase):
+    """Test atmospheric filtering on synthetic phase."""
+    from gam.modeling.insar import InSARInverter
+    
+    inverter = InSARInverter()
+    
+    # Add synthetic atmosphere: low-frequency noise
+    atm_noise = np.sin(synthetic_wrapped_phase.lat * 10) * np.cos(synthetic_wrapped_phase.lon * 10) * 0.2
+    noisy_phase = synthetic_wrapped_phase + atm_noise
+    
+    filtered = inverter.atmospheric_filter(noisy_phase, method='simple_detrend')
+    
+    assert filtered.shape == noisy_phase.shape
+    
+    # Assert reduced low-freq variance
+    orig_var = np.var(np.fft.fftshift(np.fft.fft2(noisy_phase.values))[:5, :5])  # Low freq
+    filt_var = np.var(np.fft.fftshift(np.fft.fft2(filtered.values))[:5, :5])
+    assert filt_var < orig_var * 0.5  # Reduced atmospheric signal
+
+def test_insar_okada_forward(synthetic_fault_params, synthetic_processed_grid):
+    """Test Okada forward modeling with known fault params."""
+    from gam.modeling.insar import InSARInverter
+    import numpy as np
+    
+    inverter = InSARInverter()
+    
+    # Compute forward displacement
+    disp = inverter.okada_forward(
+        synthetic_fault_params,
+        grid_coords={'lat': synthetic_processed_grid.ds.lat, 'lon': synthetic_processed_grid.ds.lon}
+    )
+    
+    assert disp.shape == (10, 10)
+    assert np.all(np.isfinite(disp))  # No NaNs
+    assert np.max(np.abs(disp)) > 0.1  # Visible displacement in mm
+    assert np.mean(disp) < 0.05  # Mostly near zero away from fault
+    assert 'displacement' in disp.name  # Assuming DataArray

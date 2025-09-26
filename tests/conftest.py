@@ -279,3 +279,105 @@ def pytest_runtest_setup(item):
     """Skip tests requiring optional deps."""
     if "seismic" in item.name and not has_obspy:
         pytest.skip("Requires obspy for seismic tests")
+# Additional fixtures for scientific algorithm tests
+
+has_pygimli = False
+try:
+    import pygimli as pg
+    has_pygimli = True
+except ImportError:
+    pass
+
+@pytest.fixture(scope="function")
+def synthetic_dem():
+    """Synthetic Digital Elevation Model (DEM) for gravity terrain correction."""
+    lat = np.linspace(30.0, 32.0, 10)
+    lon = np.linspace(29.0, 31.0, 10)
+    coords = {'lat': lat, 'lon': lon}
+    elevation = 100 + np.random.rand(10, 10) * 500  # meters, base 100m
+    da = xr.DataArray(elevation, coords=coords, dims=['lat', 'lon'])
+    ds = da.to_dataset(name='elevation')
+    ds.attrs['units'] = 'm'
+    ds.attrs['resolution'] = 0.2
+    return ds
+
+@pytest.fixture(scope="function")
+def sample_seismic_trace():
+    """Sample seismic trace for STA/LTA picking tests."""
+    if not has_obspy:
+        pytest.skip("Seismic tests require obspy")
+    from obspy import Trace, Stream, UTCDateTime
+    # Synthetic trace with a pick at 0.5s
+    dt = 0.01  # 100 Hz
+    npts = 1000
+    time = np.arange(npts) * dt
+    data = np.random.randn(npts)
+    data[50:100] += 5 * np.exp(-((time[50:100] - 0.05)/0.01)**2)  # P-wave arrival
+    header = {'starttime': UTCDateTime(2020, 1, 1), 'sampling_rate': 100}
+    tr = Trace(data=data, header=header)
+    return Stream([tr])
+
+@pytest.fixture(scope="function")
+def synthetic_wrapped_phase():
+    """Synthetic wrapped phase for InSAR unwrapping tests."""
+    lat = np.linspace(30.0, 32.0, 20)
+    lon = np.linspace(29.0, 31.0, 20)
+    coords = {'lat': lat, 'lon': lon}
+    # True phase with linear gradient + noise
+    true_phase = np.outer(lat, np.ones(20)) * 0.1 + np.outer(np.ones(20), lon) * 0.05
+    wrapped_phase = np.mod(true_phase + np.random.normal(0, 0.1, (20, 20)), 2 * np.pi) - np.pi
+    da = xr.DataArray(wrapped_phase, coords=coords, dims=['lat', 'lon'])
+    da.attrs['units'] = 'radians'
+    return da
+
+@pytest.fixture(scope="function")
+def known_velocity_model():
+    """Known 1D velocity model for PyGIMLi inversion tests."""
+    if not has_pygimli:
+        pytest.skip("PyGIMLi tests require pygimli")
+    depths = np.linspace(0, 2000, 11)  # m
+    velocities = np.array([1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500])  # m/s
+    return {'depths': depths, 'velocities': velocities}
+
+@pytest.fixture(scope="function")
+def synthetic_fault_params():
+    """Synthetic fault parameters for Okada forward modeling."""
+    return {
+        'strike': 45.0,  # degrees
+        'dip': 60.0,
+        'rake': 90.0,  # normal fault
+        'slip': 0.5,  # meters
+        'length': 5000.0,  # m
+        'width': 3000.0,
+        'depth': 10000.0,  # m
+        'lon': 30.0,
+        'lat': 31.0
+    }
+
+@pytest.fixture(scope="session")
+def benchmark_dataset():
+    """Benchmark synthetic dataset for validation tests."""
+    # Use existing synthetic data and add expected outputs
+    import json
+    from pathlib import Path
+    base_path = Path('tests/data')
+    
+    # Load synthetic gravity as example
+    with open(base_path / 'synthetic_gravity.json', 'r') as f:
+        raw_data = json.load(f)
+    
+    # Synthetic expected anomalies.csv content
+    expected_anomalies = pd.DataFrame({
+        'lat': [30.5, 31.0],
+        'lon': [29.5, 30.0],
+        'depth': [500.0, 1000.0],
+        'confidence': [0.95, 0.92],
+        'anomaly_type': ['density_contrast', 'void'],
+        'strength': [2.1, 1.8]
+    })
+    
+    return {
+        'raw_data': raw_data,
+        'expected_anomalies': expected_anomalies,
+        'tolerance': 0.1  # RMSE threshold
+    }
