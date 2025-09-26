@@ -164,3 +164,17 @@ class ResourceUtils:
         except ImportError:
             logger.warning("psutil not installed; returning dummy resources")
             return ResourceInfo(cpu_percent=0.0, memory_percent=0.0, available_memory_gb=0.0)
+from pyproj import Transformer, CRS
+
+
+def transform_coordinates(lons, lats, source_crs='EPSG:4326', target_crs='EPSG:32633'):
+    """Transforms coordinates from a source to a target CRS."""
+    transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
+    x, y = transformer.transform(lons, lats)
+    return x, y
+def reverse_transform_coordinates(xs, ys, source_crs='EPSG:32633', target_crs='EPSG:4326'):
+    """Transforms coordinates from target to source CRS (inverse)."""
+    from pyproj import Transformer, CRS
+    transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
+    lons, lats = transformer.transform(xs, ys)
+    return lons, lats

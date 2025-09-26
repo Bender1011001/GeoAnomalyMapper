@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from scipy import signal
 from obspy import Stream, Trace
 import obspy
+from obspy.signal.trigger import classic_sta_lta
 
 from gam.core.exceptions import PreprocessingError
 from gam.ingestion.data_structures import RawData
@@ -261,8 +262,8 @@ class SeismicPreprocessor(Preprocessor):
     Notes
     -----
     - Assumes RawData.values as ObsPy Stream.
-    - Travel time: Simple STA/LTA picking for P-wave approx.
-    - Grids amplitudes/velocities to 2D map.
+    - Travel time picking: STA/LTA algorithm for P-wave onset detection (Trnkoczy, 2010).
+    - Outputs gridded picked travel times in seconds.
 
     Examples
     --------
@@ -282,12 +283,14 @@ class SeismicPreprocessor(Preprocessor):
             - grid_resolution: float (default: 0.1)
             - lowcut: float (default: 0.1)
             - highcut: float (default: 1.0)
-            - extract: str ('velocity' or 'amplitude', default: 'velocity')
+            - sta_len: float (s, default: 1.0)
+            - lta_len: float (s, default: 10.0)
+            - threshold: float (default: 3.5)
 
         Returns
         -------
         ProcessedGrid
-            Seismic grid (velocity or amplitude).
+            Grid of picked P-wave travel times in seconds.
 
         Raises
         ------
@@ -300,7 +303,9 @@ class SeismicPreprocessor(Preprocessor):
         grid_res = kwargs.get('grid_resolution', 0.1)
         lowcut = kwargs.get('lowcut', 0.1)
         highcut = kwargs.get('highcut', 1.0)
-        extract = kwargs.get('extract', 'velocity')
+        sta_len = kwargs.get('sta_len', 1.0)
+        lta_len = kwargs.get('lta_len', 10.0)
+        threshold = kwargs.get('threshold', 3.5)
 
         stream = data.values.copy()
 
@@ -309,44 +314,66 @@ class SeismicPreprocessor(Preprocessor):
         filtered_stream = bandpass.apply(RawData(data.metadata, stream))
         logger.info(f"Applied bandpass filter ({lowcut}-{highcut} Hz)")
 
-        # Step 2: Extract travel time / features (basic: max amplitude as proxy for velocity)
-        # Placeholder: STA/LTA for picking, but simple max amp for grid
-        amplitudes = []
+        # Step 2: Travel-time picking using STA/LTA
+        picked_times = []
         lats, lons = [], []
         for tr in filtered_stream:
-            # Assume trace.stats.coordinates for lat/lon
-            lat = tr.stats.coordinates.latitude or np.mean([data.metadata['bbox'][0], data.metadata['bbox'][1]])
-            lon = tr.stats.coordinates.longitude or np.mean([data.metadata['bbox'][2], data.metadata['bbox'][3]])
+            dt = tr.stats.delta
+            if len(tr.data) == 0:
+                picked_times.append(np.nan)
+                lat = tr.stats.coordinates.get('latitude', np.mean([data.metadata['bbox'][0], data.metadata['bbox'][1]]))
+                lon = tr.stats.coordinates.get('longitude', np.mean([data.metadata['bbox'][2], data.metadata['bbox'][3]]))
+                lats.append(lat)
+                lons.append(lon)
+                continue
+            sta_samples = max(1, int(sta_len / dt))
+            lta_samples = max(sta_samples + 1, int(lta_len / dt))
+            if lta_samples > len(tr.data):
+                logger.warning(f"Trace too short: len={len(tr.data)}, needed={lta_samples}")
+                picked_times.append(np.nan)
+                lat = tr.stats.coordinates.get('latitude', np.mean([data.metadata['bbox'][0], data.metadata['bbox'][1]]))
+                lon = tr.stats.coordinates.get('longitude', np.mean([data.metadata['bbox'][2], data.metadata['bbox'][3]]))
+                lats.append(lat)
+                lons.append(lon)
+                continue
+            try:
+                c_sta = classic_sta_lta(tr.data, sta_samples, lta_samples)
+                above_thresh = np.nonzero(c_sta >= threshold)[0]
+                if len(above_thresh) > 0:
+                    pick_idx = above_thresh[0]
+                else:
+                    pick_idx = len(c_sta) // 2
+                    logger.debug(f"No clear pick for trace, using center: idx={pick_idx}")
+                pick_time = pick_idx * dt
+                picked_times.append(pick_time)
+            except Exception as e:
+                logger.warning(f"Error in STA/LTA picking: {e}")
+                picked_times.append(np.nan)
+            lat = tr.stats.coordinates.get('latitude', np.mean([data.metadata['bbox'][0], data.metadata['bbox'][1]]))
+            lon = tr.stats.coordinates.get('longitude', np.mean([data.metadata['bbox'][2], data.metadata['bbox'][3]]))
             lats.append(lat)
             lons.append(lon)
-            # Basic velocity proxy: peak velocity = max(abs(diff(trace.data))) / dt
-            dt = tr.stats.delta
-            vel = np.max(np.abs(np.diff(tr.data))) / dt if len(tr.data) > 1 else 0.0
-            amplitudes.append(vel if extract == 'velocity' else np.max(np.abs(tr.data)))
 
-        if not amplitudes:
+        if len(picked_times) == 0:
             raise PreprocessingError("No seismic traces to process")
 
-        values = np.array(amplitudes)
+        values = np.array(picked_times)
         points = np.column_stack((lats, lons))
 
-        # Step 3: Unit conversion (assume nm/s to m/s if needed)
-        from_unit = data.metadata.get('units', 'm/s')
-        if unit_converter.validate_unit('seismic', from_unit):
-            values = unit_converter.convert(values, from_unit, 'm/s', 'seismic')
-        logger.info(f"Converted seismic units from {from_unit} to m/s")
+        # No unit conversion for travel times
+        logger.info("Picked travel times extracted using STA/LTA (units: s)")
 
         # Step 4: Gridding
         gridder = RegularGridder(resolution=grid_res, method='linear')
         raw_gridded = RawData(data.metadata, np.column_stack((points, values)))
         grid = gridder.apply(raw_gridded)
 
-        grid.units = 'm/s' if extract == 'velocity' else 'counts'
+        grid.units = 's'
         grid.add_metadata('modality', 'seismic')
-        grid.add_metadata('extracted_feature', extract)
-        grid.add_metadata('processing_steps', ['bandpass_filter', 'feature_extraction', 'unit_conversion', 'gridding'])
+        grid.add_metadata('feature', 'travel_time')
+        grid.add_metadata('processing_steps', ['bandpass_filter', 'sta_lta_picking', 'gridding'])
 
-        logger.info(f"Seismic preprocessing complete ({extract}): grid shape {grid.ds['data'].shape}")
+        logger.info(f"Seismic preprocessing complete (travel time picking): grid shape {grid.ds['data'].shape}")
         return grid
 
 

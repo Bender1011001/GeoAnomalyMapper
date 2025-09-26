@@ -8,10 +8,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, griddata
 
 import pygimli as pg
 from pygimli.physics.traveltime import TravelTimeModelling, simulate
+from pygimli.optimization import RIES
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
 from gam.modeling.base import Inverter
@@ -23,7 +24,7 @@ from gam.preprocessing.data_structures import ProcessedGrid
 logger = logging.getLogger(__name__)
 
 
-class SeismicInverter(Inverter):
+class SeismicModel(Inverter):
     """
     PyGIMLi-based travel time tomography for P-wave velocity estimation.
 
@@ -73,6 +74,11 @@ class SeismicInverter(Inverter):
     - **Reproducibility**: Fixed random seed for initial model.
     - **Error Handling**: Raises if no rays traced or non-convergence.
 
+    References
+    ----------
+    - PyGIMLi: Günther et al. (2022), https://www.pygimli.org/
+    - Travel-time tomography: Shearer (2019), Introductory Seismology.
+
     Examples
     --------
     >>> inverter = SeismicInverter(v_min=1000, v_max=7000)
@@ -98,7 +104,7 @@ class SeismicInverter(Inverter):
         Parameters
         ----------
         data : ProcessedGrid
-            Seismic data ('data' as travel times in ms; coords include source/receiver info).
+            Seismic data ('data' as travel times in s; geometry via kwargs['sources'], kwargs['receivers']).
         **kwargs : dict, optional
             - 'dimension': int, 2 or 3 (default: 3)
             - 'sources': np.ndarray, source locations (Nx3)
@@ -128,31 +134,37 @@ class SeismicInverter(Inverter):
         # Extract data
         if 'data' not in data.ds:
             raise GAMError("Missing 'data' (travel times)")
-        travel_times = data.ds['data'].values.flatten() * 1e-3  # ms to s
+        travel_times = data.ds['data'].values.flatten()  # s
         mask = ~np.isnan(travel_times)
         if not np.any(mask):
             raise GAMError("No valid travel times")
         travel_times = travel_times[mask]
 
-        # Geometry (assume metadata or coords; simplified)
+        # Geometry from kwargs
         dimension = kwargs.get('dimension', 3)
         if dimension not in [2, 3]:
             raise ValueError("Dimension must be 2 or 3")
         
-        # Placeholder geometry; in practice, from metadata['sources/receivers']
-        n_src = 50  # Example
-        sources = np.random.uniform(data.ds['lon'].min(), data.ds['lon'].max(), (n_src, 1))
-        sources = np.column_stack([sources, np.zeros(n_src), np.zeros(n_src)])  # x,y,z=0
-        receivers = sources.copy()  # For demo; use actual
-        
+        sources = kwargs.get('sources')
+        if sources is None:
+            raise GAMError("Sources geometry required in kwargs['sources'] (Nx3 array in m)")
+        receivers = kwargs.get('receivers')
+        if receivers is None:
+            raise GAMError("Receivers geometry required in kwargs['receivers'] (Nx3 array in m)")
+        if len(sources) != len(receivers) or len(travel_times) != len(sources):
+            raise GAMError("Number of travel times must match number of source-receiver pairs")
+        if sources.shape[1] < 3:
+            # Assume 2D, add z=0
+            sources = np.column_stack([sources, np.zeros(len(sources))])
+            receivers = np.column_stack([receivers, np.zeros(len(receivers))])
         if dimension == 2:
-            sources = sources[:, :2]
-            receivers = receivers[:, :2]
+            sources = sources[:, [0, 2]]  # x,z for 2D profile
+            receivers = receivers[:, [0, 2]]
 
-        # Mesh
-        mesh_config = kwargs.get('mesh_config', {'type': 'rtree', 'hmin': 5.0, 'depth': 2000})
+        # Mesh from survey geometry and config (e.g., resolution via hmin)
+        mesh_config = kwargs.get('mesh_config', {'type': 'rtree', 'hmin': 50.0, 'depth': 2000})  # hmin: mesh resolution in m
         mesh_gen = MeshGenerator()
-        self.mesh = mesh_gen.create_seismic_mesh(data, dimension=dimension, **mesh_config)
+        self.mesh = mesh_gen.create_seismic_mesh(sources, receivers, dimension=dimension, **mesh_config)
 
         # Modelling
         self.modelling = TravelTimeModelling(mesh=self.mesh, dimension=dimension)
@@ -167,41 +179,38 @@ class SeismicInverter(Inverter):
         log_s_min = np.log(1.0 / self.v_max)
         log_s_max = np.log(1.0 / self.v_min)
 
-        # Inversion
-        damping = kwargs.get('damping', 0.1)
+        # Inversion using RIES
+        damping = kwargs.get('damping', 100.0)  # Regularization factor
         max_iter = kwargs.get('max_iterations', 20)
+        abs_err = kwargs.get('absolute_error', 0.005)  # Default error 5 ms in s
         
         try:
-            self.modelling.invert(
-                lmLambda=damping,
-                maxIter=max_iter,
-                bounds=[log_s_min, log_s_max],
-                mstart=log_slowness_init,
-                verbose=True,
-            )
+            fop = self.modelling
+            inv = RIES(fop=fop, verbose=True, maxIter=max_iter)
+            inv.setData(travel_times, absoluteError=abs_err)
+            inv.setRegularisation(damping * len(travel_times))  # Scale with data
+            inv.setBounds([log_s_min, log_s_max])
+            inv.setModel(log_slowness_init)
+            inv.run()
         except Exception as e:
             raise InversionConvergenceError(f"Inversion failed: {e}")
 
         # Recovered model
-        log_slowness_rec = self.modelling.estimate()
+        log_slowness_rec = inv.estimate()
         slowness_rec = np.exp(log_slowness_rec)
         v_rec = 1.0 / slowness_rec
 
         # Convergence check (chi2 approx)
-        chi2 = np.sum((self.modelling.residuals() ** 2))
+        chi2 = inv.getChi2()
         dof = len(travel_times)
         if chi2 > 2 * dof:
             warnings.warn(f"Marginal convergence: chi2={chi2:.2f} > 2*dof={2*dof:.2f}")
 
         # Uncertainty (from covariance; simplified diagonal)
-        uncertainty = self._estimate_uncertainty(self.modelling, v_rec)
+        uncertainty = self._estimate_uncertainty(inv, v_rec)
 
-        # To 3D grid (extrude 2D if needed)
-        if dimension == 2:
-            v_rec_3d = np.repeat(v_rec[:, np.newaxis], len(data.ds['depth']), axis=1)
-            unc_3d = np.repeat(uncertainty[:, np.newaxis], len(data.ds['depth']), axis=1)
-        else:
-            v_rec_3d, unc_3d = self._interpolate_to_grid(v_rec, uncertainty, data)
+        # To 3D grid
+        v_rec_3d, unc_3d = self._interpolate_to_grid(v_rec, uncertainty, data)
 
         metadata = {
             'converged': chi2 <= 2 * dof,
@@ -209,6 +218,7 @@ class SeismicInverter(Inverter):
             'residuals': chi2,
             'units': 'm/s',
             'algorithm': 'pygimli_traveltime_tomography',
+            'inversion_method': 'RIES',
             'parameters': {
                 'dimension': dimension,
                 'damping': damping,
@@ -243,10 +253,15 @@ class SeismicInverter(Inverter):
         logger.info(f"Seismic fusion: shape={fused.shape}")
         return fused
 
-    def _estimate_uncertainty(self, modelling: TravelTimeModelling, v_rec: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def _estimate_uncertainty(self, inv: RIES, v_rec: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Uncertainty from model covariance diagonal."""
         # Simplified; use full covariance in production
-        cov_diag = modelling.jacobian().T @ np.diag(modelling.relativeError()**2) @ modelling.jacobian()
+        J = inv.jacobian()
+        errors = inv.absoluteError()
+        if np.isscalar(errors):
+            errors = np.full(len(inv.data()), errors)
+        C_d_inv = np.diag(1.0 / (errors ** 2))
+        cov_diag = J.T @ C_d_inv @ J
         sigma_m = np.sqrt(np.diag(np.linalg.pinv(cov_diag + 1e-10)))
         # Propagate to velocity
         dv_dm = -v_rec**2  # d v / d s = -v^2 (s=1/v)
@@ -255,20 +270,17 @@ class SeismicInverter(Inverter):
 
     def _interpolate_to_grid(self, model_flat: npt.NDArray[np.float64], unc_flat: npt.NDArray[np.float64],
                              data: ProcessedGrid) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Interpolate to ProcessedGrid."""
-        # Assume mesh cell centers align; use RegularGridInterpolator
-        # Get coords from mesh
+        """Interpolate model from mesh to regular grid."""
+        # Cell centers (assume x,y,z in meters)
         cc = self.mesh.cellCenters()
-        # For 3D
-        interp_v = RegularGridInterpolator((data.ds['lat'].values, data.ds['lon'].values, data.ds['depth'].values),
-                                           model_flat.reshape((len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth']))),
-                                           method='linear', bounds_error=False, fill_value=np.nan)
-        interp_unc = RegularGridInterpolator((data.ds['lat'].values, data.ds['lon'].values, data.ds['depth'].values),
-                                             unc_flat.reshape((len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth']))),
-                                             method='linear', bounds_error=False, fill_value=np.nan)
-        
-        lats, lons, depths = np.meshgrid(data.ds['lat'], data.ds['lon'], data.ds['depth'], indexing='ij')
-        points = np.stack([lats.ravel(), lons.ravel(), depths.ravel()], axis=-1)
-        v_3d = interp_v(points).reshape(lats.shape)
-        unc_3d = interp_unc(points).reshape(lats.shape)
+        source_points = cc  # Nx3
+
+        # Target grid points (assume lat/lon/depth, convert to approx meters)
+        lats_g, lons_g, depths_g = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, data.ds['depth'].values, indexing='ij')
+        scale = 111000.0  # approx m per degree at equator
+        target_points = np.stack([lons_g.ravel() * scale, lats_g.ravel() * scale, depths_g.ravel()], axis=-1)
+
+        # Interpolate (assume source_points in same coord system)
+        v_3d = griddata(source_points, model_flat, target_points, method='linear', fill_value=np.nan).reshape(lats_g.shape)
+        unc_3d = griddata(source_points, unc_flat, target_points, method='linear', fill_value=np.nan).reshape(lats_g.shape)
         return v_3d, unc_3d

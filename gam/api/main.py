@@ -43,6 +43,10 @@ class ResultsResponse(BaseModel):
 
 async def run_analysis_job(job_id: str, request: AnalysisRequest):
     """Background task to run the analysis pipeline asynchronously."""
+    def progress_callback(stage: str, progress: float):
+        """Callback to update job store with progress."""
+        job_store.update_job(job_id, {"stage": stage, "progress": progress})
+
     job_store.update_job(job_id, {
         "status": "RUNNING",
         "start_time": datetime.now(),
@@ -50,6 +54,7 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
         "stage": "Starting"
     })
 
+    pipeline = None
     try:
         # Create unique output directory for this job
         base_output_dir = Path(request.output_dir)
@@ -70,32 +75,15 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
         # Convert bbox to tuple
         bbox_tuple: Tuple[float, float, float, float] = tuple(request.bbox)
 
-        # Stage 1: Ingestion
-        job_store.update_job(job_id, {"stage": "Ingestion", "progress": 0.2})
-        raw_data = pipeline.ingestion.fetch_multiple(
-            modalities=request.modalities,
+        # Run the full pipeline
+        results = pipeline.run_analysis(
             bbox=bbox_tuple,
+            modalities=request.modalities,
+            output_dir=str(job_output_dir),
             use_cache=True,
             global_mode=False,
-            tiles=10
-        )
-
-        # Stage 2: Preprocessing
-        job_store.update_job(job_id, {"stage": "Preprocessing", "progress": 0.4})
-        processed_data = pipeline.preprocessing.process(raw_data)
-
-        # Stage 3: Modeling - Inversion
-        job_store.update_job(job_id, {"stage": "Modeling (Inversion)", "progress": 0.6})
-        inversion_results = pipeline.modeling.invert(processed_data)
-
-        # Stage 4: Anomaly Detection
-        job_store.update_job(job_id, {"stage": "Anomaly Detection", "progress": 0.8})
-        anomalies = pipeline.modeling.detect_anomalies(inversion_results)
-
-        # Stage 5: Visualization
-        job_store.update_job(job_id, {"stage": "Visualization", "progress": 0.9})
-        visualizations = pipeline.visualization.generate(
-            processed_data, inversion_results, anomalies, output_dir=str(job_output_dir)
+            tiles=10,
+            progress_callback=progress_callback
         )
 
         # Store results
@@ -104,18 +92,15 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
             "progress": 1.0,
             "stage": "Finished",
             "results": {
-                "raw_data": raw_data,
-                "processed_data": processed_data,
-                "inversion_results": inversion_results,
-                "anomalies": anomalies,
-                "visualizations": {k: str(v) for k, v in visualizations.items()}
+                "raw_data": results.raw_data,
+                "processed_data": results.processed_data,
+                "inversion_results": results.inversion_results,
+                "anomalies": results.anomalies,
+                "visualizations": {k: str(v) for k, v in results.visualizations.items()}
             },
-            "output_files": {k: str(v) for k, v in visualizations.items()},
-            "message": f"Analysis completed successfully. Found {len(anomalies)} anomalies."
+            "output_files": {k: str(v) for k, v in results.visualizations.items()},
+            "message": f"Analysis completed successfully. Found {len(results.anomalies)} anomalies."
         })
-    
-        # Cleanup
-        pipeline.close()
 
     except IngestionError as e:
         job_store.update_job(job_id, {
@@ -154,7 +139,7 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
             "stage": "Unknown"
         })
     finally:
-        if 'pipeline' in locals():
+        if pipeline:
             pipeline.close()
 
 @app.post("/analysis", response_model=AnalysisResponse)
