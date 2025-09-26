@@ -71,24 +71,21 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
     Okada (1985) rectangular dislocation forward model for InSAR LOS displacement.
 
     Computes surface displacements due to a rectangular fault in elastic half-space.
-    Preferred implementation uses PyCoulomb library for accurate Okada solution
-    (strike-slip with rake=0; extensible to general cases). Falls back to Mogi
-    point-source approximation if PyCoulomb unavailable (reduced fidelity for
-    extended sources; suitable for small faults but underestimates far-field).
+    Uses PyCoulomb library for accurate Okada solution (strike-slip with rake=0;
+    extensible to general cases). Fault parameters configurable via config or kwargs
+    in the InSARInverter class.
 
     Parameters
     ----------
     params : np.ndarray
         Shape (8,): [x0, y0, d, L, W, strike, dip, slip]
-        - x0, y0: Source center longitude (degrees) and latitude (degrees) for PyCoulomb path,
-          or approximate local Cartesian easting/northing (meters) for fallback.
+        - x0, y0: Source center longitude (degrees) and latitude (degrees).
         - d: Depth to top of fault (meters).
         - L, W: Fault length (along strike, meters) and width (downdip, meters).
         - strike, dip: Fault orientation (degrees clockwise from north; dip from horizontal).
         - slip: Strike-slip amount (meters; positive right-lateral).
     obs_pos : np.ndarray
-        Shape (N, 2): Observation points as [longitude, latitude] (degrees) for PyCoulomb,
-        or local [easting, northing] (meters) for fallback. Consistent with params[0:2].
+        Shape (N, 2): Observation points as [longitude, latitude] (degrees).
         N is number of points; assumes geographic coordinates consistent with InSAR conventions.
     inc : float
         Radar incidence angle (radians; 0=zenith, pi/2=nadir).
@@ -106,19 +103,18 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
     -----
     - Units: lon/lat degrees, depth/L/W meters (converted to km internally for PyCoulomb),
       angles radians (inc/head) or degrees (strike/dip), slip meters.
-    - PyCoulomb path: Accurate analytical Okada for uniform slip rectangular fault.
+    - PyCoulomb: Accurate analytical Okada for uniform slip rectangular fault.
       Assumes pure strike-slip (rake=0); depth to top edge. Internal conversion from
       assumed local meters to degrees uses ~111 km/deg scale (approximate; best for
       small regions near equator/lon=0; distortion <1% for 100km at mid-latitudes).
       Update conversion with reference lon/lat for production accuracy.
-    - Fallback (no PyCoulomb): Logs warning; approximates as Mogi point source at center
-      with volume_change = L * W * slip (m³). Reduced fidelity: treats extended fault as
-      point, accurate only near center (<10km); underestimates gradients/distal effects.
-      Raises GAMError if mogi_forward unavailable (though present in module).
-    - Validation: Raises GAMError for invalid shapes/lengths.
+    - Fault parameters: Configurable via InSARInverter kwargs or global config.yaml
+      (e.g., fault_length, fault_width, strike, dip, slip).
+    - Validation: Raises ImportError if PyCoulomb unavailable; GAMError for invalid shapes/lengths.
     - Limitations: No topography/viscoelasticity; half-space only. Strike-slip focus;
       for dip-slip/tensile, extend rake/params in future phases.
-    - Dependencies: NumPy (always); PyCoulomb (optional, install via pip for preferred path).
+    - Dependencies: NumPy, PyCoulomb (required; install via 'pip install pycoulomb').
+    - Reference: Okada (1985) Surface deformation due to shear and tensile faults in a half-space.
     """
     if len(params) != 8:
         raise GAMError("okada_forward expects 8 parameters: x0,y0,d,L,W,strike,dip,slip")
@@ -167,11 +163,7 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
         return los
 
     else:
-        logger.warning("Okada model fallback: PyCoulomb not available, using Mogi proxy (reduced fidelity).")
-        # Fallback to existing Mogi approximation (expects meters)
-        dv = L * W * slip  # Approximate volume change (m³)
-        obs_3d = np.column_stack([obs_pos, np.zeros(len(obs_pos))])
-        return mogi_forward(np.array([x0, y0, d, dv]), obs_3d, inc, head, poisson)
+        raise ImportError("PyCoulomb not available. Install with 'pip install pycoulomb' for accurate Okada modeling.")
 
 
 class InSARInverter(Inverter):
