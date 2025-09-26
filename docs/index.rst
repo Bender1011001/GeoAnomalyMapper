@@ -10,14 +10,15 @@ Welcome to GeoAnomalyMapper's documentation!
    user/installation
    user/quickstart
    user/user_guide
+   scientific_methods
 
 .. toctree::
    :maxdepth: 2
    :caption: Tutorials:
 
-   tutorials/01_basic_analysis
-   tutorials/02_multi_modality_fusion
-   tutorials/03_global_processing
+   tutorials/01_basic_analysis.ipynb
+   tutorials/02_multi_modality_fusion.ipynb
+   tutorials/03_global_processing.ipynb
 
 .. toctree::
    :maxdepth: 2
@@ -49,8 +50,6 @@ Welcome to GeoAnomalyMapper's documentation!
    :caption: Troubleshooting:
 
    troubleshooting/common_issues
-   troubleshooting/faq
-   troubleshooting/support
 
 .. toctree::
    :maxdepth: 1

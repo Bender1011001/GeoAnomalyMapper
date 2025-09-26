@@ -274,6 +274,7 @@ def setup_logging():
 def pytest_configure(config):
     """Add custom markers."""
     config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "validation: mark test as scientific validation test")
 
 def pytest_runtest_setup(item):
     """Skip tests requiring optional deps."""
