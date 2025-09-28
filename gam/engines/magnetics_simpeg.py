@@ -12,7 +12,7 @@ from scipy.interpolate import RegularGridInterpolator, griddata
 
 import simpeg
 from simpeg import (
-    data,
+    data as spdata,
     data_misfit,
     directives,
     inversion,
@@ -27,6 +27,7 @@ from discretize import TreeMesh
 from discretize.utils import active_from_xyz
 from simpeg import inverse_problem
 from simpeg.potential_fields import magnetics
+from simpeg.potential_fields.utils import depth_weighting
 
 from gam.core.utils import transform_coordinates
 
@@ -183,14 +184,19 @@ class MagneticInverter(Inverter):
             store_sensitivities="forward_only",
         )
 
-        # Data misfit (5% relative or 1 nT absolute)
-        data_obj = data.Data(dobs=observed)
+        # Build Data object with standard deviations for each observation.
+        # SimPEG's least-squares formulation requires a per-datum standard deviation.
+        # We assume a relative error (default 5%) of the absolute anomaly plus a noise floor (1 nT).
+        rel_err = float(kwargs.get("relative_error", 0.05))
+        floor_nt = float(kwargs.get("noise_floor_nt", 1.0))
+        # Standard deviation in nT
+        std = rel_err * np.abs(observed) + floor_nt
+        data_obj = spdata.Data(dobs=observed)
+        data_obj.standard_deviation = std
         dmis = data_misfit.L2DataMisfit(data=data_obj, simulation=sim)
-        dmis.relative_error = np.ones(len(observed)) * 0.05
-        dmis.noise_floor = np.ones(len(observed)) * 1.0
 
-        # Regularization with depth weighting
-        w_depth = regularization.depth_weighting(self.mesh, indActive=active_cells, exponent=2.0)
+        # Regularization with depth weighting.  Use the potential_fields.utils version.
+        w_depth = depth_weighting(self.mesh, indActive=active_cells, exponent=2.0)
         reg_type = kwargs.get('reg_type', kwargs.get('regularization', {}).get('type', 'l2'))
         mapping = maps.IdentityMap(nP=int(active_cells.sum()))
         if reg_type == 'l2':
@@ -211,27 +217,38 @@ class MagneticInverter(Inverter):
         m0 = kwargs.get('reference_model', np.full(self.mesh.nC, self.background_sus))
         reg.mref = m0
 
-        # Depth weighting
-        if kwargs.get('depth_weighting', True):
-            wr = sim.getJtJdiag(m0) ** 0.5
-            wr = wr / np.linalg.norm(wr)
-            reg.cell_weights = wr
+        # Additional weighting using approximate sensitivity.  Normalize so that weights sum to unity.
+        if kwargs.get("depth_weighting", True):
+            try:
+                wr = sim.getJtJdiag(m0) ** 0.5
+                if np.linalg.norm(wr) > 0:
+                    wr = wr / np.linalg.norm(wr)
+                reg.cell_weights = wr
+            except Exception:
+                # Fall back to depth weighting only
+                reg.cell_weights = w_depth
 
         # Optimization
         opt = optimization.InexactGaussNewton(maxIter=kwargs.get('max_iterations', 15))
 
         # Inversion setup
         invProb = inverse_problem.BaseInvProblem(dmis, reg, opt)
-        beta0_ratio = kwargs.get('beta0_ratio', 1.0)
-        target_misfit = kwargs.get('target_misfit', len(observed))
+        beta0_ratio = float(kwargs.get("beta0_ratio", 1.0))
+        # Target misfit: for L2 data misfit, chi^2 target ~ 0.5 * N (number of observations)
+        N = len(observed)
+        target_misfit = float(kwargs.get("target_misfit", 0.5 * N))
         directives_list = [
             directives.BetaEstimate_ByEig(beta0_ratio=beta0_ratio),
             directives.UpdateSensitivityWeights(),
+            directives.BetaSchedule(coolingFactor=float(kwargs.get("beta_cooling", 2.0))),
             directives.TargetMisfit(target=target_misfit),
-            directives.SaveOutputEveryIteration(),
+            directives.SaveOutputEveryIteration(save_txt=False),
         ]
-        if reg_type == 'tv':
-            directives_list.append(directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1))
+        if reg_type != "l2":
+            # Total variation / sparse. Use IRLS to approximate L1.
+            directives_list.append(
+                directives.Update_IRLS(f_min_change=1e-2, maxIRLSIter=10, beta_tol=1e-1, coolEps=1.5)
+            )
         self.inv = inversion.BaseInversion(invProb, directiveList=directives_list)
 
         # Directives included in inversion setup
@@ -245,8 +262,8 @@ class MagneticInverter(Inverter):
         if phi_d > 1.5 * chi2:
             raise InversionConvergenceError(f"phi_d={phi_d:.2f} > 1.5*chi2={1.5*chi2:.2f}")
 
-        # Uncertainty
-        uncertainty = self._estimate_uncertainty(m_rec, self.inv)
+        # Uncertainty: diagonal posterior variance approximation
+        uncertainty = self._estimate_uncertainty_diag(sim, data_obj, reg, m_rec)
 
         # Interpolate to grid
         model_3d, unc_3d = self._interpolate_to_grid(m_rec, uncertainty, data, mask)
@@ -337,16 +354,33 @@ class MagneticInverter(Inverter):
         locations = np.column_stack([x, y, np.zeros(len(lons_flat))])
         return locations
 
-    def _estimate_uncertainty(self, m_rec: npt.NDArray[np.float64], inv: inversion.BaseInversion) -> npt.NDArray[np.float64]:
-        """Uncertainty from Hessian diagonal."""
-        sigma_d = 1.0
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            H = inv.reg.hessian(m_rec, req_grad=False)
-            unc = np.sqrt(np.diag(np.linalg.pinv(H)) * sigma_d**2)
-        unc = unc[inv.reg.indActive]
+    def _estimate_uncertainty_diag(
+        self,
+        sim: magnetics.simulation.Simulation3DIntegral,
+        data_obj: spdata.Data,
+        reg: regularization.BaseRegularization,
+        m_rec: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
+        """
+        Approximate posterior standard deviation from diagonal of (Jᵀ Wdᵀ Wd J + β R)⁻¹.
+        Uses Simulation3DIntegral.getJtJdiag if available; falls back to 10% |m|.
+        """
+        try:
+            # Weighting by inverse standard deviation
+            Wd = 1.0 / np.maximum(data_obj.standard_deviation, 1e-12)
+            jtjd = sim.getJtJdiag(Wd=Wd, m=m_rec)
+            beta = float(self.inv.invProb.beta) if hasattr(self.inv, "invProb") else 1.0
+            # Regularization diagonal (alpha_s term)
+            reg_diag = getattr(reg, "alpha_s", 1.0) * np.ones_like(jtjd)
+            diag_A = jtjd + beta * reg_diag
+            var = 1.0 / np.maximum(diag_A, 1e-12)
+            std = np.sqrt(var)
+        except Exception:
+            # Fallback: 10% of recovered susceptibility magnitude
+            std = 0.10 * np.abs(m_rec) + 1e-12
+        # Full array on mesh
         full_unc = np.zeros(self.mesh.nC)
-        full_unc[inv.reg.indActive] = unc
+        full_unc[reg.indActive] = std
         return full_unc
 
     def _interpolate_to_grid(self, model_flat: npt.NDArray[np.float64], unc_flat: npt.NDArray[np.float64],
