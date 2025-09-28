@@ -275,9 +275,13 @@ class InSARInverter(Inverter):
         if 'incidence' in data.ds and 'heading' in data.ds:
             inc_grid = data.ds['incidence'].values.flatten()[mask]
             head_grid = data.ds['heading'].values.flatten()[mask]
+            # Use mean incidence/heading for metadata if arrays provided
+            inc = float(np.nanmean(inc_grid))
+            head = float(np.nanmean(head_grid))
         else:
-            inc = kwargs.get('inc', data.ds.attrs.get('incidence', 0.3))
-            head = kwargs.get('head', data.ds.attrs.get('heading', 0.0))
+            # Use provided or metadata defaults
+            inc = float(kwargs.get('inc', data.ds.attrs.get('incidence', 0.3)))
+            head = float(kwargs.get('head', data.ds.attrs.get('heading', 0.0)))
             inc_grid = np.full(len(obs_xy), inc)
             head_grid = np.full(len(obs_xy), head)
         obs_pos = np.column_stack([obs_xy, np.zeros(len(obs_xy))])  # z=0
@@ -293,13 +297,21 @@ class InSARInverter(Inverter):
         K = kwargs.get('sources', 2)  # Number of sources
         source_type = kwargs.get('source_type', 'mogi')
         if source_type == 'mogi':
+            # Least-squares forward function capturing LOS geometry
             forward_func = lambda theta, obs: mogi_multi_forward(theta, obs, inc_grid, head_grid, self.poisson)
+            # Grid search forward function explicitly passes inc_grid and head_grid
+            gs_forward = lambda theta, obs, inc, head: mogi_multi_forward(theta, obs, inc, head, self.poisson)
             n_params = 4 * K
-            param_names = [f'x{i+1}', f'y{i+1}', f'depth{i+1}', f'dV{i+1}' for i in range(K)]
+            param_names = []
+            for i in range(K):
+                param_names += [f'x{i+1}', f'y{i+1}', f'depth{i+1}', f'dV{i+1}']
         elif source_type == 'okada':
-            # For multi-Okada, more params; for now single
+            # Single Okada source
             K = 1
+            # Least-squares forward uses per-pixel inc/head from closure
             forward_func = lambda p, obs: okada_forward(p, obs[:, :2], inc_grid, head_grid, self.poisson)
+            # Grid search forward ignores passed inc/head and uses closure-defined arrays
+            gs_forward = lambda p, obs, inc, head: okada_forward(p, obs[:, :2], inc_grid, head_grid, self.poisson)
             n_params = 8
             param_names = ['x0', 'y0', 'depth', 'L', 'W', 'strike', 'dip', 'slip']
         else:
@@ -309,7 +321,8 @@ class InSARInverter(Inverter):
         bounds = kwargs.get('grid_bounds', {'x': [obs_xy[:,0].min()-50000, obs_xy[:,0].max()+50000],
                                             'y': [obs_xy[:,1].min()-50000, obs_xy[:,1].max()+50000],
                                             'depth': [0, 10000], 'dV': [-1e6, 1e6]})
-        init_single = self._grid_search(lambda p, obs: forward_func(p[:4], obs) if source_type=='mogi' else forward_func(p, obs), los_disp, obs_pos, bounds, n_grid=10)
+        # Initial guess via coarse grid search. For Mogi, search over first source; Okada uses all params
+        init_single = self._grid_search(gs_forward, los_disp, obs_pos, inc_grid, head_grid, bounds, n_grid=10)
         if source_type == 'mogi' and K > 1:
             init_guess = np.tile(init_single, K)
             init_guess[4:] += np.random.normal(0, 10000, n_params-4)  # Perturb others
@@ -339,10 +352,16 @@ class InSARInverter(Inverter):
             raise InversionConvergenceError(f"Cost={res.cost:.2f} > threshold")
 
         params = res.x
-        pred_disp = forward_func(params, obs_pos, inc_grid, head_grid)
+        # Compute predicted displacements using best-fit parameters
+        if source_type == 'mogi':
+            pred_disp = mogi_multi_forward(params, obs_pos, inc_grid, head_grid, self.poisson)
+        else:
+            # Okada forward uses only the first two coordinates of obs_pos
+            pred_disp = okada_forward(params, obs_pos[:, :2], inc_grid, head_grid, self.poisson)
 
         # Uncertainty (Fisher approx)
-        J = self._compute_jacobian(forward_func, params, obs_pos, inc_grid, head_grid)
+        # Use grid-search forward function for Jacobian (accepts inc/head grids)
+        J = self._compute_jacobian(gs_forward, params, obs_pos, inc_grid, head_grid)
         cov = np.linalg.pinv(J.T @ J) * np.var(res.fun)
         unc_params = np.sqrt(np.diag(cov))
         

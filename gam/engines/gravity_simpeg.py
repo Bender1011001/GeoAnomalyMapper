@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +13,7 @@ from scipy.interpolate import RegularGridInterpolator, griddata
 
 import simpeg
 from simpeg import (
-    data,
+    data as spdata,
     data_misfit,
     directives,
     inversion,
@@ -28,6 +28,7 @@ from discretize import TreeMesh
 from discretize.utils import active_from_xyz
 from simpeg import inverse_problem
 from simpeg.potential_fields import gravity
+from simpeg.potential_fields.utils import depth_weighting
 
 from gam.core.utils import transform_coordinates, reverse_transform_coordinates
 from gam.core.config import get_config
@@ -145,129 +146,169 @@ class GravityInverter(Inverter):
             np.random.seed(random_seed)
             simpeg.utils.rand.seed(random_seed)
 
-        # Validate input
-        if 'data' not in data.ds:
+        # Validate input and mask NaNs
+        if "data" not in data.ds:
             raise GAMError("ProcessedGrid missing 'data' variable")
-        observed = data.ds['data'].values.flatten()  # mGal
-        if np.any(np.isnan(observed)):
-            warnings.warn("NaN values in observed data; masking")
-            mask = ~np.isnan(observed)
-            observed = observed[mask]
+        obs_mgal_flat = data.ds["data"].values.reshape(-1)
+        valid = ~np.isnan(obs_mgal_flat)
+        if not np.any(valid):
+            raise GAMError("No valid gravity observations (all NaN).")
 
-        config = get_config()
+        # Observation locations at surface (z=0)
+        all_xyz = self._get_locations(data)
+        xyz = all_xyz[valid, :]
+        obs_mgal = obs_mgal_flat[valid].copy()
 
-        # Generate mesh
-        mesh_config = kwargs.get('mesh_config', {'type': 'tree', 'hmin': 10.0, 'hmax': 1000.0})
-        mesh_gen = MeshGenerator()
-        self.mesh = mesh_gen.create_mesh(data, **mesh_config)
-        active_cells = self._get_active_cells(data)
-
-        # Create survey and problem
-        locations = self._get_locations(data)
-        receiver_list = gravity.receivers.Point(locations, components=("gz",))
-        src = gravity.sources.SourceField(receiver_list=[receiver_list])
+        # Create survey with selected component
+        component = kwargs.get("component", "gz")
+        rx = gravity.receivers.Point(xyz, components=(component,))
+        src = gravity.sources.SourceField(receiver_list=[rx])
         self.survey = gravity.survey.Survey(source_field=src)
 
-        terrain_correction = kwargs.get('terrain_correction', bool(config.get('modeling', {}).get('gravity', {}).get('dem_path')) or 'topography' in data.ds.attrs)
+        # Terrain correction option
+        config = get_config()
+        terrain_correction = kwargs.get(
+            "terrain_correction",
+            bool(config.get("modeling", {}).get("gravity", {}).get("dem_path"))
+            or "topography" in data.ds.attrs,
+        )
         if terrain_correction:
-            correction = self._compute_terrain_correction(data)
-            observed -= correction
-            logger.info("Terrain correction subtracted from observed gravity data.")
+            tc = self._compute_terrain_correction(data)
+            if tc.shape[0] == self.survey.nD:
+                obs_mgal = obs_mgal - tc
+                logger.info(
+                    f"Applied terrain correction: range [{tc.min():.2f}, {tc.max():.2f}] mGal"
+                )
+            else:
+                logger.warning("Terrain correction size mismatch; skipping correction.")
 
-        rho_map = maps.IdentityMap(nP=int(active_cells.sum()))
+        # Mesh and active cells
+        mesh_cfg = kwargs.get("mesh_config", {"type": "tree", "hmin": 10.0, "hmax": 1000.0})
+        mesh_gen = MeshGenerator()
+        self.mesh = mesh_gen.create_mesh(data, **mesh_cfg)
+        actv = self._get_active_cells(data)
+        n_actv = int(actv.sum())
+        if n_actv == 0:
+            raise GAMError("No active cells (check mesh/topography).")
+
+        # Simulation for density contrast
+        rho_map = maps.IdentityMap(nP=n_actv)
         sim = gravity.simulation.Simulation3DIntegral(
-            survey=self.survey, mesh=self.mesh, rhoMap=rho_map, indActive=active_cells,
+            survey=self.survey,
+            mesh=self.mesh,
+            rhoMap=rho_map,
+            indActive=actv,
             store_sensitivities="forward_only",
         )
 
-        observed_si = observed * 1e-5  # Convert mGal to m/s² for SimPEG consistency
-
-        # Observed data now terrain-corrected if applicable; forward uses flat datum
-
-        # Data misfit
-        data_obj = data.Data(dobs=observed_si)
+        # Data object (SI units: m/s^2)
+        dobs_si = obs_mgal * 1e-5
+        data_obj = spdata.Data(survey=self.survey, dobs=dobs_si)
+        # Define standard deviation as relative error plus noise floor
+        rel_err = float(kwargs.get("relative_error", 0.05))
+        floor_mgal = float(kwargs.get("noise_floor_mgal", 0.1))
+        std_si = rel_err * np.abs(dobs_si) + (floor_mgal * 1e-5)
+        data_obj.standard_deviation = std_si
         dmis = data_misfit.L2DataMisfit(data=data_obj, simulation=sim)
-        # Relative error 5% or 0.1 mGal equivalent
-        dmis.relative_error = np.ones(len(observed_si)) * 0.05
-        dmis.noise_floor = np.ones(len(observed_si)) * (0.1 * 1e-5)
 
         # Regularization with depth weighting
-        w_depth = regularization.depth_weighting(self.mesh, indActive=active_cells, exponent=2.0)
-        reg_type = kwargs.get('reg_type', config.get('modeling', {}).get('gravity', {}).get('regularization', 'l2'))
-        mapping = maps.IdentityMap(nP=int(active_cells.sum()))
-        if reg_type == 'l2':
-            reg = regularization.Simple(
-                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth,
-            )
-        else:  # TV
+        wr = depth_weighting(self.mesh, indActive=actv, exponent=2.0)
+        reg_type = kwargs.get("reg_type", "l2").lower()
+        if reg_type == "tv":
             reg = regularization.Sparse(
-                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth, norms=[0,1,1,1]
+                mesh=self.mesh,
+                indActive=actv,
+                mapping=rho_map,
+                cell_weights=wr,
+                norms=[0, 1, 1, 1],
             )
-        reg_params = kwargs.get('regularization', {'alpha_s': 1e-4, 'alpha_x': 1, 'alpha_y': 1, 'alpha_z': 1})
-        reg.alpha_s = reg_params['alpha_s']
-        reg.alpha_x = reg_params['alpha_x']
-        reg.alpha_y = reg_params['alpha_y']
-        reg.alpha_z = reg_params['alpha_z']
+        else:
+            reg = regularization.Simple(
+                mesh=self.mesh, indActive=actv, mapping=rho_map, cell_weights=wr
+            )
+        reg_params = kwargs.get(
+            "regularization",
+            {"alpha_s": 1e-4, "alpha_x": 1.0, "alpha_y": 1.0, "alpha_z": 1.0},
+        )
+        reg.alpha_s = float(reg_params.get("alpha_s", 1e-4))
+        reg.alpha_x = float(reg_params.get("alpha_x", 1.0))
+        reg.alpha_y = float(reg_params.get("alpha_y", 1.0))
+        reg.alpha_z = float(reg_params.get("alpha_z", 1.0))
 
-        # Reference model
-        m0 = kwargs.get('reference_model', np.zeros(self.mesh.nC))
-        reg.mref = m0
+        # Reference model on active cells
+        mref_full = kwargs.get("reference_model", None)
+        if mref_full is None:
+            mref = np.zeros(n_actv)
+        else:
+            if mref_full.shape[0] != self.mesh.nC:
+                raise GAMError("reference_model must be full-length (mesh.nC).")
+            mref = mref_full[actv]
+        reg.mref = mref
 
         # Optimization
-        opt = optimization.InexactGaussNewton(maxIter=kwargs.get('max_iterations', 20))
+        opt = optimization.InexactGaussNewton(maxIter=int(kwargs.get("max_iterations", 20)))
 
-        # Inversion
         invProb = inverse_problem.BaseInvProblem(dmis, reg, opt)
-        beta0_ratio = kwargs.get('beta0_ratio', 1.0)
-        target_misfit = kwargs.get('target_misfit', len(observed_si))
+        beta0_ratio = float(kwargs.get("beta0_ratio", 1.0))
+        N = self.survey.nD
+        target = float(kwargs.get("target_misfit", 0.5 * N))
         directives_list = [
             directives.BetaEstimate_ByEig(beta0_ratio=beta0_ratio),
             directives.UpdateSensitivityWeights(),
-            directives.TargetMisfit(target=target_misfit),
-            directives.SaveOutputEveryIteration(),
+            directives.BetaSchedule(coolingFactor=float(kwargs.get("beta_cooling", 2.0))),
+            directives.SaveOutputEveryIteration(save_txt=False),
+            directives.TargetMisfit(target=target),
         ]
-        if reg_type == 'tv':
-            directives_list.append(directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1))
+        if reg_type == "tv":
+            directives_list.append(
+                directives.Update_IRLS(
+                    f_min_change=1e-2, maxIRLSIter=10, beta_tol=1e-1, coolEps=1.5
+                )
+            )
+
         self.inv = inversion.BaseInversion(invProb, directiveList=directives_list)
 
-        # Directives included in inversion setup
+        # Run inversion starting from zero model
+        m0 = np.zeros(n_actv)
+        m_actv = self.inv.run(m0)
 
-        # Run inversion
-        m_rec = self.inv.run(np.zeros(int(active_cells.sum())))
+        # Convergence check using phi_d
+        phi_d = float(dmis.phi_d)
+        if not np.isfinite(phi_d) or phi_d > 1.2 * target:
+            raise InversionConvergenceError(
+                f"Did not hit target misfit: phi_d={phi_d:.3f} vs target={target:.3f}"
+            )
 
-        # Check convergence
-        phi_d = self.inv.dmis.phi_d
-        chi2 = len(observed_si)
-        if phi_d > 1.5 * chi2:  # Rough target
-            raise InversionConvergenceError(f"phi_d={phi_d:.2f} > 1.5*chi2={1.5*chi2:.2f}")
+        # Uncertainty approximation on active cells
+        unc_actv = self._estimate_uncertainty_diag(sim, data_obj, reg, m_actv)
 
-        # Uncertainty (diagonal approx)
-        uncertainty = self._estimate_uncertainty(m_rec, self.inv)
-
-        # Convert to density (contrast * base)
-        density_model = m_rec * self.base_density  # Assuming m_rec is contrast
-
-        # Interpolate to data grid (3D)
-        model_3d, unc_3d = self._interpolate_to_grid(density_model, uncertainty, data)
+        # Interpolate to (lat,lon,depth) grid
+        model_3d, unc_3d = self._interpolate_to_grid(m_actv, unc_actv, data, actv)
 
         metadata = {
-            'converged': phi_d <= 1.5 * chi2,
-            'iterations': self.inv.nIterations,
-            'residuals': phi_d,
-            'units': 'kg/m³',
-            'algorithm': 'simpeg_gravity_tree',
-            'parameters': {
-                'base_density': self.base_density,
-                'regularization': reg_params,
-                'max_iterations': kwargs.get('max_iterations', 20),
-                'terrain_correction': terrain_correction,
-                'regularization_type': reg_type,
+            "converged": phi_d <= 1.2 * target,
+            "phi_d": phi_d,
+            "target": target,
+            "units": "kg/m^3 (density contrast)",
+            "algorithm": "SimPEG gravity (Simulation3DIntegral, TreeMesh)",
+            "parameters": {
+                "regularization": reg_params,
+                "reg_type": reg_type,
+                "relative_error": rel_err,
+                "noise_floor_mgal": floor_mgal,
+                "beta_cooling": float(kwargs.get("beta_cooling", 2.0)),
+                "max_iterations": int(kwargs.get("max_iterations", 20)),
+                "component": component,
+                "terrain_correction": bool(terrain_correction),
+                "n_obs": int(N),
+                "n_active_cells": int(n_actv),
             },
         }
 
-        results = InversionResults(model=model_3d, uncertainty=unc_3d, metadata=metadata)
-        logger.info(f"Gravity inversion completed: {results.model.shape}, converged={metadata['converged']}")
-        return results
+        logger.info(
+            f"Gravity inversion OK: N={N}, phi_d={phi_d:.3f}, active={n_actv}, shape={model_3d.shape}"
+        )
+        return InversionResults(model=model_3d, uncertainty=unc_3d, metadata=metadata)
 
     def fuse(self, models: List[InversionResults], **kwargs) -> npt.NDArray[np.float64]:
         """
@@ -464,25 +505,51 @@ class GravityInverter(Inverter):
         full_unc[inv.reg.indActive] = unc
         return full_unc
 
-    def _interpolate_to_grid(self, model_flat: npt.NDArray[np.float64], unc_flat: npt.NDArray[np.float64],
-                             data: ProcessedGrid) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Interpolate model from active cells to data grid using griddata."""
-        actv = self._get_active_cells(data)
-        cc = self.mesh.gridCC[actv]
-        model_active = model_flat
-        unc_active = unc_flat[actv]
-        # Data points in xyz
-        lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
-        depths = data.ds['depth'].values
-        lat_flat, lon_flat = lats.ravel(), lons.ravel()
-        x_data, y_data = transform_coordinates(lon_flat, lat_flat)
-        # For each depth level
-        model_3d = np.zeros((len(data.ds['lat']), len(data.ds['lon']), len(depths)))
+    def _estimate_uncertainty_diag(
+        self,
+        sim: gravity.simulation.Simulation3DIntegral,
+        d: spdata.Data,
+        reg: regularization.BaseRegularization,
+        m_actv: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
+        """
+        Diagonal posterior variance approximation: diag((Jᵀ Wdᵀ Wd J + β R)⁻¹).
+        Uses getJtJdiag if available; else returns conservative 10% of |m|.
+        """
+        try:
+            Wd = 1.0 / np.maximum(d.standard_deviation, 1e-12)
+            jtjd = sim.getJtJdiag(Wd=Wd, m=m_actv)
+            beta = float(self.inv.invProb.beta) if hasattr(self.inv, "invProb") else 1.0
+            reg_diag = getattr(reg, "alpha_s", 1.0) * np.ones_like(jtjd)
+            diag_A = jtjd + beta * reg_diag
+            var = 1.0 / np.maximum(diag_A, 1e-12)
+            return np.sqrt(var)
+        except Exception as e:
+            logger.warning(f"Uncertainty diag fallback (reason: {e})")
+            return 0.10 * np.abs(m_actv) + 1e-9
+
+    def _interpolate_to_grid(
+        self,
+        m_actv: npt.NDArray[np.float64],
+        u_actv: npt.NDArray[np.float64],
+        grid: ProcessedGrid,
+        actv: npt.NDArray[np.bool_],
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """Interpolate active-cell model to (lat, lon, depth)."""
+        assert self.mesh is not None
+        cc = self.mesh.gridCC[actv]  # (n_actv, 3)
+        lat = grid.ds["lat"].values
+        lon = grid.ds["lon"].values
+        depth = grid.ds["depth"].values
+        LON, LAT = np.meshgrid(lon, lat, indexing="xy")
+        x_data, y_data = transform_coordinates(LON.ravel(), LAT.ravel())
+        model_3d = np.zeros((len(lat), len(lon), len(depth)), dtype=float)
         unc_3d = np.zeros_like(model_3d)
-        for i_d, d in enumerate(depths):
-            z_data = np.full(len(lat_flat), -d)  # assume depth positive down
-            points_data = np.column_stack([x_data, y_data, z_data])
-            # Interpolate
-            model_3d[:, :, i_d] = griddata(cc, model_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
-            unc_3d[:, :, i_d] = griddata(cc, unc_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
+        for k, d in enumerate(depth):
+            z_data = -float(d) * np.ones_like(x_data)
+            points = np.column_stack([x_data, y_data, z_data])
+            m_slice = griddata(cc, m_actv, points, method="linear", fill_value=0.0)
+            u_slice = griddata(cc, u_actv, points, method="linear", fill_value=0.0)
+            model_3d[:, :, k] = m_slice.reshape(len(lat), len(lon))
+            unc_3d[:, :, k] = u_slice.reshape(len(lat), len(lon))
         return model_3d, unc_3d
