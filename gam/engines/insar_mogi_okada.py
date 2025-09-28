@@ -30,45 +30,45 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def mogi_forward(params: np.ndarray, obs_los: np.ndarray, inc: float, head: float, 
-                 poisson: float = 0.25) -> np.ndarray:
-    """
-    Mogi point source forward model for LOS displacement.
+def mogi_uxyz(x, y, z, x0, y0, d, dV, nu=0.25):
+    """Mogi displacements ux, uy, uz."""
+    dx = x - x0
+    dy = y - y0
+    dz = z + d  # depth positive down
+    r = np.sqrt(dx**2 + dy**2 + dz**2)
+    r3 = r**3
+    ux = dV * dx * dz / (4 * np.pi * r3)
+    uy = dV * dy * dz / (4 * np.pi * r3)
+    uz = dV * (r**2 - 2 * dz**2) / (4 * np.pi * r3)
+    return ux, uy, uz
 
-    Parameters
-    ----------
-    params : np.ndarray
-        [x, y, depth, dv] - location (m), depth (m), volume change (m³)
-    obs_los : np.ndarray
-        Observation points [N, 3] (x, y, los_unit_vector)
-    inc : float
-        Incidence angle (rad)
-    head : float
-        Heading angle (rad)
-    poisson : float
-        Poisson ratio
-
-    Returns
-    -------
-    np.ndarray
-        Predicted LOS displacements (m)
+def mogi_multi_forward(theta: np.ndarray, obs_pos: np.ndarray, inc_grid: np.ndarray, head_grid: np.ndarray, nu: float = 0.25) -> np.ndarray:
     """
-    x0, y0, d, dv = params
-    r = np.sqrt((obs_los[:, 0] - x0)**2 + (obs_los[:, 1] - y0)**2 + d**2)
-    disp_u = dv * (x0 - obs_los[:, 0]) * d / (4 * np.pi * r**3)
-    disp_v = dv * (y0 - obs_los[:, 1]) * d / (4 * np.pi * r**3)
-    disp_w = dv * r**2 - 3 * d**2 / (4 * np.pi * r**3)
+    Multi-source Mogi forward model for LOS displacement.
     
-    # LOS unit vector
-    los = np.array([np.sin(inc) * np.cos(head), np.sin(inc) * np.sin(head), np.cos(inc)])
-    los_disp = disp_u * los[0] + disp_v * los[1] + disp_w * los[2]
-    return los_disp
+    theta: flat array [x0_1, y0_1, d_1, dV_1, ..., x0_K, y0_K, d_K, dV_K]
+    obs_pos: N x 3 (x, y, z=0)
+    inc_grid, head_grid: N (flattened incidence and heading in rad)
+    """
+    K = len(theta) // 4
+    pred = np.zeros(len(obs_pos))
+    x, y, z = obs_pos[:, 0], obs_pos[:, 1], obs_pos[:, 2]
+    for i in range(K):
+        idx = 4 * i
+        x0, y0, d, dV = theta[idx:idx+4]
+        ux, uy, uz = mogi_uxyz(x, y, z, x0, y0, d, dV, nu)
+        # Per-pixel LOS
+        los_x = np.sin(inc_grid) * np.cos(head_grid)
+        los_y = np.sin(inc_grid) * np.sin(head_grid)
+        los_z = np.cos(inc_grid)
+        pred += ux * los_x + uy * los_y + uz * los_z
+    return pred
 
 
-def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: float,
+def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc_grid: np.ndarray, head_grid: np.ndarray,
                   poisson: float = 0.25) -> np.ndarray:
     """
-    Okada (1985) rectangular dislocation forward model for InSAR LOS displacement.
+    Okada (1985) rectangular dislocation forward model for InSAR LOS displacement with per-pixel LOS.
 
     Computes surface displacements due to a rectangular fault in elastic half-space.
     Uses PyCoulomb library for accurate Okada solution (strike-slip with rake=0;
@@ -85,12 +85,9 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
         - strike, dip: Fault orientation (degrees clockwise from north; dip from horizontal).
         - slip: Strike-slip amount (meters; positive right-lateral).
     obs_pos : np.ndarray
-        Shape (N, 2): Observation points as [longitude, latitude] (degrees).
-        N is number of points; assumes geographic coordinates consistent with InSAR conventions.
-    inc : float
-        Radar incidence angle (radians; 0=zenith, pi/2=nadir).
-    head : float
-        Radar heading angle (radians; 0=north, pi/2=east, clockwise).
+        Shape (N, 3): Observation points as [x, y, z=0] in meters.
+    inc_grid, head_grid : np.ndarray
+        Shape (N,): Incidence and heading angles in radians per observation.
     poisson : float
         Poisson's ratio (unitless; default 0.25 for crust).
 
@@ -101,11 +98,11 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
 
     Notes
     -----
-    - Units: lon/lat degrees, depth/L/W meters (converted to km internally for PyCoulomb),
+    - Units: x/y/z meters, depth/L/W meters (converted to km internally for PyCoulomb),
       angles radians (inc/head) or degrees (strike/dip), slip meters.
     - PyCoulomb: Accurate analytical Okada for uniform slip rectangular fault.
       Assumes pure strike-slip (rake=0); depth to top edge. Internal conversion from
-      assumed local meters to degrees uses ~111 km/deg scale (approximate; best for
+      local meters to degrees uses ~111 km/deg scale (approximate; best for
       small regions near equator/lon=0; distortion <1% for 100km at mid-latitudes).
       Update conversion with reference lon/lat for production accuracy.
     - Fault parameters: Configurable via InSARInverter kwargs or global config.yaml
@@ -118,8 +115,8 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
     """
     if len(params) != 8:
         raise GAMError("okada_forward expects 8 parameters: x0,y0,d,L,W,strike,dip,slip")
-    if obs_pos.ndim != 2 or obs_pos.shape[1] != 2:
-        raise GAMError("obs_pos must be (N, 2)")
+    if obs_pos.shape[1] != 3:
+        raise GAMError("obs_pos must be (N, 3)")
 
     x0, y0, d, L, W, strike, dip, slip = params
 
@@ -149,15 +146,13 @@ def okada_forward(params: np.ndarray, obs_pos: np.ndarray, inc: float, head: flo
         # Compute 3D displacements (E, N, U in m)
         disps = cc.displacement_points_list(obs_points, [fault], poisson)
 
-        # Project to LOS (east, north, up dot unit vector)
-        los_vec = np.array([
-            np.sin(inc) * np.cos(head),  # East component
-            np.sin(inc) * np.sin(head),  # North
-            np.cos(inc)                 # Up
-        ])
+        # Project to per-pixel LOS (east, north, up dot unit vector)
+        los_x = np.sin(inc_grid) * np.cos(head_grid)  # East component
+        los_y = np.sin(inc_grid) * np.sin(head_grid)  # North
+        los_z = np.cos(inc_grid)  # Up
         los = np.array([
-            np.dot([d.dE, d.dN, d.dU], los_vec)
-            for d in disps
+            d.dE * los_x[i] + d.dN * los_y[i] + d.dU * los_z[i]
+            for i, d in enumerate(disps)
         ], dtype=float)
 
         return los
@@ -276,10 +271,16 @@ class InSARInverter(Inverter):
         obs_x, obs_y = transform_coordinates(lons_masked, lats_masked)
         obs_xy = np.column_stack([obs_x, obs_y])
         
-        # Radar geometry
-        inc = kwargs.get('inc', data.ds.attrs.get('incidence', 0.3))  # rad
-        head = kwargs.get('head', data.ds.attrs.get('heading', 0.0))  # rad
-        obs_los = np.column_stack([obs_xy, np.zeros(len(obs_xy))])  # z=0
+        # Radar geometry per pixel
+        if 'incidence' in data.ds and 'heading' in data.ds:
+            inc_grid = data.ds['incidence'].values.flatten()[mask]
+            head_grid = data.ds['heading'].values.flatten()[mask]
+        else:
+            inc = kwargs.get('inc', data.ds.attrs.get('incidence', 0.3))
+            head = kwargs.get('head', data.ds.attrs.get('heading', 0.0))
+            inc_grid = np.full(len(obs_xy), inc)
+            head_grid = np.full(len(obs_xy), head)
+        obs_pos = np.column_stack([obs_xy, np.zeros(len(obs_xy))])  # z=0
 
         # Atmospheric correction (planar ramp)
         if kwargs.get('atm_correction', True):
@@ -288,56 +289,81 @@ class InSARInverter(Inverter):
         # Noise estimation
         noise_std = np.std(los_disp) * 0.1  # 10% relative
 
-        # Source type
+        # Multi-source
+        K = kwargs.get('sources', 2)  # Number of sources
         source_type = kwargs.get('source_type', 'mogi')
         if source_type == 'mogi':
-            forward_func = lambda p, obs: mogi_forward(p, obs, inc, head, self.poisson)
-            n_params = 4  # x,y,depth,dv
-            param_names = ['x', 'y', 'depth', 'dv']
+            forward_func = lambda theta, obs: mogi_multi_forward(theta, obs, inc_grid, head_grid, self.poisson)
+            n_params = 4 * K
+            param_names = [f'x{i+1}', f'y{i+1}', f'depth{i+1}', f'dV{i+1}' for i in range(K)]
         elif source_type == 'okada':
-            forward_func = lambda p, obs: okada_forward(p, obs[:, :2], inc, head, self.poisson)
-            n_params = 8  # x0,y0,depth,L,W,strike,dip,slip
+            # For multi-Okada, more params; for now single
+            K = 1
+            forward_func = lambda p, obs: okada_forward(p, obs[:, :2], inc_grid, head_grid, self.poisson)
+            n_params = 8
             param_names = ['x0', 'y0', 'depth', 'L', 'W', 'strike', 'dip', 'slip']
         else:
             raise ValueError(f"Unknown source_type: {source_type}")
 
-        # Grid search for initial guess
+        # Initial guess: grid search for first source, duplicate for others
         bounds = kwargs.get('grid_bounds', {'x': [obs_xy[:,0].min()-50000, obs_xy[:,0].max()+50000],
                                             'y': [obs_xy[:,1].min()-50000, obs_xy[:,1].max()+50000],
-                                            'depth': [0, 10000]})
-        init_guess = self._grid_search(forward_func, los_disp, obs_los, bounds, n_grid=10)
-
-        # Bounds for lsq
-        if source_type == 'mogi':
-            bounds_lsq = ([bounds['x'][0], bounds['y'][0], 0, -1e6],  # dv can be negative (deflation)
-                          [bounds['x'][1], bounds['y'][1], bounds['depth'][1], 1e6])
+                                            'depth': [0, 10000], 'dV': [-1e6, 1e6]})
+        init_single = self._grid_search(lambda p, obs: forward_func(p[:4], obs) if source_type=='mogi' else forward_func(p, obs), los_disp, obs_pos, bounds, n_grid=10)
+        if source_type == 'mogi' and K > 1:
+            init_guess = np.tile(init_single, K)
+            init_guess[4:] += np.random.normal(0, 10000, n_params-4)  # Perturb others
         else:
-            bounds_lsq = ([bounds['x'][0], bounds['y'][0], 0, 1000, 1000, 0, 0, -10],
-                          [bounds['x'][1], bounds['y'][1], bounds['depth'][1], 50000, 50000, 360, 90, 10])
+            init_guess = init_single
+
+        # Bounds for lsq (per source)
+        if source_type == 'mogi':
+            lb_single = [bounds['x'][0], bounds['y'][0], 0, -1e8]
+            ub_single = [bounds['x'][1], bounds['y'][1], bounds['depth'][1], 1e8]
+            lb = lb_single * K
+            ub = ub_single * K
+        else:
+            lb = [bounds['x'][0], bounds['y'][0], 0, 1000, 1000, 0, 0, -10]
+            ub = [bounds['x'][1], bounds['y'][1], bounds['depth'][1], 50000, 50000, 360, 90, 10]
+        bounds_lsq = (lb, ub)
 
         # Least squares inversion
         res = least_squares(
-            lambda p: (forward_func(p, obs_los) - los_disp) / noise_std,
+            lambda theta: (forward_func(theta, obs_pos) - los_disp) / noise_std,
             init_guess,
             bounds=bounds_lsq,
-            max_nfev=kwargs.get('max_iterations', 100),
-            method='trf'
+            method="trf", max_nfev=kwargs.get('max_iterations', 1000)
         )
 
         if res.cost > 1.5 * len(los_disp):  # Normalized chi2 /2 >1.5
             raise InversionConvergenceError(f"Cost={res.cost:.2f} > threshold")
 
         params = res.x
-        pred_disp = forward_func(params, obs_los)
+        pred_disp = forward_func(params, obs_pos, inc_grid, head_grid)
 
-        # Uncertainty (Jacobian approx)
-        J = self._compute_jacobian(forward_func, params, obs_los)
-        cov = np.linalg.pinv(J.T @ J) * noise_std**2
+        # Uncertainty (Fisher approx)
+        J = self._compute_jacobian(forward_func, params, obs_pos, inc_grid, head_grid)
+        cov = np.linalg.pinv(J.T @ J) * np.var(res.fun)
         unc_params = np.sqrt(np.diag(cov))
+        
+        # Bootstrap uncertainty (optional, 100 resamples)
+        if kwargs.get('bootstrap_uncertainty', True):  # Default True as per task
+            n_bootstrap = 100
+            boot_params = np.zeros((n_bootstrap, len(params)))
+            for b in range(n_bootstrap):
+                residuals_boot = np.random.choice(res.fun, size=len(res.fun), replace=True)
+                def residual_boot(theta):
+                    pred = forward_func(theta, obs_pos, inc_grid, head_grid)
+                    return (pred - los_disp + residuals_boot * noise_std) / noise_std
+                res_boot = least_squares(residual_boot, params, bounds=bounds_lsq, method='trf')
+                boot_params[b] = res_boot.x
+            unc_bootstrap = np.std(boot_params, axis=0)
+            unc_params = np.sqrt(unc_params**2 + unc_bootstrap**2)  # Combine
 
-        # Volume/pressure
+        # Total volume/pressure for multi Mogi
         if source_type == 'mogi':
-            dv = params[3]
+            dvs = params[3::4]
+            dv = np.sum(dvs)
             pressure = (dv * self.modulus * (1 - self.poisson)) / ((1 + self.poisson) * (1 - 2 * self.poisson)) / 1e6  # MPa, approx
         else:
             dv = params[3] * params[4] * params[7]  # L*W*slip
@@ -375,10 +401,24 @@ class InSARInverter(Inverter):
         _, y_grid = transform_coordinates(lons_grid_y, lats_grid)
         src_y_idx = np.argmin(np.abs(y_grid - params[1]))
 
-        src_z_idx = np.argmin(np.abs(data.ds['depth'].values - params[2]))
-        model_3d[src_y_idx, src_x_idx, src_z_idx] = dv / cell_volume  # Density
+        # For multi-source, place deltas at each source location
+        model_3d = np.zeros((len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth'])))
         unc_3d = np.zeros_like(model_3d)
-        unc_3d[src_y_idx, src_x_idx, src_z_idx] = unc_params[3] / cell_volume
+        for i in range(K if source_type=='mogi' else 1):
+            if source_type == 'mogi':
+                px, py, pz, pdv = params[4*i:4*(i+1)]
+                p_unc = unc_params[4*i:4*(i+1)]
+            else:
+                px, py, pz, pdv = params[0], params[1], params[2], dv
+                p_unc = [unc_params[0], unc_params[1], unc_params[2], np.sqrt(np.sum(unc_params[3:5]**2 + unc_params[7]**2))]
+            
+            # Find indices (approx)
+            src_x_idx = np.argmin(np.abs(x_grid - px))
+            src_y_idx = np.argmin(np.abs(y_grid - py))
+            src_z_idx = np.argmin(np.abs(data.ds['depth'].values - pz))
+            model_3d[src_y_idx, src_x_idx, src_z_idx] += pdv / cell_volume
+            unc_3d[src_y_idx, src_x_idx, src_z_idx] += p_unc[3]**2 / cell_volume**2
+        unc_3d = np.sqrt(unc_3d)
 
         metadata = {
             'converged': res.cost <= 1.5 * len(los_disp),
@@ -430,8 +470,8 @@ class InSARInverter(Inverter):
         logger.debug(f"Atm correction: coeffs={coeffs}")
         return corrected
 
-    def _grid_search(self, forward_func, los_disp: npt.NDArray[np.float64], obs_los: npt.NDArray[np.float64],
-                     bounds: Dict[str, List[float]], n_grid: int = 10) -> np.ndarray:
+    def _grid_search(self, forward_func, los_disp: npt.NDArray[np.float64], obs_pos: npt.NDArray[np.float64],
+                     inc_grid: np.ndarray, head_grid: np.ndarray, bounds: Dict[str, List[float]], n_grid: int = 10) -> np.ndarray:
         """Coarse grid search for initial params."""
         x_grid = np.linspace(bounds['x'][0], bounds['x'][1], n_grid)
         y_grid = np.linspace(bounds['y'][0], bounds['y'][1], n_grid)
@@ -443,7 +483,7 @@ class InSARInverter(Inverter):
             for y in y_grid:
                 for d in depth_grid:
                     # Rough dv estimate (scale to data range)
-                    pred = forward_func(np.array([x, y, d, np.std(los_disp)]), obs_los)
+                    pred = forward_func(np.array([x, y, d, np.std(los_disp)]), obs_pos, inc_grid, head_grid)
                     cost = np.sum((pred - los_disp)**2)
                     if cost < best_cost:
                         best_cost = cost
@@ -456,14 +496,17 @@ class InSARInverter(Inverter):
         logger.info(f"Grid search best cost: {best_cost:.2f}")
         return best_params
 
-    def _compute_jacobian(self, forward_func, params: np.ndarray, obs_los: npt.NDArray[np.float64], 
-                          eps: float = 1e-6) -> npt.NDArray[np.float64]:
-        """Numerical Jacobian."""
+    def _compute_jacobian(self, forward_func, params: np.ndarray, obs_pos: npt.NDArray[np.float64],
+                          inc_grid: np.ndarray, head_grid: np.ndarray, eps: float = 1e-6) -> npt.NDArray[np.float64]:
+        """Numerical Jacobian for multi-source."""
         n_params = len(params)
-        J = np.zeros((len(obs_los), n_params))
+        J = np.zeros((len(obs_pos), n_params))
         for i in range(n_params):
             params_plus = params.copy()
             params_plus[i] += eps
-            pred_plus = forward_func(params_plus, obs_los)
-            J[:, i] = (pred_plus - forward_func(params - eps * np.eye(n_params)[i], obs_los)) / (2 * eps)
+            pred_plus = forward_func(params_plus, obs_pos, inc_grid, head_grid)
+            params_minus = params.copy()
+            params_minus[i] -= eps
+            pred_minus = forward_func(params_minus, obs_pos, inc_grid, head_grid)
+            J[:, i] = (pred_plus - pred_minus) / (2 * eps)
         return J
