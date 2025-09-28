@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, griddata
 
 import simpeg
 from simpeg import (
@@ -24,6 +24,8 @@ from simpeg import (
     utils,
 )
 from discretize import TreeMesh
+from discretize.utils import active_from_xyz
+from simpeg import inverse_problem
 from simpeg.potential_fields import magnetics
 
 from gam.core.utils import transform_coordinates
@@ -167,34 +169,43 @@ class MagneticInverter(Inverter):
 
         # Survey setup
         locations = self._get_locations(data)[mask]  # Filter valid
-        rx_list = [magnetics.receivers.Point(locations, components=["tmi"])]
-        src_field = magnetics.sources.UniformBackgroundField(rx_list, parameters=b0)
-        self.survey = simpeg.survey.Survey(src_field, rx_list)
+        receiver_list = magnetics.receivers.Point(locations, components=("tmi",))
+        src = magnetics.sources.SourceField(
+           receiver_list=[receiver_list],
+           parameters=magnetics.EarthField(B=np.linalg.norm(b0), inclination=np.rad2deg(inclination), declination=np.rad2deg(declination))
+        )
+        self.survey = magnetics.survey.Survey(source_field=src)
 
         # Simulation
-        sim = magnetics.simulation.Simulation3DLinear(
-            survey=self.survey,
-            mesh=self.mesh,
-            model_map=maps.IdentityMap(self.mesh),
-            indActive=active_cells,
+        chi_map = maps.IdentityMap(nP=int(active_cells.sum()))
+        sim = magnetics.simulation.Simulation3DIntegral(
+            survey=self.survey, mesh=self.mesh, chiMap=chi_map, indActive=active_cells,
+            store_sensitivities="forward_only",
         )
 
         # Data misfit (5% relative or 1 nT absolute)
-        dmisfit = data_misfit.L2DataMisfit(simulation=sim, data=sim.make_synthetic_data(observed, add_noise=True))
-        dmisfit.relative_error = np.ones(len(observed)) * 0.05
-        dmisfit.absolute_error = np.ones(len(observed)) * 1.0
+        data_obj = data.Data(dobs=observed)
+        dmis = data_misfit.L2DataMisfit(data=data_obj, simulation=sim)
+        dmis.relative_error = np.ones(len(observed)) * 0.05
+        dmis.noise_floor = np.ones(len(observed)) * 1.0
 
-        # Regularization
-        reg_type = kwargs.get('regularization', {}).get('type', 'smooth')
-        alpha = kwargs.get('regularization', {}).get('alpha', 1e-3)
-        if reg_type == 'smooth':
-            reg = regularization.WeightedLeastSquares(self.mesh, indActive=active_cells)
-        elif reg_type == 'compact':
-            reg = regularization.Sparse(self.mesh, indActive=active_cells, mapping=maps.IdentityMap(self.mesh))
-            reg.nP = 10  # Sparsity level
-        else:
-            raise ValueError(f"Unknown reg_type: {reg_type}")
-        reg.alpha_s = alpha
+        # Regularization with depth weighting
+        w_depth = regularization.depth_weighting(self.mesh, indActive=active_cells, exponent=2.0)
+        reg_type = kwargs.get('reg_type', kwargs.get('regularization', {}).get('type', 'l2'))
+        mapping = maps.IdentityMap(nP=int(active_cells.sum()))
+        if reg_type == 'l2':
+            reg = regularization.Simple(
+                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth,
+            )
+        else:  # TV
+            reg = regularization.Sparse(
+                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth, norms=[0,1,1,1]
+            )
+        reg_params = kwargs.get('regularization', {'alpha_s': 1e-4, 'alpha_x': 1, 'alpha_y': 1, 'alpha_z': 1})
+        reg.alpha_s = reg_params['alpha_s']
+        reg.alpha_x = reg_params['alpha_x']
+        reg.alpha_y = reg_params['alpha_y']
+        reg.alpha_z = reg_params['alpha_z']
 
         # Reference model
         m0 = kwargs.get('reference_model', np.full(self.mesh.nC, self.background_sus))
@@ -207,32 +218,29 @@ class MagneticInverter(Inverter):
             reg.cell_weights = wr
 
         # Optimization
-        opt = optimization.ProjectedGNCG(
-            maxIter=kwargs.get('max_iterations', 15),
-            lower=0.0,  # Non-negative susceptibility
-            upper=np.inf,
-            maxIterLS=15,
-            maxIterCG=6,
-            tolCG=1e-3,
-        )
+        opt = optimization.InexactGaussNewton(maxIter=kwargs.get('max_iterations', 15))
 
         # Inversion setup
-        self.inv = inversion.BaseInversion(dmisfit, reg, opt, beta0=1e2)
-
-        # Directives
-        self.inv.directiveList = [
-            directives.BetaSchedule(coolEps_q=True, beta0_ratio=1.0),
-            directives.BetaMaxIterative(maxIterLS=15, maxIter=30),
-            directives.TargetMisfit(),
-            directives.UpdateSensitivityWeights(everyIter=False),
-            directives.UpdatePreconditioner(),
+        invProb = inverse_problem.BaseInvProblem(dmis, reg, opt)
+        beta0_ratio = kwargs.get('beta0_ratio', 1.0)
+        target_misfit = kwargs.get('target_misfit', len(observed))
+        directives_list = [
+            directives.BetaEstimate_ByEig(beta0_ratio=beta0_ratio),
+            directives.UpdateSensitivityWeights(),
+            directives.TargetMisfit(target=target_misfit),
+            directives.SaveOutputEveryIteration(),
         ]
+        if reg_type == 'tv':
+            directives_list.append(directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1))
+        self.inv = inversion.BaseInversion(invProb, directiveList=directives_list)
+
+        # Directives included in inversion setup
 
         # Run
-        m_rec = self.inv.run(m0)
+        m_rec = self.inv.run(np.zeros(int(active_cells.sum())))
 
         # Convergence check
-        phi_d = self.inv.dmis.host
+        phi_d = self.inv.dmis.phi_d
         chi2 = len(observed)
         if phi_d > 1.5 * chi2:
             raise InversionConvergenceError(f"phi_d={phi_d:.2f} > 1.5*chi2={1.5*chi2:.2f}")
@@ -300,26 +308,26 @@ class MagneticInverter(Inverter):
         return fused
 
     def _get_active_cells(self, data: ProcessedGrid) -> npt.NDArray[np.bool_]:
-        """Active cells based on data extent."""
-        pad = 0.1
-        lons_min, lons_max = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
-        lats_min, lats_max = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
-        # Approximate center for transformation
-        lon_center = (lons_min + lons_max) / 2
-        lat_center = (lats_min + lats_max) / 2
-        xmin, _ = transform_coordinates([lons_min], [lat_center])
-        xmax, _ = transform_coordinates([lons_max], [lat_center])
-        _, ymin = transform_coordinates([lon_center], [lats_min])
-        _, ymax = transform_coordinates([lon_center], [lats_max])
-        zmin, zmax = 0, 3000  # Magnetic depth range
+        """Define active cells below topography using active_from_xyz."""
+        topo = data.ds.attrs.get('topography')
+        if topo is None:
+            # Default: below z=0
+            actv = self.mesh.gridCC[:, 2] <= 0
+            logger.info("No topography; active cells below z=0")
+            return actv
 
-        active = self.mesh.gridCC[:, 0] > xmin[0]
-        active &= self.mesh.gridCC[:, 0] < xmax[0]
-        active &= self.mesh.gridCC[:, 1] > ymin[0]
-        active &= self.mesh.gridCC[:, 1] < ymax[0]
-        active &= self.mesh.gridCC[:, 2] > -zmax
-        active &= self.mesh.gridCC[:, 2] < -zmin
-        return active
+        # Create surface points: lat, lon, elev
+        lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
+        elevs = topo.ravel()  # assume topo is (n_lat, n_lon)
+        # Transform to xyz
+        x_surf, y_surf = transform_coordinates(lons.ravel(), lats.ravel())
+        z_surf = elevs  # assume elev in meters
+        topo_points = np.c_[x_surf, y_surf, z_surf]
+
+        # Active below topo
+        actv = active_from_xyz(self.mesh, topo_points, "top")
+        logger.info(f"Active cells from topo: {actv.sum()} / {self.mesh.nC}")
+        return actv
 
     def _get_locations(self, data: ProcessedGrid) -> npt.NDArray[np.float64]:
         """Observation locations."""
@@ -343,17 +351,23 @@ class MagneticInverter(Inverter):
 
     def _interpolate_to_grid(self, model_flat: npt.NDArray[np.float64], unc_flat: npt.NDArray[np.float64],
                              data: ProcessedGrid, mask: Optional[npt.NDArray[np.bool_]] = None) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Interpolate to 3D grid."""
-        # Reshape to mesh shape (assume known)
-        # For simplicity, use full mesh shape; adjust based on active
-        mesh_shape = (len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth']))
-        if model_flat.size != np.prod(mesh_shape):
-            # Pad or resize as needed
-            model_reshaped = np.pad(model_flat, (0, np.prod(mesh_shape) - model_flat.size), mode='constant')
-            model_reshaped = model_reshaped[:np.prod(mesh_shape)].reshape(mesh_shape)
-        else:
-            model_reshaped = model_flat.reshape(mesh_shape)
-        
-        unc_reshaped = np.pad(unc_flat, (0, np.prod(mesh_shape) - unc_flat.size), mode='constant')[:np.prod(mesh_shape)].reshape(mesh_shape)
-        
-        return model_reshaped, unc_reshaped
+        """Interpolate model from active cells to data grid using griddata."""
+        actv = self._get_active_cells(data)
+        cc = self.mesh.gridCC[actv]
+        model_active = model_flat
+        unc_active = unc_flat[actv]
+        # Data points in xyz
+        lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
+        depths = data.ds['depth'].values
+        lat_flat, lon_flat = lats.ravel(), lons.ravel()
+        x_data, y_data = transform_coordinates(lon_flat, lat_flat)
+        # For each depth level
+        model_3d = np.zeros((len(data.ds['lat']), len(data.ds['lon']), len(depths)))
+        unc_3d = np.zeros_like(model_3d)
+        for i_d, d in enumerate(depths):
+            z_data = np.full(len(lat_flat), -d)  # assume depth positive down
+            points_data = np.column_stack([x_data, y_data, z_data])
+            # Interpolate
+            model_3d[:, :, i_d] = griddata(cc, model_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
+            unc_3d[:, :, i_d] = griddata(cc, unc_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
+        return model_3d, unc_3d

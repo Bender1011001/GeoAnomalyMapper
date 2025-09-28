@@ -115,11 +115,7 @@ class JointInverter(Inverter):
         model_stack = np.stack([m.model for m in models], axis=-1)  # (lat, lon, depth, n_mod)
         unc_stack = np.stack([m.uncertainty for m in models], axis=-1)
 
-        # Normalization
-        normalize = kwargs.get('normalize', True)
-        if normalize:
-            norm_method = normalize if isinstance(normalize, str) else 'zscore'
-            model_stack = self._normalize_models(model_stack, unc_stack, method=norm_method)
+        # Normalization removed: use physical joint objective instead of z-score per slice
 
         # Auto weights from confidence (inverse unc)
         if 'weights' not in kwargs or kwargs['weights'] is None:
@@ -151,26 +147,7 @@ class JointInverter(Inverter):
         logger.info(f"Joint fusion ({scheme}): shape={prob_map.shape}, mean_prob={np.mean(prob_map):.3f}")
         return prob_map
 
-    def _normalize_models(self, model_stack: npt.NDArray[np.float64], unc_stack: npt.NDArray[np.float64],
-                          method: str = 'zscore') -> npt.NDArray[np.float64]:
-        """Normalize models per depth slice."""
-        n_mod, n_depth = model_stack.shape[-2], model_stack.shape[2]
-        for d in range(n_depth):
-            slice_mod = model_stack[:, :, d, :]
-            if method == 'zscore':
-                mean_d = np.nanmean(slice_mod, axis=(0,1))
-                std_d = np.nanstd(slice_mod, axis=(0,1))
-                std_d[std_d == 0] = 1.0
-                slice_mod = (slice_mod - mean_d) / std_d
-            elif method == 'minmax':
-                min_d = np.nanmin(slice_mod, axis=(0,1))
-                max_d = np.nanmax(slice_mod, axis=(0,1))
-                range_d = max_d - min_d
-                range_d[range_d == 0] = 1.0
-                slice_mod = (slice_mod - min_d) / range_d
-            model_stack[:, :, d, :] = slice_mod
-        logger.debug(f"Models normalized ({method})")
-        return model_stack
+    # _normalize_models removed: no per-slice z-score normalization
 
     def _cross_gradient_fusion(self, model_stack: npt.NDArray[np.float64], unc_stack: npt.NDArray[np.float64],
                                weights: npt.NDArray[np.float64], **kwargs) -> npt.NDArray[np.float64]:

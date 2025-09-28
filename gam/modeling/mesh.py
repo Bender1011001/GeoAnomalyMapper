@@ -89,7 +89,7 @@ class MeshGenerator:
 
     def create_mesh(self, data: ProcessedGrid, type: str = 'adaptive', **kwargs) -> Union[simpeg.mesh.BaseMesh, pg.Mesh]:
         """
-        Create mesh based on type.
+        Create shared octree mesh for modalities.
 
         Parameters
         ----------
@@ -98,13 +98,15 @@ class MeshGenerator:
         type : str
             'regular', 'adaptive', 'seismic' (default: 'adaptive').
         **kwargs : dict
-            - 'hmin': float, min cell size (m, default: 10)
-            - 'hmax': float, max cell size (m, default: 1000)
+            - 'base_cell_m': float, base cell size (default: 25)
+            - 'padding_cells': int, padding levels (default: 6)
+            - 'hmin': float, min cell size near surface/receivers (default: base_cell_m / 4)
+            - 'hmax': float, max cell size at depth (default: base_cell_m * 32)
             - 'depth': float, max depth (m, default: 5000)
             - 'target_crs': str (default: 'EPSG:32633' UTM)
             - 'dimension': int (2 or 3, default: 3)
             - 'refine_topo': bool (default: True)
-            - 'refine_data': bool (default: True)
+            - 'refine_receivers': bool (default: True, refine around data locations)
             - 'quality_threshold': float (default: 5.0 aspect)
 
         Returns
@@ -126,14 +128,14 @@ class MeshGenerator:
 
     def create_simpeg_mesh(self, data: ProcessedGrid, mesh_type: str = 'adaptive', **kwargs) -> simpeg.mesh.BaseMesh:
         """
-        Create SimPEG mesh (Tensor or Tree).
+        Create shared octree TreeMesh for SimPEG modalities.
 
         Parameters
         ----------
         data : ProcessedGrid
-            For extent and refinement.
+            For extent and refinement (receivers at data locations).
         mesh_type : str
-            'regular' or 'adaptive'.
+            'regular' or 'adaptive' (octree).
         **kwargs : see create_mesh
 
         Returns
@@ -141,6 +143,14 @@ class MeshGenerator:
         simpeg.mesh.BaseMesh
             TensorMesh or TreeMesh.
         """
+        # Shared parameters
+        base_cell_m = kwargs.get('base_cell_m', 25.0)
+        padding_cells = kwargs.get('padding_cells', 6)
+        hmin = kwargs.get('hmin', base_cell_m / 4)
+        hmax = kwargs.get('hmax', base_cell_m * 32)
+        depth = kwargs.get('depth', 5000.0)
+        dimension = kwargs.get('dimension', 3)
+
         # Project coords if needed
         target_crs = kwargs.get('target_crs', 'EPSG:32633')  # UTM example
         if self.crs != target_crs:
@@ -148,42 +158,44 @@ class MeshGenerator:
             x, y = self._project_coords(data.ds['lon'].values, data.ds['lat'].values)
             extent = [x.min(), x.max(), y.min(), y.max()]
         else:
-            # Assume degrees as m for demo; scale
-            extent = [data.ds['lon'].min() * 111000, data.ds['lon'].max() * 111000,
-                      data.ds['lat'].min() * 111000, data.ds['lat'].max() * 111000]
+            # Scale degrees to m
+            lon_extent = (data.ds['lon'].max() - data.ds['lon'].min()) * 111000
+            lat_extent = (data.ds['lat'].max() - data.ds['lat'].min()) * 111000
+            extent = [0, lon_extent, 0, lat_extent]
 
-        hmin = kwargs.get('hmin', 10.0)
-        hmax = kwargs.get('hmax', 1000.0)
-        depth = kwargs.get('depth', 5000.0)
-        dimension = kwargs.get('dimension', 3)
+        # Add padding: extend extent by hmax * padding_cells
+        pad = hmax * padding_cells
+        extent_padded = [extent[0] - pad, extent[1] + pad, extent[2] - pad, extent[3] + pad]
 
         if mesh_type == 'regular':
-            # TensorMesh: uniform cells
-            n_cells_x = int((extent[1] - extent[0]) / hmin)
-            n_cells_y = int((extent[3] - extent[2]) / hmin)
-            n_cells_z = int(depth / hmin)
-            hx = np.ones(n_cells_x) * hmin
-            hy = np.ones(n_cells_y) * hmin
-            hz = np.ones(n_cells_z) * hmin
-            tensor_mesh = TensorMesh([hx, hy, hz], x0=[extent[0], extent[2], 0])
+            # TensorMesh: uniform cells based on base_cell_m
+            n_cells_x = int((extent_padded[1] - extent_padded[0]) / base_cell_m)
+            n_cells_y = int((extent_padded[3] - extent_padded[2]) / base_cell_m)
+            n_cells_z = int(depth / base_cell_m)
+            hx = np.ones(n_cells_x) * base_cell_m
+            hy = np.ones(n_cells_y) * base_cell_m
+            hz = np.ones(n_cells_z) * base_cell_m
+            tensor_mesh = TensorMesh([hx, hy, hz], x0=[extent_padded[0], extent_padded[2], 0])
             self._validate_mesh_quality(tensor_mesh, **kwargs)
-            logger.info(f"Created regular TensorMesh: {tensor_mesh.nC} cells")
+            logger.info(f"Created regular TensorMesh: {tensor_mesh.nC} cells with padding {padding_cells}")
             return tensor_mesh
         elif mesh_type == 'adaptive':
-            # TreeMesh: adaptive
-            # Initial coarse
-            n_base = 4
-            tree_mesh = TreeMesh(extent, hmin=hmin)
-            # Refine based on data/topo
-            if kwargs.get('refine_data', True):
-                tree_mesh = self._refine_data_density(tree_mesh, data.ds['lon'].values * 111000, 
-                                                      data.ds['lat'].values * 111000, hmin=hmin)
+            # Shared octree TreeMesh
+            tree_mesh = TreeMesh(extent_padded, hmin=hmin)
+            # Refine around receivers (data locations)
+            if kwargs.get('refine_receivers', True):
+                receiver_x = data.ds['lon'].values * 111000 if self.crs == 'EPSG:4326' else x
+                receiver_y = data.ds['lat'].values * 111000 if self.crs == 'EPSG:4326' else y
+                tree_mesh = self._refine_receivers(tree_mesh, receiver_x, receiver_y, hmin=hmin)
+            # Refine near surface/anomalies (top 500m)
+            tree_mesh = self._refine_surface(tree_mesh, hmin=hmin)
+            # Topography refinement
             if kwargs.get('refine_topo', True) and 'topography' in data.ds.attrs:
                 topo = data.ds.attrs['topography']
                 tree_mesh = self._refine_topography(tree_mesh, topo, hmin=hmin)
             tree_mesh.finalize()
             self._validate_mesh_quality(tree_mesh, **kwargs)
-            logger.info(f"Created adaptive TreeMesh: {tree_mesh.nC} cells")
+            logger.info(f"Created shared octree TreeMesh: {tree_mesh.nC} cells, padding {padding_cells}, base {base_cell_m}m")
             return tree_mesh
         else:
             raise ValueError(f"Invalid SimPEG mesh_type: {mesh_type}")
@@ -252,30 +264,46 @@ class MeshGenerator:
         x, y = self.transformer.transform(lons, lats)
         return x, y
 
-    def _refine_data_density(self, tree_mesh: simpeg.mesh.TreeMesh, x_data: np.ndarray, y_data: np.ndarray, 
-                             hmin: float, n_neighbors: int = 5) -> simpeg.mesh.TreeMesh:
-        """Refine TreeMesh where data dense."""
-        if len(x_data) == 0:
+    def _refine_receivers(self, tree_mesh: simpeg.mesh.TreeMesh, x_receivers: np.ndarray, y_receivers: np.ndarray,
+                          hmin: float, radius: float = 500.0) -> simpeg.mesh.TreeMesh:
+        """Refine around receiver (data) locations for shared mesh."""
+        if len(x_receivers) == 0:
             return tree_mesh
-        tree_data = KDTree(np.column_stack([x_data, y_data]))
-        # Find dense regions
-        dist, _ = tree_data.query(np.column_stack([x_data, y_data]), k=n_neighbors)
-        dense_mask = np.mean(dist, axis=1) < 100.0  # <100m average
-        dense_points = np.column_stack([x_data[dense_mask], y_data[dense_mask]])
-        # Insert points for refinement
-        for pt in dense_points[:100]:  # Limit to avoid over-refine
-            tree_mesh.insert_cells(pt, h=hmin)
-        logger.debug(f"Refined {len(dense_points)} data points")
+        for rx_x, rx_y in zip(x_receivers, y_receivers):
+            # Refine in sphere around receiver
+            tree_mesh.insert_cells([rx_x, rx_y, 0], h=hmin, max_level=4)  # Refine up to 4 levels
+            # Add nearby points
+            for dx in [-hmin, 0, hmin]:
+                for dy in [-hmin, 0, hmin]:
+                    pt = [rx_x + dx, rx_y + dy, 0]
+                    if np.sqrt(dx**2 + dy**2) < radius:
+                        tree_mesh.insert_cells(pt, h=hmin)
+        logger.debug(f"Refined around {len(x_receivers)} receivers")
+        return tree_mesh
+
+    def _refine_surface(self, tree_mesh: simpeg.mesh.TreeMesh, hmin: float, surface_depth: float = 500.0) -> simpeg.mesh.TreeMesh:
+        """Refine near surface for anomalies/receivers."""
+        # Refine top layers
+        surface_cells = tree_mesh.gridCC[tree_mesh.gridCC[:, 2] < surface_depth]
+        for cell in surface_cells[:200]:  # Limit
+            tree_mesh.insert_cells(cell[:2], h=hmin, max_level=3)
+        logger.debug(f"Refined surface to {surface_depth}m")
         return tree_mesh
 
     def _refine_topography(self, tree_mesh: simpeg.mesh.TreeMesh, topo: np.ndarray, hmin: float) -> simpeg.mesh.TreeMesh:
-        """Refine near surface topography."""
-        # Assume topo is 2D grid; sample points near z=0
-        # Simplified: refine top layer
-        surface_cells = tree_mesh.gridCC[tree_mesh.gridCC[:, 2] < 100]  # Top 100m
-        for cell in surface_cells[:50]:  # Sample
-            tree_mesh.insert_cells(cell[:2], h=hmin)  # x,y
-        logger.debug("Refined near topography")
+        """Refine below topography surface."""
+        # Sample topo points for refinement below surface
+        # Assume topo (n_lat, n_lon); flatten and add z=topo
+        if topo.ndim == 2:
+            lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')  # Assume data available
+            elevs = topo.ravel()
+            x_topo, y_topo = self._project_coords(lons.ravel(), lats.ravel()) if self.transformer else (lons.ravel()*111000, lats.ravel()*111000)
+            topo_points = np.column_stack([x_topo, y_topo, elevs])
+            # Refine just below each topo point
+            for pt in topo_points[::10]:  # Subsample
+                below_pt = [pt[0], pt[1], pt[2] - hmin]  # Below surface
+                tree_mesh.insert_cells(below_pt[:2], h=hmin)
+        logger.debug("Refined below topography")
         return tree_mesh
 
     def _refine_pygimli_data(self, mesh_pg: pg.Mesh, x_data: np.ndarray, y_data: np.ndarray, 

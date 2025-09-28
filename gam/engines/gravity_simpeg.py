@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 import numpy.typing as npt
 import rasterio
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, griddata
 
 import simpeg
 from simpeg import (
@@ -25,6 +25,8 @@ from simpeg import (
     utils,
 )
 from discretize import TreeMesh
+from discretize.utils import active_from_xyz
+from simpeg import inverse_problem
 from simpeg.potential_fields import gravity
 
 from gam.core.utils import transform_coordinates, reverse_transform_coordinates
@@ -162,9 +164,9 @@ class GravityInverter(Inverter):
 
         # Create survey and problem
         locations = self._get_locations(data)
-        receiver_list = [gravity.receivers.Point(locations, components=kwargs.get('component', 'gz'))]
-        source_field = gravity.sources.UniformBackgroundField(receiver_list=receiver_list)
-        self.survey = simpeg.survey.Survey(source_field, receiver_list)
+        receiver_list = gravity.receivers.Point(locations, components=("gz",))
+        src = gravity.sources.SourceField(receiver_list=[receiver_list])
+        self.survey = gravity.survey.Survey(source_field=src)
 
         terrain_correction = kwargs.get('terrain_correction', bool(config.get('modeling', {}).get('gravity', {}).get('dem_path')) or 'topography' in data.ds.attrs)
         if terrain_correction:
@@ -172,11 +174,10 @@ class GravityInverter(Inverter):
             observed -= correction
             logger.info("Terrain correction subtracted from observed gravity data.")
 
-        simulation_obj = gravity.simulation.Simulation3DIntegral(
-            survey=self.survey,
-            mesh=self.mesh,
-            rhoMap=maps.IdentityMap(self.mesh),
-            indActive=active_cells,
+        rho_map = maps.IdentityMap(nP=int(active_cells.sum()))
+        sim = gravity.simulation.Simulation3DIntegral(
+            survey=self.survey, mesh=self.mesh, rhoMap=rho_map, indActive=active_cells,
+            store_sensitivities="forward_only",
         )
 
         observed_si = observed * 1e-5  # Convert mGal to m/s² for SimPEG consistency
@@ -184,27 +185,25 @@ class GravityInverter(Inverter):
         # Observed data now terrain-corrected if applicable; forward uses flat datum
 
         # Data misfit
-        dmisfit = data_misfit.L2DataMisfit(simulation=simulation_obj, data=d.Data(dobs=observed_si))
+        data_obj = data.Data(dobs=observed_si)
+        dmis = data_misfit.L2DataMisfit(data=data_obj, simulation=sim)
         # Relative error 5% or 0.1 mGal equivalent
-        dmisfit.relative_error = np.ones(len(observed_si)) * 0.05
-        dmisfit.absolute_error = np.ones(len(observed_si)) * (0.1 * 1e-5)
+        dmis.relative_error = np.ones(len(observed_si)) * 0.05
+        dmis.noise_floor = np.ones(len(observed_si)) * (0.1 * 1e-5)
 
-        # Regularization
-        reg_params = kwargs.get('regularization', {'alpha_s': 1e-4, 'alpha_x': 1, 'alpha_y': 1, 'alpha_z': 1})
-        reg_type = kwargs.get('regularization_type', config.get('modeling', {}).get('gravity', {}).get('regularization', 'l2'))
-        mapping = maps.IdentityMap(self.mesh)
+        # Regularization with depth weighting
+        w_depth = regularization.depth_weighting(self.mesh, indActive=active_cells, exponent=2.0)
+        reg_type = kwargs.get('reg_type', config.get('modeling', {}).get('gravity', {}).get('regularization', 'l2'))
+        mapping = maps.IdentityMap(nP=int(active_cells.sum()))
         if reg_type == 'l2':
-            reg = regularization.WeightedLeastSquares(
-                mesh=self.mesh,
-                indActive=active_cells,
-                mapping=mapping,
+            reg = regularization.Simple(
+                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth,
             )
-        else:
+        else:  # TV
             reg = regularization.Sparse(
-                mesh=self.mesh,
-                indActive=active_cells,
-                mapping=mapping,
+                mesh=self.mesh, indActive=active_cells, mapping=mapping, cell_weights=w_depth, norms=[0,1,1,1]
             )
+        reg_params = kwargs.get('regularization', {'alpha_s': 1e-4, 'alpha_x': 1, 'alpha_y': 1, 'alpha_z': 1})
         reg.alpha_s = reg_params['alpha_s']
         reg.alpha_x = reg_params['alpha_x']
         reg.alpha_y = reg_params['alpha_y']
@@ -215,40 +214,30 @@ class GravityInverter(Inverter):
         reg.mref = m0
 
         # Optimization
-        opt = optimization.ProjectedGNCG(
-            maxIter=kwargs.get('max_iterations', 20),
-            lower=-np.inf,
-            upper=np.inf,
-            maxIterLS=20,
-            maxIterCG=10,
-            tolCG=1e-3,
-        )
+        opt = optimization.InexactGaussNewton(maxIter=kwargs.get('max_iterations', 20))
 
         # Inversion
-        self.inv = inversion.BaseInversion(
-            dmisfit, reg, opt, beta0=1e3, betaest=inversion.directives.BetaEstimateBySingularValue()
-        )
-
-        # Directives
-        beta_max = 20
-        self.inv.directiveList = [
-            directives.BetaSchedule(coolEps_q=True, coolEps_beta=1.0, beta0_ratio=1.0),
-            directives.BetaMaxIterative(beta0=beta_max, maxIterLS=20, maxIter=40),
-            directives.TargetMisfit(),
+        invProb = inverse_problem.BaseInvProblem(dmis, reg, opt)
+        beta0_ratio = kwargs.get('beta0_ratio', 1.0)
+        target_misfit = kwargs.get('target_misfit', len(observed_si))
+        directives_list = [
+            directives.BetaEstimate_ByEig(beta0_ratio=beta0_ratio),
             directives.UpdateSensitivityWeights(),
-            directives.UpdatePreconditioner(),
+            directives.TargetMisfit(target=target_misfit),
+            directives.SaveOutputEveryIteration(),
         ]
-        if reg_type == 'l1':
-            self.inv.directiveList.append(
-                directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1)
-            )
+        if reg_type == 'tv':
+            directives_list.append(directives.Update_IRLS(maxIRLSIter=10, beta_tol=1e-1))
+        self.inv = inversion.BaseInversion(invProb, directiveList=directives_list)
+
+        # Directives included in inversion setup
 
         # Run inversion
-        m_rec = self.inv.run(m0)
+        m_rec = self.inv.run(np.zeros(int(active_cells.sum())))
 
         # Check convergence
-        phi_d = self.inv.dmis.host
-        chi2 = len(observed)
+        phi_d = self.inv.dmis.phi_d
+        chi2 = len(observed_si)
         if phi_d > 1.5 * chi2:  # Rough target
             raise InversionConvergenceError(f"phi_d={phi_d:.2f} > 1.5*chi2={1.5*chi2:.2f}")
 
@@ -320,27 +309,26 @@ class GravityInverter(Inverter):
         return fused
 
     def _get_active_cells(self, data: ProcessedGrid) -> npt.NDArray[np.bool_]:
-        """Define active cells based on data extent and padding."""
-        # Pad 10% for boundary effects
-        pad = 0.1
-        lons_min, lons_max = data.ds['lon'].min() - pad, data.ds['lon'].max() + pad
-        lats_min, lats_max = data.ds['lat'].min() - pad, data.ds['lat'].max() + pad
-        # Approximate center for transformation
-        lon_center = (lons_min + lons_max) / 2
-        lat_center = (lats_min + lats_max) / 2
-        xmin, _ = transform_coordinates([lons_min], [lat_center])
-        xmax, _ = transform_coordinates([lons_max], [lat_center])
-        _, ymin = transform_coordinates([lon_center], [lats_min])
-        _, ymax = transform_coordinates([lon_center], [lats_max])
-        zmin, zmax = 0, 5000  # Default depth range in meters
+        """Define active cells below topography using active_from_xyz."""
+        topo = data.ds.attrs.get('topography')
+        if topo is None:
+            # Default: below z=0
+            actv = self.mesh.gridCC[:, 2] <= 0
+            logger.info("No topography; active cells below z=0")
+            return actv
 
-        active = self.mesh.gridCC[:, 0] > xmin[0]
-        active &= self.mesh.gridCC[:, 0] < xmax[0]
-        active &= self.mesh.gridCC[:, 1] > ymin[0]
-        active &= self.mesh.gridCC[:, 1] < ymax[0]
-        active &= self.mesh.gridCC[:, 2] > -zmax
-        active &= self.mesh.gridCC[:, 2] < -zmin
-        return active
+        # Create surface points: lat, lon, elev
+        lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
+        elevs = topo.ravel()  # assume topo is (n_lat, n_lon)
+        # Transform to xyz
+        x_surf, y_surf = transform_coordinates(lons.ravel(), lats.ravel())
+        z_surf = elevs  # assume elev in meters
+        topo_points = np.c_[x_surf, y_surf, z_surf]
+
+        # Active below topo
+        actv = active_from_xyz(self.mesh, topo_points, "top")
+        logger.info(f"Active cells from topo: {actv.sum()} / {self.mesh.nC}")
+        return actv
 
     def _get_locations(self, data: ProcessedGrid) -> npt.NDArray[np.float64]:
         """Extract observation locations from grid centers."""
@@ -478,15 +466,23 @@ class GravityInverter(Inverter):
 
     def _interpolate_to_grid(self, model_flat: npt.NDArray[np.float64], unc_flat: npt.NDArray[np.float64],
                              data: ProcessedGrid) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Interpolate flat model to 3D grid."""
-        # Get cell centers
-        cc = self.mesh.gridCC
-        # Create interpolator (3D)
-        interp_model = RegularGridInterpolator((data.ds['lat'].values, data.ds['lon'].values, data.ds['depth'].values),
-                                               model_flat.reshape(self.mesh.shape_cells), method='linear', bounds_error=False)
-        interp_unc = RegularGridInterpolator((data.ds['lat'].values, data.ds['lon'].values, data.ds['depth'].values),
-                                             unc_flat.reshape(self.mesh.shape_cells), method='linear', bounds_error=False)
-        points = np.array(np.meshgrid(data.ds['lat'], data.ds['lon'], data.ds['depth'], indexing='ij')).T.reshape(-1, 3)
-        model_3d = interp_model(points).reshape(len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth']))
-        unc_3d = interp_unc(points).reshape(len(data.ds['lat']), len(data.ds['lon']), len(data.ds['depth']))
+        """Interpolate model from active cells to data grid using griddata."""
+        actv = self._get_active_cells(data)
+        cc = self.mesh.gridCC[actv]
+        model_active = model_flat
+        unc_active = unc_flat[actv]
+        # Data points in xyz
+        lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
+        depths = data.ds['depth'].values
+        lat_flat, lon_flat = lats.ravel(), lons.ravel()
+        x_data, y_data = transform_coordinates(lon_flat, lat_flat)
+        # For each depth level
+        model_3d = np.zeros((len(data.ds['lat']), len(data.ds['lon']), len(depths)))
+        unc_3d = np.zeros_like(model_3d)
+        for i_d, d in enumerate(depths):
+            z_data = np.full(len(lat_flat), -d)  # assume depth positive down
+            points_data = np.column_stack([x_data, y_data, z_data])
+            # Interpolate
+            model_3d[:, :, i_d] = griddata(cc, model_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
+            unc_3d[:, :, i_d] = griddata(cc, unc_active, points_data, method='linear', fill_value=0.0).reshape(len(data.ds['lat']), len(data.ds['lon']))
         return model_3d, unc_3d
