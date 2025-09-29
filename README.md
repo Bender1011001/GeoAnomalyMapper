@@ -39,7 +39,7 @@ Get started in seconds with the intuitive web dashboard—no coding required! Th
 
 1. Install GAM via pip:
    ```bash
-   pip install geoanomalymapper
+   pip install geoanomalymapper[dashboard]
    ```
 
 2. Launch the full system with one command:
@@ -80,6 +80,45 @@ The workflow is simple: Select preset → Draw region → Run analysis → Explo
 
 For a guided tour, check the [Dashboard User Guide](docs/user/dashboard_guide.md).
 
+## Dependency Management
+
+GAM uses a modern dependency management approach with `pyproject.toml` for project metadata and optional dependencies, combined with `pip-tools` for reproducible installations. This ensures flexibility in development while providing pinned versions for production builds.
+
+### Key Files
+- `pyproject.toml`: Defines core dependencies and optional extras (e.g., `dev`, `api`, `dashboard`, `geophysics`).
+- `requirements.in`: Unpinned core dependencies for flexibility.
+- `requirements-*.in`: Unpinned dependencies for specific extras (dev, api, dashboard).
+- `requirements.txt`: Pinned core dependencies (compiled from `requirements.in`).
+- `requirements-*.txt`: Pinned extras (compiled from respective `.in` files).
+
+### Workflow
+1. **Install Core Dependencies** (for basic CLI use):
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Install with Extras** (e.g., for dashboard):
+   ```bash
+   pip install -e .[dashboard]  # Editable install; uses pyproject.toml
+   # Or for full dev setup:
+   pip install -e .[dev,dashboard,api,geophysics]
+   ```
+
+3. **Update Dependencies** (when adding new packages to `.in` files):
+   ```bash
+   pip-compile --upgrade requirements.in requirements-dev.in requirements-api.in requirements-dashboard.in
+   ```
+   This regenerates the pinned `.txt` files with resolved dependencies.
+
+4. **Reinstall After Updates**:
+   ```bash
+   pip install -r requirements.txt  # For core
+   # Or reinstall extras via pyproject.toml
+   pip install -e .[dev]
+   ```
+
+This setup allows unpinned versions in `.in` files for broad compatibility during development, while `.txt` files ensure reproducible builds (e.g., in Docker). For more details, see [Dependency Guide](docs/developer/dependencies.md).
+
 ## Installation Instructions
 
 GAM supports multiple installation methods. We recommend Python 3.10+ and a virtual environment. The dashboard requires no additional setup beyond the core installation.
@@ -96,7 +135,7 @@ Ideal for researchers or analysts using the web dashboard.
 
 2. Install via pip (includes Streamlit and FastAPI dependencies):
    ```bash
-   pip install geoanomalymapper[gui]
+   pip install geoanomalymapper[dashboard]
    ```
 
 3. Verify and start the GUI:
@@ -119,11 +158,16 @@ For those modifying code or extending functionality.
    ```bash
    conda create -n gam-dev python=3.12
    conda activate gam-dev
-   pip install -r requirements-dev.txt  # Includes testing tools
-   pip install -e .[gui]  # Editable install with GUI support
+   pip install -e .[dev]  # Editable install with dev tools
    ```
 
-3. Start development dashboard:
+3. To update dependencies after changes:
+   ```bash
+   pip-compile --upgrade requirements.in  # Regenerate pinned files
+   pip install -e .[dev,dashboard]  # Reinstall with extras
+   ```
+
+4. Start development dashboard:
    ```bash
    gam start --dev  # Enables hot-reload
    ```
@@ -136,14 +180,14 @@ For heavy geospatial processing with GUI.
    ```bash
    conda create -n gam-research -c conda-forge python=3.12 gdal obspy simpeg
    conda activate gam-research
-   pip install geoanomalymapper[gui]
+   pip install -e .[dashboard,geophysics]  # From source, or use pip install geoanomalymapper[dashboard,geophysics]
    ```
 
 **System Requirements**:
 - **OS**: Linux/macOS (preferred); Windows via WSL.
 - **Hardware**: 16GB+ RAM, multi-core CPU; GPU optional for 3D rendering.
 - **Storage**: 100GB+ for global data (use external drives or cloud caching).
-- **Dependencies**: See [requirements.txt](requirements.txt) for full list. Common issues: GDAL (use `conda install -c conda-forge gdal` if pip fails).
+- **Dependencies**: Managed via pyproject.toml and pip-tools. Common issues: GDAL (use `conda install -c conda-forge gdal` if pip fails).
 
 For troubleshooting, see [Installation Guide](docs/user/installation.md).
 

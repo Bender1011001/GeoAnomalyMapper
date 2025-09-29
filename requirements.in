@@ -1,0 +1,44 @@
+# Core dependencies for GeoAnomalyMapper
+# These are extracted from pyproject.toml [tool.poetry.dependencies] with unpinned versions for flexibility.
+# Organized by category for clarity.
+
+# Scientific computing
+numpy>=1.26.0
+scipy>=1.11.0
+pandas>=2.1.0
+scikit-learn>=1.3.0
+
+# Geospatial libraries
+geopandas>=0.14.0
+rasterio>=1.3.0
+shapely>=2.0.0
+pyproj>=3.6.0
+fiona>=1.9.0
+
+# Data handling and I/O
+xarray>=2023.8.0
+netcdf4>=1.6.0
+h5py>=3.9.0
+tables>=3.8.0
+imageio>=2.31.0
+pillow>=10.0.0
+
+# Visualization (core plotting needs)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.17.0
+
+# Utilities and infrastructure
+requests>=2.31.0
+pydantic>=2.4.0
+click>=8.1.0
+tqdm>=4.66.0
+joblib>=1.3.0
+pyyaml>=6.0.2
+tenacity>=8.2.0
+dask[complete]>=2024.8.0
+sqlalchemy>=1.4.0
+
+# No additional core dependencies found in requirements.txt or setup.py beyond these.
+# Transitive dependencies (e.g., affine from rasterio) will be resolved by pip-tools.
+# Optional/geophysics deps like simpeg, pygimli moved to extras.

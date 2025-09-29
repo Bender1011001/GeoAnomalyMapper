@@ -1,89 +1,46 @@
-# Multi-stage Dockerfile for GAM FastAPI Backend
-# Optimized for production deployment with uvicorn
+# Use common base images built from Dockerfile.base
+FROM gam-base:builder AS builder
 
-# Stage 1: Builder
-FROM python:3.12-slim-bookworm AS builder
-
-# Install system dependencies for geospatial and build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
-    libgdal-dev \
-    libgeos-dev \
-    libproj-dev \
-    libspatialindex-dev \
-    libnetcdf-dev \
-    libhdf5-dev \
-    libpq-dev \
-    libssl-dev \
-    libffi-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set Python environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Create and activate virtual environment
 ENV VIRTUAL_ENV=/opt/venv
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Upgrade pip and install build dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
-# Install Python dependencies
-WORKDIR /tmp/build
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir .[geophysics,visualization]
-
-# Copy source code
-COPY . /app
+ENV PATH="/opt/venv/bin:${PATH}"
 WORKDIR /app
+
+# Install only manifests first for caching
+# Supports either requirements.txt or pyproject.toml based installs
+COPY requirements.txt pyproject.toml ./
+
+# Primary path: requirements.txt present
+RUN if [ -f "requirements.txt" ]; then \
+      pip install --no-cache-dir -r requirements.txt ; \
+    fi
+
+# Optional extras commonly used by API; fastapi/uvicorn may be optional in pyproject extras
+# Keep compatible with both workflows by installing explicitly if not already present
+RUN pip install --no-cache-dir fastapi uvicorn
+
+# Copy source and install project
+COPY . /app
 RUN pip install --no-cache-dir -e .
 
-# Stage 2: Runtime
-FROM python:3.12-slim-bookworm AS runtime
+# ---------- Runtime ----------
+FROM gam-base:runtime AS runtime
 
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgdal31 \
-    libgeos-c1v5 \
-    libproj19 \
-    libspatialindex6v5 \
-    libnetcdf19 \
-    libhdf5-103 \
-    libpq5 \
-    libssl3 \
-    libffi8 \
-    ca-certificates \
-    curl \
-    gdal-bin \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy virtual environment from builder
 ENV VIRTUAL_ENV=/opt/venv
-COPY --from=builder /opt/venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Create non-root user
-RUN groupadd --gid 1000 gam && useradd --uid 1000 --gid 1000 -m gam
-RUN mkdir -p /app/data /app/results && chown -R gam:gam /app
-
-USER gam
+ENV PATH="/opt/venv/bin:${PATH}"
 WORKDIR /app
+USER root
 
-# Copy source code
-COPY --from=builder --chown=gam:gam /app .
+# Prepare writable locations consistent with compose volumes
+RUN mkdir -p /app/data /app/results && chown -R gam:gam /app
+USER gam
 
-# Expose port
+# Bring in the prebuilt venv and source tree from builder
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder --chown=gam:gam /app /app
+
 EXPOSE 8000
 
-# Health check: Verify FastAPI is responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000 || exit 1
+  CMD curl -f http://localhost:8000 || exit 1
 
-# Default command (overridden by docker-compose or scripts)
 CMD ["sh", "deployment/docker/start-api.sh"]
