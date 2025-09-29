@@ -1,0 +1,29 @@
+# Development dependencies for GeoAnomalyMapper
+# Includes testing, linting, formatting, type checking, and documentation tools.
+# Extracted and consolidated from pyproject.toml dev group and setup.py extras.
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+coverage>=7.6.0
+
+# Linting and formatting
+black>=23.9.0
+isort>=5.12.0
+flake8>=6.1.0
+mypy>=1.6.0
+pre-commit>=3.5.0
+
+# Documentation
+sphinx>=7.4.0
+
+# Jupyter and notebooks
+jupyter>=1.0.0
+ipykernel>=6.25.0
+notebook>=7.0.0
+
+# Utilities
+psutil>=6.0.0
+
+# Dependency management
+pip-tools>=7.0.0

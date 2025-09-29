@@ -1,0 +1,6 @@
+# API-specific dependencies for GeoAnomalyMapper
+# These are for the FastAPI backend and server.
+
+# Web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0

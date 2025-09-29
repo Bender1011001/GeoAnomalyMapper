@@ -2,6 +2,10 @@
 include LICENSE
 include README.md
 include requirements.txt
+include requirements.in
+include requirements-dev.in
+include requirements-api.in
+include requirements-dashboard.in
 include config.yaml
 include data_sources.yaml
 
