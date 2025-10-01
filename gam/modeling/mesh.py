@@ -9,8 +9,13 @@ import numpy as np
 import pyproj
 from scipy.spatial import KDTree
 
-import pygimli as pg
-from pygimli.meshtools import createMesh
+# Optional PyGIMLi: only required for seismic meshes
+try:
+    import pygimli as pg  # type: ignore
+    from pygimli import meshtools as pg_meshtools  # type: ignore
+except Exception:
+    pg = None  # type: ignore[assignment]
+    pg_meshtools = None  # type: ignore[assignment]
 import simpeg
 from discretize import TensorMesh, TreeMesh
 
@@ -215,6 +220,9 @@ class MeshGenerator:
         pg.Mesh
             RTree2D or RTree3D.
         """
+        # Guard: require PyGIMLi for seismic meshes
+        if pg is None or pg_meshtools is None:
+            raise GAMError("PyGIMLi is not installed. Install 'pygimli' to enable seismic mesh generation.")
         dimension = kwargs.get('dimension', 3)
         hmin = kwargs.get('hmin', 5.0)
         depth = kwargs.get('depth', 2000.0)
@@ -230,7 +238,7 @@ class MeshGenerator:
             mesh_pg = pg.extrude(mesh_pg, y=[(x_min + x_max)/2])
         else:
             # 3D RTree
-            plc = pg.meshtools.createPLC()
+            plc = pg_meshtools.createPLC()
             # Boundary box
             plc.createPolygon([(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)], isClosed=True)
             plc.createPolygon([(x_min, y_min, 0), (x_max, y_min, 0), (x_max, y_max, 0), (x_min, y_max, 0)], isClosed=True)

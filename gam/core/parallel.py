@@ -93,6 +93,8 @@ class DaskCoordinator:
         if self.backend == 'local':
             cluster = LocalCluster(
                 n_workers=self.n_workers,
+                threads_per_worker=2,
+                processes=False,
                 memory_limit=self.memory_limit,
                 dashboard_address=None,  # Disable for now
             )

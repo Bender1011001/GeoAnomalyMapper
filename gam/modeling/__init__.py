@@ -38,12 +38,29 @@ from .anomaly_detection import AnomalyDetector
 from .base import Inverter
 from .data_structures import AnomalyOutput, InversionResults
 from .fusion import JointInverter
-from .gravity import GravityInverter
-from .insar import InSARInverter
-from .magnetic import MagneticInverter
+# Import heavy engines lazily/optionally to avoid hard failures if optional deps are missing
+try:
+    from gam.engines.gravity_simpeg import GravityInverter  # requires simpeg, discretize
+except Exception as _e:
+    GravityInverter = None  # type: ignore
+    logging.getLogger(__name__).warning(f"GravityInverter unavailable: {type(_e).__name__}: {_e}")
+try:
+    from gam.engines.insar_mogi_okada import InSARInverter  # optional PyCoulomb at runtime
+except Exception as _e:
+    InSARInverter = None  # type: ignore
+    logging.getLogger(__name__).warning(f"InSARInverter unavailable: {type(_e).__name__}: {_e}")
+try:
+    from gam.engines.magnetics_simpeg import MagneticInverter  # requires simpeg, discretize
+except Exception as _e:
+    MagneticInverter = None  # type: ignore
+    logging.getLogger(__name__).warning(f"MagneticInverter unavailable: {type(_e).__name__}: {_e}")
 from .manager import ModelingManager
 from .mesh import MeshGenerator
-from .seismic import SeismicInverter
+try:
+    from gam.engines.seismic_pygimli import SeismicInverter  # requires pygimli
+except Exception as _e:
+    SeismicInverter = None  # type: ignore
+    logging.getLogger(__name__).warning(f"SeismicInverter unavailable: {type(_e).__name__}: {_e}")
 
 # Set up module logging
 logger = logging.getLogger(__name__)

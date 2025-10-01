@@ -14,11 +14,15 @@ from gam.modeling.anomaly_detection import AnomalyDetector
 from gam.modeling.base import Inverter
 from gam.modeling.data_structures import AnomalyOutput, InversionResults
 from gam.modeling.fusion import JointInverter
-from gam.modeling.gravity import GravityInverter
-from gam.modeling.insar import InSARInverter
-from gam.modeling.magnetic import MagneticInverter
+from gam.engines.gravity_simpeg import GravityInverter
+from gam.engines.insar_mogi_okada import InSARInverter
+from gam.engines.magnetics_simpeg import MagneticInverter
 from gam.modeling.mesh import MeshGenerator
-from gam.modeling.seismic import SeismicInverter
+try:
+    from gam.engines.seismic_pygimli import SeismicInverter
+except Exception as _e:
+    SeismicInverter = None  # type: ignore
+    logging.getLogger(__name__).warning(f"SeismicInverter unavailable: {type(_e).__name__}: {_e}")
 from gam.preprocessing.data_structures import ProcessedGrid
 
 
@@ -123,12 +127,16 @@ class ModelingManager:
         self.mesh_gen = MeshGenerator(crs='EPSG:4326')
         self.joint_fuser = JointInverter()
         self.anomaly_detector = AnomalyDetector()
-        self.inverter_registry = {
-            'gravity': GravityInverter(),
-            'magnetic': MagneticInverter(),
-            'seismic': SeismicInverter(),
-            'insar': InSARInverter(),
-        }
+        # Build registry only with available engines
+        self.inverter_registry = {}
+        if GravityInverter is not None:
+            self.inverter_registry['gravity'] = GravityInverter()
+        if MagneticInverter is not None:
+            self.inverter_registry['magnetic'] = MagneticInverter()
+        if SeismicInverter is not None:
+            self.inverter_registry['seismic'] = SeismicInverter()
+        if InSARInverter is not None:
+            self.inverter_registry['insar'] = InSARInverter()
         # Add more as implemented
 
     def load_config(self, path: str) -> ModelingConfig:

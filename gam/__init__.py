@@ -107,7 +107,7 @@ from .core.exceptions import GAMError, PipelineError
 from .core.utils import validate_bbox
 
 # CLI entry (if using Click/Argparse in core.cli)
-from .core.cli import cli  # For direct invocation if needed
+# from .core.cli import cli  # TODO: Implement CLI in core/cli.py for direct invocation
 
 __all__ = [
     # High-level

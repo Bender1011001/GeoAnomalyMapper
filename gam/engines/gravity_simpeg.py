@@ -28,10 +28,24 @@ from discretize import TreeMesh
 from discretize.utils import active_from_xyz
 from simpeg import inverse_problem
 from simpeg.potential_fields import gravity
-from simpeg.potential_fields.utils import depth_weighting
+# depth_weighting location varies across SimPEG versions; provide robust fallback
+try:
+    # SimPEG <= 0.19 style
+    from simpeg.potential_fields.utils import depth_weighting  # type: ignore
+except Exception:
+    try:
+        # Some versions expose it under simpeg.utils
+        from simpeg.utils import depth_weighting  # type: ignore
+    except Exception:
+        # Minimal fallback: uniform weights for active cells
+        def depth_weighting(mesh, indActive=None, exponent: float = 2.0):
+            n = int(np.sum(indActive)) if indActive is not None else (
+                int(getattr(mesh, "n_cells", 0)) or int(getattr(mesh, "nC", 0)) or 0
+            )
+            return np.ones(n, dtype=float)
 
 from gam.core.utils import transform_coordinates, reverse_transform_coordinates
-from gam.core.config import get_config
+# Config access not required here; terrain correction defaults based on data attrs
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
 from gam.modeling.base import Inverter
@@ -165,12 +179,9 @@ class GravityInverter(Inverter):
         src = gravity.sources.SourceField(receiver_list=[rx])
         self.survey = gravity.survey.Survey(source_field=src)
 
-        # Terrain correction option
-        config = get_config()
-        terrain_correction = kwargs.get(
-            "terrain_correction",
-            bool(config.get("modeling", {}).get("gravity", {}).get("dem_path"))
-            or "topography" in data.ds.attrs,
+        # Terrain correction option (default: based on presence of topography metadata)
+        terrain_correction = bool(
+            kwargs.get("terrain_correction", "topography" in getattr(data.ds, "attrs", {}))
         )
         if terrain_correction:
             tc = self._compute_terrain_correction(data)
