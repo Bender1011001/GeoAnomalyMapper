@@ -134,24 +134,194 @@ class GravityFetcher(DataSource):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
 
-            # Download files
-            files = self.session.download_files(item, destination=tmpdir)
-            print(f"DEBUG - Downloaded {len(files)} files to {tmpdir}")
+            # Locate downloadable files from item JSON and download candidate GeoTIFF
+            files_meta = item.get('files', []) or []
+            if not files_meta:
+                # Some items require fetching file info explicitly
+                try:
+                    files_meta = self.session.get_item_files(item)
+                except Exception:
+                    files_meta = []
+            print(f"DEBUG - Gravity files_meta count={len(files_meta)} sample={[ (f.get('name') or '') for f in files_meta ][:5]}")
 
-            # Find GeoTIFF with gravity/Bouguer keyword
             geotiff_path = None
-            for f in tmp_path.rglob('*.tif'):
-                if any(kw in f.name.lower() for kw in ['bouguer', 'gravity', 'anom']):
-                    geotiff_path = f
+            # Prefer Bouguer/gravity anomaly GeoTIFFs
+            preferred_keywords = ['bouguer', 'gravity', 'anom', 'anomaly']
+            for fmeta in files_meta:
+                fname = (fmeta.get('name') or '').lower()
+                if fname.endswith(('.tif', '.tiff')) and any(kw in fname for kw in preferred_keywords):
+                    name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                    if isinstance(name_val, dict):
+                        name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                    local_path = Path(tmpdir) / str(name_val)
+                    # sciencebasepy: download_file(item_json, file_info, local_filename)
+                    self.session.download_file(item, fmeta, str(local_path))
+                    geotiff_path = local_path
                     break
+
+            # If not found via keywords, try first GeoTIFF
+            if geotiff_path is None:
+                for fmeta in files_meta:
+                    fname = (fmeta.get('name') or '').lower()
+                    if fname.endswith(('.tif', '.tiff')):
+                        name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                        if isinstance(name_val, dict):
+                            name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                        local_path = Path(tmpdir) / str(name_val)
+                        self.session.download_file(item, fmeta, str(local_path))
+                        geotiff_path = local_path
+                        break
+
+            # If no GeoTIFF yet, try ZIP assets then search extracted GeoTIFFs
             if not geotiff_path:
-                raise DataFetchError("Gravity", "No suitable GeoTIFF found in item")
+                for fmeta in files_meta:
+                    fname = (fmeta.get('name') or '').lower()
+                    if fname.endswith('.zip'):
+                        local_zip = Path(tmpdir) / fmeta.get('name', 'download.zip')
+                        # sciencebasepy: download_file(item_json, file_info, local_filename)
+                        self.session.download_file(item, fmeta, str(local_zip))
+                        try:
+                            with zipfile.ZipFile(local_zip, 'r') as zf:
+                                zf.extractall(tmpdir)
+                        except Exception as e:
+                            logger.warning("Failed to extract ZIP %s: %s", local_zip, e)
+                        break
+
+            # After potential extraction, ensure we have a GeoTIFF path
+            if not geotiff_path:
+                for f in Path(tmpdir).rglob('*.tif'):
+                    if any(kw in f.name.lower() for kw in ['bouguer', 'gravity', 'anom', 'anomaly']):
+                        geotiff_path = f
+                        break
+
+            if not geotiff_path or not geotiff_path.exists():
+                # Fallback: search child items for downloadable GeoTIFFs
+                try:
+                    resp = requests.get(
+                        "https://www.sciencebase.gov/catalog/items",
+                        params={"parentId": item_id, "max": 200, "fields": "id,title,files", "format": "json"},
+                        headers={"Accept": "application/json", "User-Agent": "GAM/0.1"},
+                        timeout=self.timeout,
+                    )
+                    if resp.ok:
+                        data = resp.json() or {}
+                        items = data.get("items", []) or []
+                        preferred_keywords = ['bouguer', 'gravity', 'anom', 'anomaly']
+                        for child in items:
+                            files_meta_child = child.get("files", []) or []
+                            # Prefer keyworded geotiffs
+                            for fmeta in files_meta_child:
+                                fname = (fmeta.get('name') or '').lower()
+                                if fname.endswith(('.tif', '.tiff')) and any(kw in fname for kw in preferred_keywords):
+                                    name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                                    if isinstance(name_val, dict):
+                                        name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                                    local_path = Path(tmpdir) / str(name_val)
+                                    child_item = self.session.get_item(child.get('id'))
+                                    self.session.download_file(child_item, fmeta, str(local_path))
+                                    geotiff_path = local_path
+                                    break
+                            if geotiff_path:
+                                break
+                            # Any geotiff
+                            for fmeta in files_meta_child:
+                                fname = (fmeta.get('name') or '').lower()
+                                if fname.endswith(('.tif', '.tiff')):
+                                    name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                                    if isinstance(name_val, dict):
+                                        name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                                    local_path = Path(tmpdir) / str(name_val)
+                                    child_item = self.session.get_item(child.get('id'))
+                                    self.session.download_file(child_item, fmeta, str(local_path))
+                                    geotiff_path = local_path
+                                    break
+                            if geotiff_path:
+                                break
+                except Exception as e:
+                    logger.warning("ScienceBase child search failed: %s", e)
+
+            if not geotiff_path or not geotiff_path.exists():
+                # Fallback: try distributionLinks on parent item
+                try:
+                    dist_links = item.get('distributionLinks', []) or item.get('links', []) or []
+                    for link in dist_links:
+                        orig_url = (link.get('uri') or link.get('url') or '')
+                        url_lc = orig_url.lower()
+                        name_val = link.get('title') or link.get('type') or 'download'
+                        if isinstance(name_val, dict):
+                            name_val = name_val.get('title') or name_val.get('name') or 'download'
+                        name_safe = str(name_val).replace(' ', '_')
+                        if any(url_lc.endswith(ext) for ext in ['.tif', '.tiff', '.zip']):
+                            suffix = '.zip' if url_lc.endswith('.zip') else ('.tiff' if url_lc.endswith('.tiff') else '.tif')
+                            local_path = Path(tmpdir) / (name_safe + suffix)
+                            r = requests.get(orig_url, stream=True, timeout=self.timeout, headers={"User-Agent": "GAM/0.1"})
+                            if r.ok:
+                                with open(local_path, 'wb') as fh:
+                                    for chunk in r.iter_content(chunk_size=8192):
+                                        if chunk:
+                                            fh.write(chunk)
+                                if local_path.suffix.lower() == '.zip':
+                                    try:
+                                        with zipfile.ZipFile(local_path, 'r') as zf:
+                                            zf.extractall(tmpdir)
+                                    except Exception as e:
+                                        logger.warning("Failed to extract ZIP from distributionLink %s: %s", local_path, e)
+                                else:
+                                    geotiff_path = local_path
+                                    break
+                except Exception as e:
+                    logger.warning("distributionLinks fallback failed: %s", e)
+
+                # Fallback: search child items for downloadable GeoTIFFs
+                if not geotiff_path or not geotiff_path.exists():
+                    try:
+                        resp = requests.get(
+                            "https://www.sciencebase.gov/catalog/items",
+                            params={"parentId": item_id, "max": 200, "fields": "id,title,files"},
+                            timeout=self.timeout,
+                        )
+                        if resp.ok:
+                            data = resp.json() or {}
+                            items = data.get("items", []) or []
+                            preferred_keywords = ['bouguer', 'gravity', 'anom', 'anomaly']
+                            for child in items:
+                                files_meta_child = child.get("files", []) or []
+                                # Prefer keyworded geotiffs
+                                for fmeta in files_meta_child:
+                                    fname = (fmeta.get('name') or '').lower()
+                                    if fname.endswith(('.tif', '.tiff')) and any(kw in fname for kw in preferred_keywords):
+                                        local_path = Path(tmpdir) / fmeta.get('name', 'download.tif')
+                                        child_item = self.session.get_item(child.get('id'))
+                                        self.session.download_file(child_item, fmeta, str(local_path))
+                                        geotiff_path = local_path
+                                        break
+                                if geotiff_path:
+                                    break
+                                # Any geotiff
+                                for fmeta in files_meta_child:
+                                    fname = (fmeta.get('name') or '').lower()
+                                    if fname.endswith(('.tif', '.tiff')):
+                                        local_path = Path(tmpdir) / fmeta.get('name', 'download.tif')
+                                        child_item = self.session.get_item(child.get('id'))
+                                        self.session.download_file(child_item, fmeta, str(local_path))
+                                        geotiff_path = local_path
+                                        break
+                                if geotiff_path:
+                                    break
+                    except Exception as e:
+                        logger.warning("ScienceBase child search failed: %s", e)
+
+                if not geotiff_path or not geotiff_path.exists():
+                    raise DataFetchError("Gravity", "No suitable GeoTIFF found or downloaded in ScienceBase item")
             print(f"DEBUG - Using GeoTIFF: {geotiff_path}")
+
+            # geotiff_path already selected via ScienceBase file metadata above
 
             # Open with rasterio and clip to bbox
             with rasterio.open(geotiff_path) as src:
-                # Compute window for bbox
-                minx, miny, maxx, maxy = bbox  # lon min, lat min, lon max, lat max
+                # Compute window for bbox (incoming order: min_lat, max_lat, min_lon, max_lon)
+                min_lat, max_lat, min_lon, max_lon = bbox
+                minx, miny, maxx, maxy = min_lon, min_lat, max_lon, max_lat
                 window = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
                 window = rasterio.windows.intersection(window, ((0, src.height), (0, src.width)))
 
@@ -401,24 +571,91 @@ class MagneticFetcher(DataSource):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
 
-            # Download files
-            files = self.session.download_files(item, destination=tmpdir)
-            print(f"DEBUG - Downloaded {len(files)} files to {tmpdir}")
+            # Locate downloadable files from item JSON and download candidate GeoTIFF
+            files_meta = item.get('files', []) or []
+            if not files_meta:
+                try:
+                    files_meta = self.session.get_item_files(item)
+                except Exception:
+                    files_meta = []
 
-            # Find GeoTIFF with magnetic/anom keyword
             geotiff_path = None
-            for f in tmp_path.rglob('*.tif'):
-                if any(kw in f.name.lower() for kw in ['magnetic', 'anom', 'residual']):
-                    geotiff_path = f
+            preferred_keywords = ['magnetic', 'tmi', 'rtp', 'anom', 'residual']
+            for fmeta in files_meta:
+                fname = (fmeta.get('name') or '').lower()
+                if fname.endswith(('.tif', '.tiff')) and any(kw in fname for kw in preferred_keywords):
+                    # Ensure file name is a string (some ScienceBase responses embed dicts here)
+                    name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                    if isinstance(name_val, dict):
+                        name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                    local_path = Path(tmpdir) / str(name_val)
+                    # sciencebasepy signature: download_file(item_json, file_info, local_filename)
+                    self.session.download_file(item, fmeta, str(local_path))
+                    geotiff_path = local_path
                     break
-            if not geotiff_path:
-                raise DataFetchError("Magnetic", "No suitable GeoTIFF found in item")
+
+            if geotiff_path is None:
+                # Fallback to first GeoTIFF asset
+                for fmeta in files_meta:
+                    fname = (fmeta.get('name') or '').lower()
+                    if fname.endswith(('.tif', '.tiff')):
+                        name_val = fmeta.get('name') or fmeta.get('fileName') or 'download.tif'
+                        if isinstance(name_val, dict):
+                            name_val = name_val.get('name') or name_val.get('fileName') or 'download.tif'
+                        local_path = Path(tmpdir) / str(name_val)
+                        self.session.download_file(item, fmeta, str(local_path))
+                        geotiff_path = local_path
+                        break
+
+            if not geotiff_path or not geotiff_path.exists():
+                # Fallback: search child items for downloadable GeoTIFFs
+                try:
+                    resp = requests.get(
+                        "https://www.sciencebase.gov/catalog/items",
+                        params={"parentId": item_id, "max": 200, "fields": "id,title,files", "format": "json"},
+                        headers={"Accept": "application/json", "User-Agent": "GAM/0.1"},
+                        timeout=self.timeout,
+                    )
+                    if resp.ok:
+                        data = resp.json() or {}
+                        items = data.get("items", []) or []
+                        preferred_keywords = ['magnetic', 'tmi', 'rtp', 'anom', 'residual']
+                        for child in items:
+                            files_meta_child = child.get("files", []) or []
+                            # Prefer keyworded geotiffs
+                            for fmeta in files_meta_child:
+                                fname = (fmeta.get('name') or '').lower()
+                                if fname.endswith(('.tif', '.tiff')) and any(kw in fname for kw in preferred_keywords):
+                                    local_path = Path(tmpdir) / fmeta.get('name', 'download.tif')
+                                    child_item = self.session.get_item(child.get('id'))
+                                    self.session.download_file(child_item, fmeta, str(local_path))
+                                    geotiff_path = local_path
+                                    break
+                            if geotiff_path:
+                                break
+                            # Any geotiff
+                            for fmeta in files_meta_child:
+                                fname = (fmeta.get('name') or '').lower()
+                                if fname.endswith(('.tif', '.tiff')):
+                                    local_path = Path(tmpdir) / fmeta.get('name', 'download.tif')
+                                    child_item = self.session.get_item(child.get('id'))
+                                    self.session.download_file(child_item, fmeta, str(local_path))
+                                    geotiff_path = local_path
+                                    break
+                            if geotiff_path:
+                                break
+                except Exception as e:
+                    logger.warning("ScienceBase child search failed: %s", e)
+
+            if not geotiff_path or not geotiff_path.exists():
+                raise DataFetchError("Magnetic", "No suitable GeoTIFF found or downloaded in ScienceBase item")
             print(f"DEBUG - Using GeoTIFF: {geotiff_path}")
 
             # Open with rasterio and clip to bbox
             with rasterio.open(geotiff_path) as src:
-                # Compute window for bbox
-                minx, miny, maxx, maxy = bbox  # lon min, lat min, lon max, lat max
+                # Compute window for bbox (incoming order: min_lat, max_lat, min_lon, max_lon)
+                min_lat, max_lat, min_lon, max_lon = bbox
+                minx, miny, maxx, maxy = min_lon, min_lat, max_lon, max_lat
                 window = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
                 window = rasterio.windows.intersection(window, ((0, src.height), (0, src.width)))
 
