@@ -1198,78 +1198,78 @@ def main():
             st.info("No completed jobs yet.")
 
         st.markdown('</div>', unsafe_allow_html=True)
-   st.sidebar.markdown("---")
-   st.sidebar.info("**GeoAnomalyMapper v1.0.0**")
-   # Run Button (kept in sidebar)
+    st.sidebar.markdown("---")
+    st.sidebar.info("**GeoAnomalyMapper v1.0.0**")
+    # Run Button (kept in sidebar)
     if st.sidebar.button("🚀 Run Analysis", type="primary", disabled=disabled):
-    if st.session_state.get('run_synchronously', False):
-        # Synchronous execution mimicking CLI
-        try:
-            bbox_tuple = st.session_state.get('bbox')
-            if not bbox_tuple:
-                st.error("No bounding box selected for analysis.")
-                st.stop()
+        if st.session_state.get('run_synchronously', False):
+            # Synchronous execution mimicking CLI
+            try:
+                bbox_tuple = st.session_state.get('bbox')
+                if not bbox_tuple:
+                    st.error("No bounding box selected for analysis.")
+                    st.stop()
 
-            bbox_str = f"{bbox_tuple[0]:.6f},{bbox_tuple[1]:.6f},{bbox_tuple[2]:.6f},{bbox_tuple[3]:.6f}"
-            output_path = Path(output_dir)
-            config_p = config_file_input if config_file_input and config_file_input != "config.yaml" else None
+                bbox_str = f"{bbox_tuple[0]:.6f},{bbox_tuple[1]:.6f},{bbox_tuple[2]:.6f},{bbox_tuple[3]:.6f}"
+                output_path = Path(output_dir)
+                config_p = config_file_input if config_file_input and config_file_input != "config.yaml" else None
 
-            results = run_analysis(
-                bbox_str=bbox_str,
+                results = run_analysis(
+                    bbox_str=bbox_str,
+                    modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
+                    output_dir=output_path,
+                    config_path=config_p,
+                    verbose=verbose
+                )
+
+                # Collect output files for download
+                output_files = {}
+                for file_path in output_path.rglob('*'):
+                    if file_path.is_file():
+                        output_files[file_path.name] = str(file_path)
+
+                st.session_state.job_results = {'results': results, 'output_files': output_files}
+                job_id = f"sync_{int(time.time())}"
+                st.session_state.current_job_id = job_id
+                st.session_state.is_running = False
+                st.session_state.job_status = "COMPLETED"
+                st.session_state.job_progress = 1.0
+                # Sync jobs don't go to API history
+                st.success(f"Synchronous analysis completed successfully!")
+                st.rerun()
+
+            except (PipelineError, ConfigurationError) as e:
+                error_msg = f"Synchronous analysis failed: {str(e)}"
+                st.error(error_msg)
+                logger.error(error_msg)
+                st.session_state.is_running = False
+                st.session_state.job_status = "FAILED"
+
+            except Exception as e:
+                error_msg = f"Unexpected error in synchronous analysis: {str(e)}"
+                st.error(error_msg)
+                logger.error(error_msg, exc_info=True)
+                st.session_state.is_running = False
+                st.session_state.job_status = "FAILED"
+
+        else:
+            # Asynchronous execution via API
+            job_id = start_analysis_job(
+                bbox=st.session_state.get('bbox'),
                 modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
-                output_dir=output_path,
-                config_path=config_p,
+                resolution=resolution,
+                output_dir=output_dir,
+                config_path=config_path,
                 verbose=verbose
             )
-
-            # Collect output files for download
-            output_files = {}
-            for file_path in output_path.rglob('*'):
-                if file_path.is_file():
-                    output_files[file_path.name] = str(file_path)
-
-            st.session_state.job_results = {'results': results, 'output_files': output_files}
-            job_id = f"sync_{int(time.time())}"
-            st.session_state.current_job_id = job_id
-            st.session_state.is_running = False
-            st.session_state.job_status = "COMPLETED"
-            st.session_state.job_progress = 1.0
-            # Sync jobs don't go to API history
-            st.success(f"Synchronous analysis completed successfully!")
-            st.rerun()
-
-        except (PipelineError, ConfigurationError) as e:
-            error_msg = f"Synchronous analysis failed: {str(e)}"
-            st.error(error_msg)
-            logger.error(error_msg)
-            st.session_state.is_running = False
-            st.session_state.job_status = "FAILED"
-
-        except Exception as e:
-            error_msg = f"Unexpected error in synchronous analysis: {str(e)}"
-            st.error(error_msg)
-            logger.error(error_msg, exc_info=True)
-            st.session_state.is_running = False
-            st.session_state.job_status = "FAILED"
-
-    else:
-        # Asynchronous execution via API
-        job_id = start_analysis_job(
-            bbox=st.session_state.get('bbox'),
-            modalities=st.session_state.get('modalities', ['gravity', 'magnetic']),
-            resolution=resolution,
-            output_dir=output_dir,
-            config_path=config_path,
-            verbose=verbose
-        )
-        if job_id:
-            st.session_state.current_job_id = job_id
-            st.session_state.is_running = True
-            st.session_state.job_status = "QUEUED"
-            st.session_state.job_progress = 0.0
-            st.session_state.job_start_time = time.time()  # Start timeout clock
-            st.success(f"Analysis started! Job ID: {job_id}")
-            st.rerun()
+            if job_id:
+                st.session_state.current_job_id = job_id
+                st.session_state.is_running = True
+                st.session_state.job_status = "QUEUED"
+                st.session_state.job_progress = 0.0
+                st.session_state.job_start_time = time.time()  # Start timeout clock
+                st.success(f"Analysis started! Job ID: {job_id}")
+                st.rerun()
 
     # Optimized polling: timer-based refresh every 5s without blocking sleep
     if st.session_state.is_running and st.session_state.api_available:

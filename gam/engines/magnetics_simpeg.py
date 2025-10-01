@@ -27,7 +27,21 @@ from discretize import TreeMesh
 from discretize.utils import active_from_xyz
 from simpeg import inverse_problem
 from simpeg.potential_fields import magnetics
-from simpeg.potential_fields.utils import depth_weighting
+# depth_weighting location varies across SimPEG versions; provide robust fallback
+try:
+    # SimPEG <= 0.19 style
+    from simpeg.potential_fields.utils import depth_weighting  # type: ignore
+except Exception:
+    try:
+        # Some versions expose it under simpeg.utils
+        from simpeg.utils import depth_weighting  # type: ignore
+    except Exception:
+        # Minimal fallback: uniform weights for active cells
+        def depth_weighting(mesh, indActive=None, exponent: float = 2.0):
+            n = int(np.sum(indActive)) if indActive is not None else (
+                int(getattr(mesh, "n_cells", 0)) or int(getattr(mesh, "nC", 0)) or 0
+            )
+            return np.ones(n, dtype=float)
 
 from gam.core.utils import transform_coordinates
 

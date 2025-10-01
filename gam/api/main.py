@@ -179,3 +179,78 @@ async def get_results(job_id: str):
         results=job["results"],
         output_files=job["output_files"]
     )
+
+
+def run_analysis(request: AnalysisRequest, verbose: bool = False) -> Dict[str, Any]:
+    """
+    Synchronous wrapper for analysis pipeline (for direct/CLI use).
+    
+    Parameters:
+    -----------
+    request : AnalysisRequest
+        Analysis parameters (bbox, modalities, etc.)
+    verbose : bool
+        Enable verbose logging
+    
+    Returns:
+    --------
+    Dict[str, Any]
+        Pipeline results including anomalies, visualizations, etc.
+    
+    Raises:
+    -------
+    PipelineError
+        If any stage fails
+    """
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Create output directory
+    base_output_dir = Path(request.output_dir)
+    base_output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Load config
+    config = GAMConfig.from_yaml(request.config_path) if request.config_path else GAMConfig()
+    
+    # Create pipeline
+    pipeline = GAMPipeline(
+        config=config,
+        use_dask=config.use_parallel,
+        n_workers=config.n_workers,
+        cache_dir=Path(config.cache_dir)
+    )
+    
+    try:
+        # Convert bbox
+        bbox_tuple: Tuple[float, float, float, float] = tuple(request.bbox)
+        
+        # Run synchronously
+        results = pipeline.run_analysis(
+            bbox=bbox_tuple,
+            modalities=request.modalities,
+            output_dir=str(base_output_dir),
+            use_cache=True,
+            global_mode=False,
+            tiles=10,
+            verbose=verbose
+        )
+        
+        # Convert results to dict
+        result_dict = {
+            "raw_data": results.raw_data,
+            "processed_data": results.processed_data,
+            "inversion_results": results.inversion_results,
+            "anomalies": results.anomalies,
+            "visualizations": {k: str(v) for k, v in results.visualizations.items()}
+        }
+        
+        if verbose:
+            logger.info(f"Analysis completed. Found {len(results.anomalies)} anomalies.")
+        
+        return result_dict
+        
+    except Exception as e:
+        logger.error(f"Analysis failed: {e}")
+        raise PipelineError(f"Pipeline execution failed: {str(e)}") from e
+    finally:
+        pipeline.close()
