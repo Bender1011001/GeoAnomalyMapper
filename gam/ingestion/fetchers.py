@@ -31,6 +31,14 @@ except ImportError:
     SENTINELSAT_AVAILABLE = False
     logger.warning("sentinelsat not available; InSAR fetching disabled. Install with: pip install sentinelsat")
 
+try:
+    from sciencebasepy import SbSession
+    SCIENCEBASE_AVAILABLE = True
+except ImportError:
+    SbSession = None
+    SCIENCEBASE_AVAILABLE = False
+    logger.warning("sciencebasepy not available; ScienceBase fetching disabled. Install with: pip install sciencebasepy")
+
 from shapely.geometry import box
 import zipfile
 import tempfile
@@ -44,6 +52,7 @@ from pathlib import Path
 import yaml
 import io
 import csv
+import json
 
 from .base import DataSource
 from .data_structures import RawData
@@ -66,8 +75,10 @@ class GravityFetcher(DataSource):
 
     Attributes
     ----------
-    api_url : str
-        Base URL for USGS ScienceBase gravity service.
+    session : SbSession
+        ScienceBase session.
+    catalog_path : Path
+        Path to dataset catalog JSON.
     timeout : float
         Request timeout in seconds (30s).
 
@@ -78,19 +89,87 @@ class GravityFetcher(DataSource):
 
     Notes
     -----
-    ScienceBase: https://www.sciencebase.gov/catalog/item/5f9a4a87d34eb413d5df92b8
-    Returns np.ndarray of gravity anomalies. Supports kwargs like 'mindepth', 'maxdepth'.
+    Uses national gravity grid from ScienceBase item 619a9f02d34eb622f692f96c.
+    Clips raster to bbox using rasterio.
+    Returns np.ndarray of Bouguer gravity anomalies (mGal).
     Rate limited to 60/min; retries on failure/timeout.
 
     Examples
     --------
     >>> fetcher = GravityFetcher()
-    >>> data = fetcher.fetch_data((29.0, 31.0, 30.0, 32.0))
+    >>> data = fetcher.fetch_data((38.3, 38.5, -122.1, -121.9))
     """
 
     def __init__(self):
-        self.api_url = "https://www.sciencebase.gov/catalog/item/5f9a4a87d34eb413d5df92b8"
+        if not SCIENCEBASE_AVAILABLE:
+            raise ImportError("sciencebasepy required for GravityFetcher")
+        self.session = SbSession()
+        self.catalog_path = Path(__file__).parents[3] / 'datasets' / 'gravity_magnetic_catalog.json'
         self.timeout = 30.0
+        self.modality = 'gravity'
+
+    def _load_catalog(self) -> list:
+        if not self.catalog_path.exists():
+            raise FileNotFoundError(f"Catalog not found: {self.catalog_path}")
+        with open(self.catalog_path, 'r') as f:
+            return json.load(f)
+
+    def _get_item_id(self, bbox: Tuple[float, float, float, float]) -> str:
+        catalog = self._load_catalog()
+        b_box = box(*bbox)
+        for entry in catalog:
+            if entry['modality'] == self.modality:
+                e_box = box(*entry['extent'])
+                if b_box.intersects(e_box):
+                    item_id = entry['id'].split(':')[-1]  # Remove 'USGS:' prefix if present
+                    print(f"DEBUG - Selected {self.modality} item: {item_id} from {entry['title']}")
+                    return item_id
+        raise DataFetchError(self.modality.capitalize(), "No suitable dataset found in catalog")
+
+    def _download_and_clip_raster(self, item_id: str, bbox: Tuple[float, float, float, float]) -> np.ndarray:
+        # Get item
+        item = self.session.get_item(item_id)
+
+        # Create temp dir for downloads
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            # Download files
+            files = self.session.download_files(item, destination=tmpdir)
+            print(f"DEBUG - Downloaded {len(files)} files to {tmpdir}")
+
+            # Find GeoTIFF with gravity/Bouguer keyword
+            geotiff_path = None
+            for f in tmp_path.rglob('*.tif'):
+                if any(kw in f.name.lower() for kw in ['bouguer', 'gravity', 'anom']):
+                    geotiff_path = f
+                    break
+            if not geotiff_path:
+                raise DataFetchError("Gravity", "No suitable GeoTIFF found in item")
+            print(f"DEBUG - Using GeoTIFF: {geotiff_path}")
+
+            # Open with rasterio and clip to bbox
+            with rasterio.open(geotiff_path) as src:
+                # Compute window for bbox
+                minx, miny, maxx, maxy = bbox  # lon min, lat min, lon max, lat max
+                window = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
+                window = rasterio.windows.intersection(window, ((0, src.height), (0, src.width)))
+
+                if window.width == 0 or window.height == 0:
+                    raise DataFetchError("Gravity", "Bbox outside raster extent")
+
+                # Read clipped data
+                data = src.read(1, window=window)
+
+                # If window is partial, mask further if needed (but from_bounds should suffice)
+                # For values, flatten non-NaN
+                mask = ~np.isnan(data)
+                if not mask.any():
+                    raise DataFetchError("Gravity", "No valid data in bbox")
+
+                values = data[mask].astype(float)
+                print(f"DEBUG - Extracted {len(values)} gravity values (mGal)")
+                return values
 
     @retry_fetch()
     @rate_limit(60)
@@ -101,9 +180,9 @@ class GravityFetcher(DataSource):
         Parameters
         ----------
         bbox : Tuple[float, float, float, float]
-            (min_lat, max_lat, min_lon, max_lon)
+            (min_lon, min_lat, max_lon, max_lat)  # Note: lon first for rasterio
         **kwargs : dict
-            Additional params (e.g., 'mindepth', 'maxdepth')
+            Ignored for now.
 
         Returns
         -------
@@ -114,177 +193,14 @@ class GravityFetcher(DataSource):
         ------
         DataFetchError
             On API error or invalid response.
-        APITimeoutError
-            On request timeout.
-        ValueError
-            On invalid bbox.
         """
-        # Try base URL first (for tests); fallback to bbox query on JSON failure
         try:
-            headers = {'Accept': 'application/json'}
-            # Try using configured base_url template if available
-            def build_configured_url() -> str:
-                cand = [Path('data_sources.yaml'), Path(__file__).resolve().parents[2] / 'data_sources.yaml']
-                for p in cand:
-                    if p.exists():
-                        try:
-                            with open(p, 'r') as f:
-                                cfg = yaml.safe_load(f) or {}
-                            base = cfg.get('gravity', {}).get('base_url') or cfg.get('gravity', {}).get('url')
-                            if base:
-                                min_lat, max_lat, min_lon, max_lon = bbox
-                                bbox_str = f"{min_lon},{min_lat},{max_lon},{max_lat}"
-                                return base.format(bbox=bbox_str)
-                        except Exception:
-                            pass
-                return ''
+            item_id = self._get_item_id(bbox)
+            values = self._download_and_clip_raster(item_id, bbox)
 
-            # Try direct API call with format=geojson
-            min_lat, max_lat, min_lon, max_lon = bbox
-            params = {
-                'minlat': min_lat,
-                'maxlat': max_lat,
-                'minlon': min_lon,
-                'maxlon': max_lon,
-                'format': 'geojson'
-            }
-            print(f"DEBUG - Gravity API URL: {self.api_url}")
-            print(f"DEBUG - Gravity API params: {params}")
-            response = requests.get(self.api_url, params=params, timeout=self.timeout, headers=headers)
-            response.raise_for_status()
-
-            def _try_raster(values_response) -> Any:
-                try:
-                    with MemoryFile(values_response.content) as mem:
-                        with mem.open() as src:
-                            arr = src.read(1)
-                            rows, cols = np.indices(arr.shape)
-                            from rasterio.transform import xy as ri_xy
-                            xs, ys = ri_xy(src.transform, rows.flatten(), cols.flatten())
-                            lon_arr = np.array(xs)
-                            lat_arr = np.array(ys)
-                            min_lat, max_lat, min_lon, max_lon = bbox
-                            mask = (lat_arr >= min_lat) & (lat_arr <= max_lat) & (lon_arr >= min_lon) & (lon_arr <= max_lon)
-                            if not mask.any():
-                                return None
-                            vals = arr.flatten()[mask]
-                            meta = {
-                                'modality': 'gravity',
-                                'source': 'USGS Gravity',
-                                'count': int(vals.size),
-                                'bbox': bbox,
-                                'unit': 'mGal'
-                            }
-                            return RawData(values=vals.astype(float), metadata=meta)
-                except Exception:
-                    return None
-
-            try:
-                data = response.json()
-            except ValueError:
-                # If content is CSV/text, attempt CSV parse
-                ctype = response.headers.get('Content-Type', '')
-                logger.debug("USGS Gravity response status=%s content-type=%s", response.status_code, ctype)
-                logger.debug("USGS Gravity response preview=%s", response.text[:200])
-                # Add more debug information
-                print(f"DEBUG - Gravity URL: {response.url}")
-                print(f"DEBUG - Gravity Status: {response.status_code}")
-                print(f"DEBUG - Gravity Content-Type: {ctype}")
-                print(f"DEBUG - Gravity Response (first 500 chars): {response.text[:500]}")
-                text_preview = response.text[:200]
-                if 'csv' in ctype.lower() or response.text.strip().startswith(('lat,', 'latitude', 'lon,')) or (',' in text_preview):
-                    # Try CSV with common column names
-                    buf = io.StringIO(response.text)
-                    reader = csv.DictReader(buf)
-                    gravities = []
-                    for row in reader:
-                        for key in ('gravity', 'g_anom', 'bouguer', 'complete_bouguer_anomaly'):
-                            if key in row and row[key] not in (None, ''):
-                                try:
-                                    gravities.append(float(row[key]))
-                                    break
-                                except Exception:
-                                    continue
-                    if gravities:
-                        values = np.array(gravities)
-                        metadata = {
-                            'modality': 'gravity',
-                            'source': 'USGS Gravity',
-                            'count': len(values),
-                            'bbox': bbox,
-                            'unit': 'mGal'
-                        }
-                        return RawData(values=values, metadata=metadata)
-                # Try raster if provided
-                raster_data = _try_raster(response)
-                if raster_data is not None:
-                    return raster_data
-                # Fallback: call with explicit bbox params
-                min_lat, max_lat, min_lon, max_lon = bbox
-                params = {
-                    'minlat': min_lat,
-                    'maxlat': max_lat,
-                    'minlon': min_lon,
-                    'maxlon': max_lon,
-                    'format': 'geojson'
-                }
-                response = requests.get(self.api_url, params=params, timeout=self.timeout, headers=headers)
-                response.raise_for_status()
-                try:
-                    data = response.json()
-                except ValueError:
-                    # Try CSV on second attempt as well
-                    ctype2 = response.headers.get('Content-Type', '')
-                    logger.debug("USGS Gravity (params) response status=%s content-type=%s", response.status_code, ctype2)
-                    logger.debug("USGS Gravity (params) response preview=%s", response.text[:200])
-                    buf = io.StringIO(response.text)
-                    try:
-                        reader = csv.DictReader(buf)
-                        gravities = []
-                        for row in reader:
-                            for key in ('gravity', 'g_anom', 'bouguer', 'complete_bouguer_anomaly'):
-                                if key in row and row[key] not in (None, ''):
-                                    try:
-                                        gravities.append(float(row[key]))
-                                        break
-                                    except Exception:
-                                        continue
-                        if gravities:
-                            values = np.array(gravities)
-                            metadata = {
-                                'modality': 'gravity',
-                                'source': 'USGS Gravity',
-                                'count': len(values),
-                                'bbox': bbox,
-                                'unit': 'mGal'
-                            }
-                            return RawData(values=values, metadata=metadata)
-                    except Exception:
-                        pass
-                    # Try raster on second attempt
-                    raster_data2 = _try_raster(response)
-                    if raster_data2 is not None:
-                        return raster_data2
-                    raise DataFetchError("USGS Gravity", "Invalid JSON/CSV response from USGS endpoint")
-            features = data.get('features', [])
-
-            if not features:
-                raise DataFetchError("USGS Gravity", "No data found")
-
-            # Tests expect a simple 1D array of gravity values
-            gravities = []
-            for feature in features:
-                props = feature.get('properties', {})
-                if 'gravity' in props:
-                    gravities.append(props['gravity'])
-
-            if not gravities:
-                raise DataFetchError("USGS Gravity", "No data found")
-
-            values = np.array(gravities)
             metadata = {
                 'modality': 'gravity',
-                'source': 'USGS Gravity',
+                'source': 'USGS ScienceBase Gravity',
                 'count': len(values),
                 'bbox': bbox,
                 'unit': 'mGal'
@@ -292,10 +208,8 @@ class GravityFetcher(DataSource):
 
             return RawData(values=values, metadata=metadata)
 
-        except RequestException as e:
-            raise DataFetchError("USGS Gravity", f"API request failed: {str(e)}") from e
-        except (KeyError, ValueError) as e:
-            raise DataFetchError("USGS Gravity", f"Invalid response format: {str(e)}") from e
+        except Exception as e:
+            raise DataFetchError("USGS Gravity", f"Fetch failed: {str(e)}") from e
 
 
 class SeismicFetcher(DataSource):
@@ -428,8 +342,10 @@ class MagneticFetcher(DataSource):
 
     Attributes
     ----------
-    api_url : str
-        Base URL for USGS ScienceBase magnetic service.
+    session : SbSession
+        ScienceBase session.
+    catalog_path : Path
+        Path to dataset catalog JSON.
     timeout : float
         Request timeout (30s).
 
@@ -440,19 +356,86 @@ class MagneticFetcher(DataSource):
 
     Notes
     -----
-    ScienceBase: https://www.sciencebase.gov/catalog/item/5f9a4c84d34eb413d5df92c3
-    Returns np.ndarray of magnetic anomalies. Supports kwargs like 'mindepth', 'maxdepth'.
+    Uses national magnetic grid from ScienceBase item 619a9a3ad34eb622f692f961.
+    Clips raster to bbox using rasterio.
+    Returns np.ndarray of residual magnetic anomalies (nT).
     Rate limited to 60/min; retries on failure/timeout.
 
     Examples
     --------
     >>> fetcher = MagneticFetcher()
-    >>> data = fetcher.fetch_data((29.0, 31.0, 30.0, 32.0))
+    >>> data = fetcher.fetch_data((38.3, 38.5, -122.1, -121.9))
     """
 
     def __init__(self):
-        self.api_url = "https://www.sciencebase.gov/catalog/item/5f9a4c84d34eb413d5df92c3"
+        if not SCIENCEBASE_AVAILABLE:
+            raise ImportError("sciencebasepy required for MagneticFetcher")
+        self.session = SbSession()
+        self.catalog_path = Path(__file__).parents[3] / 'datasets' / 'gravity_magnetic_catalog.json'
         self.timeout = 30.0
+        self.modality = 'magnetic'
+
+    def _load_catalog(self) -> list:
+        if not self.catalog_path.exists():
+            raise FileNotFoundError(f"Catalog not found: {self.catalog_path}")
+        with open(self.catalog_path, 'r') as f:
+            return json.load(f)
+
+    def _get_item_id(self, bbox: Tuple[float, float, float, float]) -> str:
+        catalog = self._load_catalog()
+        b_box = box(*bbox)
+        for entry in catalog:
+            if entry['modality'] == self.modality:
+                e_box = box(*entry['extent'])
+                if b_box.intersects(e_box):
+                    item_id = entry['id'].split(':')[-1]  # Remove 'USGS:' prefix if present
+                    print(f"DEBUG - Selected {self.modality} item: {item_id} from {entry['title']}")
+                    return item_id
+        raise DataFetchError(self.modality.capitalize(), "No suitable dataset found in catalog")
+
+    def _download_and_clip_raster(self, item_id: str, bbox: Tuple[float, float, float, float]) -> np.ndarray:
+        # Get item
+        item = self.session.get_item(item_id)
+
+        # Create temp dir for downloads
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            # Download files
+            files = self.session.download_files(item, destination=tmpdir)
+            print(f"DEBUG - Downloaded {len(files)} files to {tmpdir}")
+
+            # Find GeoTIFF with magnetic/anom keyword
+            geotiff_path = None
+            for f in tmp_path.rglob('*.tif'):
+                if any(kw in f.name.lower() for kw in ['magnetic', 'anom', 'residual']):
+                    geotiff_path = f
+                    break
+            if not geotiff_path:
+                raise DataFetchError("Magnetic", "No suitable GeoTIFF found in item")
+            print(f"DEBUG - Using GeoTIFF: {geotiff_path}")
+
+            # Open with rasterio and clip to bbox
+            with rasterio.open(geotiff_path) as src:
+                # Compute window for bbox
+                minx, miny, maxx, maxy = bbox  # lon min, lat min, lon max, lat max
+                window = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
+                window = rasterio.windows.intersection(window, ((0, src.height), (0, src.width)))
+
+                if window.width == 0 or window.height == 0:
+                    raise DataFetchError("Magnetic", "Bbox outside raster extent")
+
+                # Read clipped data
+                data = src.read(1, window=window)
+
+                # Mask non-NaN
+                mask = ~np.isnan(data)
+                if not mask.any():
+                    raise DataFetchError("Magnetic", "No valid data in bbox")
+
+                values = data[mask].astype(float)
+                print(f"DEBUG - Extracted {len(values)} magnetic values (nT)")
+                return values
 
     @retry_fetch()
     @rate_limit(60)
@@ -463,9 +446,9 @@ class MagneticFetcher(DataSource):
         Parameters
         ----------
         bbox : Tuple[float, float, float, float]
-            (min_lat, max_lat, min_lon, max_lon)
+            (min_lon, min_lat, max_lon, max_lat)  # Note: lon first for rasterio
         **kwargs : dict
-            Additional params (e.g., 'mindepth', 'maxdepth')
+            Ignored for now.
 
         Returns
         -------
@@ -477,165 +460,13 @@ class MagneticFetcher(DataSource):
         DataFetchError
             On API error or invalid response.
         """
-        # Try base URL first (for tests); fallback to bbox query on JSON failure
         try:
-            headers = {'Accept': 'application/json'}
-            def build_configured_url() -> str:
-                cand = [Path('data_sources.yaml'), Path(__file__).resolve().parents[2] / 'data_sources.yaml']
-                for p in cand:
-                    if p.exists():
-                        try:
-                            with open(p, 'r') as f:
-                                cfg = yaml.safe_load(f) or {}
-                            base = cfg.get('magnetic', {}).get('base_url') or cfg.get('magnetic', {}).get('url')
-                            if base:
-                                min_lat, max_lat, min_lon, max_lon = bbox
-                                bbox_str = f"{min_lon},{min_lat},{max_lon},{max_lat}"
-                                return base.format(bbox=bbox_str)
-                        except Exception:
-                            pass
-                return ''
+            item_id = self._get_item_id(bbox)
+            values = self._download_and_clip_raster(item_id, bbox)
 
-            # Try direct API call with format=geojson
-            min_lat, max_lat, min_lon, max_lon = bbox
-            params = {
-                'minlat': min_lat,
-                'maxlat': max_lat,
-                'minlon': min_lon,
-                'maxlon': max_lon,
-                'format': 'geojson'
-            }
-            print(f"DEBUG - Magnetic API URL: {self.api_url}")
-            print(f"DEBUG - Magnetic API params: {params}")
-            response = requests.get(self.api_url, params=params, timeout=self.timeout, headers=headers)
-            response.raise_for_status()
-
-            def _try_raster(values_response) -> Any:
-                try:
-                    with MemoryFile(values_response.content) as mem:
-                        with mem.open() as src:
-                            arr = src.read(1)
-                            rows, cols = np.indices(arr.shape)
-                            from rasterio.transform import xy as ri_xy
-                            xs, ys = ri_xy(src.transform, rows.flatten(), cols.flatten())
-                            lon_arr = np.array(xs)
-                            lat_arr = np.array(ys)
-                            min_lat, max_lat, min_lon, max_lon = bbox
-                            mask = (lat_arr >= min_lat) & (lat_arr <= max_lat) & (lon_arr >= min_lon) & (lon_arr <= max_lon)
-                            if not mask.any():
-                                return None
-                            vals = arr.flatten()[mask]
-                            meta = {
-                                'modality': 'magnetic',
-                                'source': 'USGS Magnetic',
-                                'count': int(vals.size),
-                                'bbox': bbox,
-                                'unit': 'nT'
-                            }
-                            return RawData(values=vals.astype(float), metadata=meta)
-                except Exception:
-                    return None
-
-            try:
-                data = response.json()
-            except ValueError:
-                ctype = response.headers.get('Content-Type', '')
-                logger.debug("USGS Magnetic response status=%s content-type=%s", response.status_code, ctype)
-                logger.debug("USGS Magnetic response preview=%s", response.text[:200])
-                # Add more debug information
-                print(f"DEBUG - Magnetic URL: {wfs_url}")
-                print(f"DEBUG - Magnetic Status: {response.status_code}")
-                print(f"DEBUG - Magnetic Content-Type: {ctype}")
-                print(f"DEBUG - Magnetic Response (first 500 chars): {response.text[:500]}")
-                if 'csv' in ctype.lower() or response.text.strip().startswith(('lat,', 'latitude', 'lon,')) or (',' in response.text[:200]):
-                    buf = io.StringIO(response.text)
-                    reader = csv.DictReader(buf)
-                    mags = []
-                    for row in reader:
-                        for key in ('magnetic', 'tmi', 'mag_anom'):
-                            if key in row and row[key] not in (None, ''):
-                                try:
-                                    mags.append(float(row[key]))
-                                    break
-                                except Exception:
-                                    continue
-                    if mags:
-                        values = np.array(mags)
-                        metadata = {
-                            'modality': 'magnetic',
-                            'source': 'USGS Magnetic',
-                            'count': len(values),
-                            'bbox': bbox,
-                            'unit': 'nT'
-                        }
-                        return RawData(values=values, metadata=metadata)
-                # Try raster if provided
-                raster_data = _try_raster(response)
-                if raster_data is not None:
-                    return raster_data
-                min_lat, max_lat, min_lon, max_lon = bbox
-                params = {
-                    'minlat': min_lat,
-                    'maxlat': max_lat,
-                    'minlon': min_lon,
-                    'maxlon': max_lon,
-                    'format': 'geojson'
-                }
-                response = requests.get(self.api_url, params=params, timeout=self.timeout, headers=headers)
-                response.raise_for_status()
-                try:
-                    data = response.json()
-                except ValueError:
-                    # Try CSV on second attempt as well
-                    ctype2 = response.headers.get('Content-Type', '')
-                    logger.debug("USGS Magnetic (params) response status=%s content-type=%s", response.status_code, ctype2)
-                    logger.debug("USGS Magnetic (params) response preview=%s", response.text[:200])
-                    buf = io.StringIO(response.text)
-                    try:
-                        reader = csv.DictReader(buf)
-                        mags = []
-                        for row in reader:
-                            for key in ('magnetic', 'tmi', 'mag_anom'):
-                                if key in row and row[key] not in (None, ''):
-                                    try:
-                                        mags.append(float(row[key]))
-                                        break
-                                    except Exception:
-                                        continue
-                        if mags:
-                            values = np.array(mags)
-                            metadata = {
-                                'modality': 'magnetic',
-                                'source': 'USGS Magnetic',
-                                'count': len(values),
-                                'bbox': bbox,
-                                'unit': 'nT'
-                            }
-                            return RawData(values=values, metadata=metadata)
-                    except Exception:
-                        pass
-                    raster_data2 = _try_raster(response)
-                    if raster_data2 is not None:
-                        return raster_data2
-                    raise DataFetchError("USGS Magnetic", "Invalid JSON/CSV response from USGS endpoint")
-            features = data.get('features', [])
-
-            if not features:
-                raise DataFetchError("USGS Magnetic", "No data found")
-
-            magnetics = []
-            for feature in features:
-                props = feature.get('properties', {})
-                if 'magnetic' in props:
-                    magnetics.append(props['magnetic'])
-
-            if not magnetics:
-                raise DataFetchError("USGS Magnetic", "No data found")
-
-            values = np.array(magnetics)
             metadata = {
                 'modality': 'magnetic',
-                'source': 'USGS Magnetic',
+                'source': 'USGS ScienceBase Magnetic',
                 'count': len(values),
                 'bbox': bbox,
                 'unit': 'nT'
@@ -643,10 +474,8 @@ class MagneticFetcher(DataSource):
 
             return RawData(values=values, metadata=metadata)
 
-        except RequestException as e:
-            raise DataFetchError("USGS Magnetic", f"API request failed: {str(e)}") from e
-        except (KeyError, ValueError) as e:
-            raise DataFetchError("USGS Magnetic", f"Invalid response format: {str(e)}") from e
+        except Exception as e:
+            raise DataFetchError("USGS Magnetic", f"Fetch failed: {str(e)}") from e
 
 
 class InSARFetcher(DataSource):
