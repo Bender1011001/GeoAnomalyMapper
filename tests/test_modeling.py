@@ -460,6 +460,118 @@ def test_insar_atmospheric_filtering(synthetic_wrapped_phase):
     filt_var = np.var(np.fft.fftshift(np.fft.fft2(filtered.values))[:5, :5])
     assert filt_var < orig_var * 0.5  # Reduced atmospheric signal
 
+def test_insar_los_sign_convention():
+    """Test LOS sign convention with synthetic uplift."""
+    from gam.modeling.insar import InSARInverter, mogi_multi_forward
+    import numpy as np
+    
+    inverter = InSARInverter()
+    
+    # Synthetic uplift: uz = +10 mm at center, e=n=0
+    obs_pos = np.array([[0, 0, 0]])  # Single point at source
+    x0, y0, d, dV = 0, 0, 1000, 1e6  # Parameters for 10mm uplift
+    ux, uy, uz = 0, 0, 0.01  # m
+    
+    # Ascending: inc=0.3 rad (~23°), head=0 (east-looking approx)
+    inc_asc = 0.3
+    head_asc = 0.0
+    los_asc = np.array([np.sin(inc_asc)*np.cos(head_asc), np.sin(inc_asc)*np.sin(head_asc), np.cos(inc_asc)])
+    d_los_asc = np.dot([ux, uy, uz], los_asc)
+    
+    # Descending: inc=0.3, head=pi (west-looking)
+    head_desc = np.pi
+    los_desc = np.array([np.sin(inc_asc)*np.cos(head_desc), np.sin(inc_asc)*np.sin(head_desc), np.cos(inc_asc)])
+    d_los_desc = np.dot([ux, uy, uz], los_desc)
+    
+    # Positive toward satellite: both >0 for uplift (range decrease)
+    assert d_los_asc > 0
+    assert d_los_desc > 0
+    
+    # Verify implementation
+    theta = np.array([x0, y0, d, dV])
+    pred_asc = mogi_multi_forward(theta, obs_pos, np.array([inc_asc]), np.array([head_asc]))
+    pred_desc = mogi_multi_forward(theta, obs_pos, np.array([inc_asc]), np.array([head_desc]))
+    assert pred_asc > 0
+    assert pred_desc > 0
+    np.testing.assert_allclose(pred_asc, d_los_asc, atol=1e-6)
+    np.testing.assert_allclose(pred_desc, d_los_desc, atol=1e-6)
+
+def test_insar_los_sign_convention():
+    """Test LOS sign convention with synthetic uplift."""
+    from gam.modeling.insar import InSARInverter, mogi_multi_forward
+    import numpy as np
+    
+    inverter = InSARInverter()
+    
+    # Synthetic uplift: uz = +10 mm at center, e=n=0
+    obs_pos = np.array([[0, 0, 0]])  # Single point at source
+    x0, y0, d, dV = 0, 0, 1000, 1e6  # Parameters for ~10mm uplift
+    ux, uy, uz = 0, 0, 0.01  # m
+    
+    # Ascending: inc=0.3 rad (~23°), head=0 (east-looking approx)
+    inc_asc = 0.3
+    head_asc = 0.0
+    los_asc = np.array([np.sin(inc_asc)*np.cos(head_asc), np.sin(inc_asc)*np.sin(head_asc), np.cos(inc_asc)])
+    d_los_asc = np.dot([ux, uy, uz], los_asc)
+    
+    # Descending: inc=0.3, head=pi (west-looking)
+    head_desc = np.pi
+    los_desc = np.array([np.sin(inc_asc)*np.cos(head_desc), np.sin(inc_asc)*np.sin(head_desc), np.cos(inc_asc)])
+    d_los_desc = np.dot([ux, uy, uz], los_desc)
+    
+    # Positive toward satellite: both >0 for uplift (range decrease)
+    assert d_los_asc > 0
+    assert d_los_desc > 0
+    
+    # Verify implementation
+    theta = np.array([x0, y0, d, dV])
+    pred_asc = mogi_multi_forward(theta, obs_pos, np.array([inc_asc]), np.array([head_asc]))
+    pred_desc = mogi_multi_forward(theta, obs_pos, np.array([inc_asc]), np.array([head_desc]))
+    assert pred_asc > 0
+    assert pred_desc > 0
+    np.testing.assert_allclose(pred_asc, d_los_asc, atol=1e-6)
+    np.testing.assert_allclose(pred_desc, d_los_desc, atol=1e-6)
+
+def test_non_gaussian_residuals():
+    """Test robustness to non-Gaussian noise."""
+    from gam.modeling.insar import InSARInverter
+    import numpy as np
+    from scipy.stats import levy_stable
+    
+    # Synthetic LOS with Gaussian vs heavy-tailed noise
+    np.random.seed(42)
+    n_points = 100
+    true_params = np.array([0, 0, 1000, 1e6])  # Mogi for ~10mm
+    obs_pos = np.random.uniform(-5000, 5000, (n_points, 2))
+    obs_pos = np.column_stack([obs_pos, np.zeros(n_points)])  # z=0
+    inc_grid = np.full(n_points, 0.3)
+    head_grid = np.full(n_points, 0.0)
+    
+    # Gaussian noise
+    gaussian_noise = np.random.normal(0, 0.001, n_points)
+    los_gauss = mogi_multi_forward(true_params, obs_pos, inc_grid, head_grid) + gaussian_noise
+    
+    # Heavy-tailed (Levy alpha=1.5)
+    levy_noise = levy_stable.rvs(alpha=1.5, size=n_points, random_state=42) * 0.001
+    los_levy = mogi_multi_forward(true_params, obs_pos, inc_grid, head_grid) + levy_noise
+    
+    # Invert both
+    def invert_los(los_data):
+        def residual(theta):
+            pred = mogi_multi_forward(theta, obs_pos, inc_grid, head_grid)
+            return pred - los_data
+        res = least_squares(residual, true_params, method='trf')
+        return res.x
+    
+    params_gauss = invert_los(los_gauss)
+    params_levy = invert_los(los_levy)
+    
+    # Recovery should be similar for Gaussian; levy may have higher variance but still close
+    rmse_gauss = np.sqrt(np.mean((params_gauss - true_params)**2))
+    rmse_levy = np.sqrt(np.mean((params_levy - true_params)**2))
+    assert rmse_gauss < 1e-3  # Good recovery
+    assert rmse_levy < 1e-2  # Reasonable for heavy-tailed
+
 def test_insar_okada_forward(synthetic_fault_params, synthetic_processed_grid):
     """Test Okada forward modeling with known fault params."""
     from gam.modeling.insar import InSARInverter

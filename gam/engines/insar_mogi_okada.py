@@ -365,17 +365,19 @@ class InSARInverter(Inverter):
         cov = np.linalg.pinv(J.T @ J) * np.var(res.fun)
         unc_params = np.sqrt(np.diag(cov))
         
-        # Bootstrap uncertainty (optional, 100 resamples)
+        # Bootstrap uncertainty (optional, 100 resamples) - parallelized with joblib
         if kwargs.get('bootstrap_uncertainty', True):  # Default True as per task
+            from joblib import Parallel, delayed
             n_bootstrap = 100
-            boot_params = np.zeros((n_bootstrap, len(params)))
-            for b in range(n_bootstrap):
+            def bootstrap_run(b):
                 residuals_boot = np.random.choice(res.fun, size=len(res.fun), replace=True)
                 def residual_boot(theta):
                     pred = forward_func(theta, obs_pos, inc_grid, head_grid)
                     return (pred - los_disp + residuals_boot * noise_std) / noise_std
                 res_boot = least_squares(residual_boot, params, bounds=bounds_lsq, method='trf')
-                boot_params[b] = res_boot.x
+                return res_boot.x
+            boot_params = Parallel(n_jobs=-1)(delayed(bootstrap_run)(b) for b in range(n_bootstrap))
+            boot_params = np.array(boot_params)
             unc_bootstrap = np.std(boot_params, axis=0)
             unc_params = np.sqrt(unc_params**2 + unc_bootstrap**2)  # Combine
 

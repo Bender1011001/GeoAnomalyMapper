@@ -49,8 +49,15 @@ from .manager import IngestionManager
 from .data_structures import RawData
 from .cache_manager import HDF5CacheManager
 from .fetchers import (
-    GravityFetcher, SeismicFetcher, MagneticFetcher, InSARFetcher
+    GravityFetcher,
+    MagneticFetcher,
+    InSARFetcher
 )
+
+try:
+    from .fetchers import SeismicFetcher
+except ImportError:
+    SeismicFetcher = None
 from .base import DataSource
 from .exceptions import (
     DataFetchError, CacheError, APITimeoutError
@@ -60,9 +67,11 @@ from .fetchers import retry_fetch
 
 __all__ = [
     'IngestionManager', 'RawData', 'HDF5CacheManager',
-    'GravityFetcher', 'SeismicFetcher', 'MagneticFetcher', 'InSARFetcher',
+    'GravityFetcher', 'MagneticFetcher', 'InSARFetcher',
     'DataSource', 'DataFetchError', 'CacheError', 'APITimeoutError'
 ]
+if SeismicFetcher is not None:
+    __all__.append('SeismicFetcher')
 
 # Logging configuration for the module
 import logging

@@ -87,19 +87,36 @@ from .preprocessing import (
     GravityPreprocessor, MagneticPreprocessor, SeismicPreprocessor, InSARPreprocessor,
     DaskPreprocessor
 )
-from .modeling import (
-    ModelingManager, InversionResults, AnomalyOutput, Inverter,
-    GravityInverter, MagneticInverter, SeismicInverter, InSARInverter,
-    JointInverter, AnomalyDetector, MeshGenerator
-)
+try:
+    from .modeling import (
+        ModelingManager, InversionResults, AnomalyOutput, Inverter,
+        GravityInverter, MagneticInverter, SeismicInverter, InSARInverter,
+        JointInverter, AnomalyDetector, MeshGenerator
+    )
+except Exception as e:
+    ModelingManager = None  # type: ignore
+    InversionResults = None  # type: ignore
+    AnomalyOutput = None  # type: ignore
+    Inverter = None  # type: ignore
+    GravityInverter = None  # type: ignore
+    MagneticInverter = None  # type: ignore
+    SeismicInverter = None  # type: ignore
+    InSARInverter = None  # type: ignore
+    JointInverter = None  # type: ignore
+    AnomalyDetector = None  # type: ignore
+    MeshGenerator = None  # type: ignore
+    log.warning(
+        "Modeling components not available. Reason: %s. "
+        "Install optional dependencies (e.g., simpeg) to enable modeling.", str(e)
+    )
 try:
     from .visualization import VisualizationManager
 except Exception as e:
-    if "GMT" in str(e):
-        VisualizationManager = None
-        log.warning(f"VisualizationManager not available due to missing GMT/PyGMT: {str(e)}; visualization features disabled.")
-    else:
-        raise
+    VisualizationManager = None
+    log.warning(
+        "Visualization components not available: %s. Install optional dependencies (PyGMT/PyVista) to enable visualization.",
+        str(e)
+    )
 
 # Core utilities (config, exceptions, etc.)
 from .core.config import GAMConfig
@@ -117,5 +134,5 @@ __all__ = [
     # Managers
     'IngestionManager', 'PreprocessingManager', 'ModelingManager', 'VisualizationManager',
     # Core
-    'GAMConfig', 'GAMError', 'PipelineError', 'validate_bbox', 'cli'
+    'GAMConfig', 'GAMError', 'PipelineError', 'validate_bbox'
 ]

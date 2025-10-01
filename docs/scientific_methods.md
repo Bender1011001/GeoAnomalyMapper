@@ -35,6 +35,8 @@ modeling:
 - Terrain correction: Nagy et al. (2000), "The gravitational potential and its derivatives for the prism."
 - Regularization: Oldenburg (1996), "The choice of parameterization in non-linear inverse problems," Geophysical Journal International.
 
+**Assumptions and Limits**: L2 misfit assumes Gaussian errors; non-Gaussian noise may bias. Uncertainty from diagonal Hessian underestimates correlations. Valid for regional scales; high-frequency noise requires preprocessing.
+
 ## Seismic Method
 
 ### Description

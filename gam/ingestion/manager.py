@@ -2,12 +2,21 @@
 """Main ingestion manager coordinating fetchers and caching for GAM."""
 
 import logging
+import os
+from pathlib import Path
+import numpy as np
 from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .cache_manager import HDF5CacheManager
-from .fetchers import GravityFetcher, SeismicFetcher, MagneticFetcher, InSARFetcher
+from .fetchers import (
+    GravityFetcher, MagneticFetcher, InSARFetcher
+)
+try:
+    from .fetchers import SeismicFetcher
+except ImportError:
+    SeismicFetcher = None
 from .data_structures import RawData
 from .exceptions import DataFetchError
 from .base import DataSource
@@ -72,7 +81,7 @@ class IngestionManager:
         self.cache = HDF5CacheManager(cache_dir)
         self.fetchers = fetchers or {
             'gravity': GravityFetcher(),
-            'seismic': SeismicFetcher(),
+            'seismic': SeismicFetcher() if SeismicFetcher is not None else None,
             'magnetic': MagneticFetcher(),
             'insar': InSARFetcher()
         }
@@ -111,23 +120,46 @@ class IngestionManager:
         except ImportError:
             logger.warning("PyYAML not installed; config loading disabled. Install with: pip install PyYAML")
             return {}
-        config_path = 'data_sources.yaml'
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Configuration file {config_path} not found. Create it with API endpoints and keys.")
-        with open(config_path, 'r') as f:
+        # Resolve config path: try CWD, then package root/../../data_sources.yaml
+        cand_paths = [
+            Path('data_sources.yaml'),
+            (Path(__file__).resolve().parents[2] / 'data_sources.yaml')
+        ]
+        config_file = next((p for p in cand_paths if p.exists()), None)
+        if not config_file:
+            raise FileNotFoundError("Configuration file data_sources.yaml not found. Create it with API endpoints and keys.")
+        with open(config_file, 'r') as f:
             config = yaml.safe_load(f) or {}
-        # Override with env vars
+        # Normalize keys and apply env overrides
         for modality, mod_config in config.items():
-            if isinstance(mod_config, dict) and 'api_key' in mod_config:
-                env_key = mod_config['api_key'].upper()
+            if not isinstance(mod_config, dict):
+                continue
+            # Normalize URL keys
+            if 'url' not in mod_config:
+                if 'base_url' in mod_config:
+                    mod_config['url'] = mod_config['base_url']
+                elif modality == 'insar' and 'api_url' in mod_config:
+                    mod_config['url'] = mod_config['api_url']
+            # API key via env if present
+            if 'api_key' in mod_config and isinstance(mod_config['api_key'], str) and mod_config['api_key'].isupper():
+                env_key = mod_config['api_key']
                 mod_config['api_key'] = os.getenv(env_key, mod_config.get('default_key', ''))
                 if not mod_config['api_key']:
                     logger.warning(f"API key for {modality} ({env_key}) not set in environment")
-            # Basic validation
-            required = ['url'] if modality != 'insar' else ['api_key']
-            missing = [k for k in required if k not in mod_config]
-            if missing:
-                raise ValueError(f"Missing required config for {modality}: {missing}")
+            # Basic validation per modality
+            if modality in ('gravity', 'magnetic'):
+                required = ['url']
+                missing = [k for k in required if k not in mod_config]
+                if missing:
+                    raise ValueError(f"Missing required config for {modality}: {missing}")
+            elif modality == 'seismic':
+                # Seismic uses FDSN server name; no URL required
+                if 'fdsn_server' not in mod_config:
+                    raise ValueError("Missing required config for seismic: ['fdsn_server']")
+            elif modality == 'insar':
+                # Ensure we have API endpoint URL
+                if 'url' not in mod_config:
+                    raise ValueError("Missing required config for insar: ['url']")
         logger.info("Configuration loaded and validated")
         return config
 
@@ -175,7 +207,8 @@ class IngestionManager:
             'bbox': bbox,
             'parameters': kwargs
         }
-        temp_data = RawData(metadata, None)  # For key generation
+        # Use an empty array placeholder to avoid None triggering validation errors
+        temp_data = RawData(metadata, np.array([]))  # For key generation
         key = self.cache._generate_key(temp_data)
         if self.cache.exists(key):
             logger.info(f"Cache hit for {modality}: {key}")
