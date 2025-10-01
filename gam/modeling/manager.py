@@ -155,6 +155,7 @@ class ModelingManager:
     def run_inversion(self, data: ProcessedGrid, modality: str, **kwargs) -> InversionResults:
         """
         Run inversion for specified modality.
+        Post-process: Add residual diagnostics (Q-Q plot check for Gaussianity).
 
         Selects inverter, generates mesh, runs invert with config/kwargs.
 

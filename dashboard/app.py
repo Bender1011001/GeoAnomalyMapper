@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 
 import streamlit as st
 import folium
-from streamlit_folium import st_folium
+from streamlit_folium import st_folium, folium_static
 import folium.plugins
-from folium.plugins import HeatMap
+from folium.plugins import Draw, HeatMap
 from branca.element import Figure, Html, MacroElement
 import pandas as pd
 import numpy as np
@@ -71,6 +71,89 @@ from gam.api.main import run_analysis
 
 # API Configuration
 API_TIMEOUT = 30  # seconds
+
+
+@st.cache_data(ttl=300)  # Cache map for 5 min
+def create_bbox_map(center_lat=0, center_lon=0, zoom=2):
+    """Create interactive map for bbox drawing."""
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=zoom,
+        tiles='OpenStreetMap'
+    )
+    
+    # Add Draw plugin for rectangle
+    draw = Draw(
+        position='topleft',
+        shape_options={
+            'rectangle': {
+                'shapeOptions': {
+                    'color': '#3388ff',
+                    'weight': 2,
+                    'fill': True,
+                    'fillColor': '#3388ff',
+                    'fillOpacity': 0.2
+                }
+            }
+        },
+        draw_options={
+            'rectangle': {
+                'show': True,
+                'shapeOptions': {
+                    'color': '#3388ff',
+                    'weight': 2,
+                    'fill': True,
+                    'fillColor': '#3388ff',
+                    'fillOpacity': 0.2
+                }
+            }
+        }
+    )
+    draw.add_to(m)
+    
+    # Instructions popup
+    folium.Marker(
+        [center_lat, center_lon],
+        popup=folium.Popup(
+            """
+            <div style="width: 300px;">
+                <h4>Draw Analysis Region</h4>
+                <p>1. Click and drag to draw a rectangle on the map</p>
+                <p>2. The bounding box will be used for data ingestion</p>
+                <p>3. Click 'Run Analysis' to start processing</p>
+                <p><em>Tip: Start with small regions (e.g., 2x2 degrees) for faster results</em></p>
+            </div>
+            """,
+            max_width=300
+        ),
+        icon=folium.Icon(color='blue', icon='info-sign')
+    ).add_to(m)
+    
+    return m
+
+
+def extract_bbox_from_draw(data: dict) -> Optional[Tuple[float, float, float, float]]:
+    """Extract bbox from drawn rectangle in st_folium data."""
+    if not data or 'last_active_drawing' not in data or not data['last_active_drawing']:
+        return None
+    
+    drawing = data['last_active_drawing']
+    if drawing['geometry']['type'] != 'Rectangle':
+        return None
+    
+    # Rectangle bounds: [[min_lat, min_lon], [max_lat, max_lon]]
+    bounds = drawing['geometry']['coordinates'][0]  # Outer ring
+    min_lat = min(coord[0] for coord in bounds)
+    max_lat = max(coord[0] for coord in bounds)
+    min_lon = min(coord[1] for coord in bounds)
+    max_lon = max(coord[1] for coord in bounds)
+    
+    # Validate reasonable size (e.g., < 20 degrees)
+    if (max_lat - min_lat > 20) or (max_lon - min_lon > 20):
+        st.warning("Drawn region too large. Please select a smaller area (max 20° span).")
+        return None
+    
+    return (min_lon, min_lat, max_lon, max_lat)
 
 
 def is_port_in_use(port: int) -> bool:

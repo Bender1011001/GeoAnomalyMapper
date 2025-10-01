@@ -23,6 +23,7 @@ preprocessing:
 modeling:
   inversion_type: "linear"  # Options: linear (SimPEG), eikonal (seismic), elastic (InSAR)
   threshold: 2.0  # Z-score threshold for anomaly detection
+  random_seed: 42  # Default seed for reproducibility
   mesh_start_coarse: 10.0  # Initial mesh cell size in km; refines iteratively
   priors:
     joint_weight: 0.5  # Bayesian fusion weight between modalities (0-1)
