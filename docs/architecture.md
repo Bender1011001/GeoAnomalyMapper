@@ -506,3 +506,306 @@ This architecture ensures seamless integration, maintainability, and extensibili
 ---
 
 *Updated: 2025-09-23 | v1.0 Implementation Complete*
+## Global Open Fusion MVP
+
+This section defines the end-to-end architecture and data flow for the Open Global Fusion MVP that fuses magnetic and gravity anomalies onto a common 0.1° global grid, tiles into 10°×10° Cloud Optimized GeoTIFFs COGs, computes a fused anomaly index, and exports PMTiles for web delivery. It adds to the existing architecture without removing content.
+
+Table of contents
+- [Overview](#global-open-fusion-mvp-overview)
+- [Data Sources and Licensing](#global-open-fusion-mvp-data-sources-and-licensing)
+- [Spatial Reference, Grid, and Tiling](#global-open-fusion-mvp-spatial-reference-grid-and-tiling)
+- [Normalization and Preprocessing](#global-open-fusion-mvp-normalization-and-preprocessing)
+- [Fusion Algorithm](#global-open-fusion-mvp-fusion-algorithm)
+- [PMTiles Export Strategy](#global-open-fusion-mvp-pmtiles-export-strategy)
+- [Batching and Resume plus Storage Layout](#global-open-fusion-mvp-batching-and-resume-plus-storage-layout)
+- [Logging Manifests and Validation Checkpoints](#global-open-fusion-mvp-logging-manifests-and-validation-checkpoints)
+- [MVP Flow Diagram](#global-open-fusion-mvp-flow-diagram)
+
+### Overview
+<a id="global-open-fusion-mvp-overview"></a>
+
+- Problem statement
+  - Build a global anomaly map by fusing magnetic and gravity anomalies on a consistent spatial framework suitable for global delivery.
+- MVP boundary
+  - Modalities
+    - Magnetic anomalies from EMAG2 v3
+    - Gravity anomalies derived from GOCE and EGM2008 sources as open derivatives free air or Bouguer
+  - Spatial framework
+    - Global 0.1° grid in EPSG:4326 WGS84
+    - Tiling into 10°×10° macro tiles as COGs
+  - Outputs
+    - Per layer COG tiles for mag grav and fused layers
+    - PMTiles archive for web delivery of the fused anomaly index
+  - Execution profile
+    - Run locally in batches with resume support
+    - All outputs under ./data/outputs
+
+### Data Sources and Licensing
+<a id="global-open-fusion-mvp-data-sources-and-licensing"></a>
+
+- EMAG2 v3 Magnetic Anomaly
+  - Description
+    - Global magnetic anomaly compilation based on satellite airborne and marine data with oceanic age and directional modeling
+  - Typical formats
+    - NetCDF CF compliant and GeoTIFF rasters at native resolution
+  - Pointers
+    - NOAA NCEI EMAG2 v3 product page and data access
+      - https://www.ncei.noaa.gov/products/earth-magnetic-anomaly-grid
+      - https://www.ncei.noaa.gov/data/earth-magnetic-anomaly-grid-2/download
+  - License and attribution
+    - Public domain US Government work where applicable
+    - Cite EMAG2 v3 and NOAA NCEI per product page guidance
+- Gravity anomaly GOCE and EGM2008 derived open derivatives
+  - Primary open options for MVP
+    - ICGEM Computation Service GFZ
+      - Compute global free air anomaly or Bouguer anomaly on a regular grid from gravity field models that include GOCE content
+      - Candidate models
+        - GO CON S GCF 2 DIR R5 GOCE DIR Release 5
+        - EIGEN 6C4 combined model GOCE GRACE LAGEOS and surface data compatible with EGM2008 degree and order limit 2190
+      - Format
+        - NetCDF or text grid as provided by ICGEM on a latitude longitude grid
+      - Terms
+        - ICGEM requires citation of the service and the chosen model acknowledge model DOIs and service DOI see ICGEM website
+      - URL
+        - https://icgem.gfz-potsdam.de
+    - Alternative where license permits
+      - DTU global gravity anomaly grids eg DTU21 marine gravity anomaly for oceanic areas licensed for open use with attribution see DTU Space
+      - Ensure any chosen gravity grid is an open derivative and complies with attribution terms
+  - License and attribution
+    - Cite the specific gravity model eg GO CON S GCF 2 DIR R5 or EIGEN 6C4 and the service or data provider ICGEM DTU etc per their terms
+- Raw download storage
+  - ./data/raw/emag2
+  - ./data/raw/gravity
+- Provenance manifest
+  - Maintain a per artifact JSON record with at minimum
+    - source_url
+    - filename
+    - sha256
+    - size_bytes
+    - acquired_at_iso
+    - license
+    - citation
+  - Store under ./data/outputs/manifest for all inputs and generated artifacts
+
+### Spatial Reference Grid and Tiling
+<a id="global-open-fusion-mvp-spatial-reference-grid-and-tiling"></a>
+
+- CRS
+  - EPSG 4326 WGS84 latitude longitude degrees
+- Global 0.1° grid
+  - Bounds
+    - Longitude min -180 inclusive to 180 exclusive
+    - Latitude min -90 inclusive to 90 inclusive
+  - Cell size
+    - 0.1 degree in both axes
+  - Derived grid size
+    - 3600 columns by 1800 rows
+- Pixel alignment and affine transform
+  - Origin upper left corner at lon -180 lat 90 with north up
+  - Georeferencing transform coefficients
+    - a 0.1 pixel width
+    - b 0 rotation x
+    - c -180 top left x
+    - d 0 rotation y
+    - e -0.1 pixel height negative for north up images
+    - f 90 top left y
+  - Expressed as GDAL style
+    - c a b f d e which is -180 0.1 0 90 0 -0.1
+- Tiling scheme 10°×10° macro tiles aligned to grid
+  - Each macro tile spans 100×100 pixels at 0.1°
+  - Tile extents are multiples of 10° exactly aligned to the grid coordinate system
+- Tile ID naming
+  - Tile ID format
+    - t NLL ELLL for north east
+    - t SLL WLLL for south west
+    - Degrees are zero padded for longitude to 3 digits and for latitude to 2 digits
+    - Examples
+      - t_N30_E120
+      - t_S10_W170
+- Directory layout for outputs
+  - ./data/outputs/cog/mag/z0p1d/tiles/&lt;tile_id&gt;.tif
+  - ./data/outputs/cog/grav/z0p1d/tiles/&lt;tile_id&gt;.tif
+  - ./data/outputs/cog/fused/z0p1d/tiles/&lt;tile_id&gt;.tif
+- Global tile coverage definition
+  - Longitude bands degrees
+    - -180 -170 -160 -150 -140 -130 -120 -110 -100 -90 -80 -70 -60 -50 -40 -30 -20 -10 0 10 20 30 40 50 60 70 80 90 100 110 120 130 140 150 160 170
+  - Latitude bands degrees
+    - -90 -80 -70 -60 -50 -40 -30 -20 -10 0 10 20 30 40 50 60 70 80
+
+### Normalization and Preprocessing
+<a id="global-open-fusion-mvp-normalization-and-preprocessing"></a>
+
+- Reprojection
+  - Reproject source rasters to EPSG 4326 if needed
+  - Resampling method
+    - Bilinear for continuous anomaly fields both magnetic and gravity
+- Resampling and alignment
+  - Resample to 0.1° on the defined global grid with exact pixel alignment to the affine transform listed above
+  - Handle NODATA as NaN end to end during processing
+- Units and metadata
+  - Magnetic anomaly units nT nanotesla
+  - Gravity anomaly units mGal milligal
+  - Standard metadata tags in outputs
+    - layer mag or grav or fused
+    - units nT mGal unitless for fused z
+    - grid 0.1deg
+    - tile_id
+    - bounds lon min lon max lat min lat max
+    - stats count min max mean std median mad
+- Cloud Optimized GeoTIFF COG specifications per tile outputs
+  - dtype float32
+  - NODATA NaN stored using IEEE NaN
+  - Compression DEFLATE level 9
+  - Predictor 2
+  - Internal tiling 512×512
+  - Overviews 2 4 8 16
+    - For mag and grav use average or nearest depending on preservation of extremes average recommended
+  - Suggested GDAL creation options
+    - COMPRESS DEFLATE ZLEVEL 9 PREDICTOR 2 TILED YES BLOCKXSIZE 512 BLOCKYSIZE 512 COPY_SRC_OVERVIEWS YES
+  - Tags and sidecar
+    - GeoTIFF tags as above
+    - Sidecar JSON STAC like with provenance and stats under
+      - ./data/outputs/metadata/&lt;tile_id&gt;_mag.json
+      - ./data/outputs/metadata/&lt;tile_id&gt;_grav.json
+      - ./data/outputs/metadata/&lt;tile_id&gt;_fused.json
+    - Sidecar fields include
+      - id tile_id
+      - layer
+      - bbox
+      - crs EPSG 4326
+      - grid 0.1deg
+      - source artifacts with URL and SHA256
+      - processing steps with versions
+      - statistics count min max mean std median mad p5 p95
+      - checksum of the emitted COG
+
+### Fusion Algorithm
+<a id="global-open-fusion-mvp-fusion-algorithm"></a>
+
+- Goal
+  - Produce a single fused anomaly index per pixel combining magnetic and gravity signals on the common grid
+- Per layer robust normalization done per tile for MVP
+  - Compute median and MAD median absolute deviation over non NaN pixels within the tile
+  - Robust z score for each pixel
+    - z = clamp to range minus 6 to plus 6 of value minus median divided by 1.4826 times MAD
+    - If MAD equals 0 fallback to small epsilon eg 1e 6 to avoid division by zero or mark z as NaN where appropriate
+- Weighting MVP
+  - Equal weights
+- Fused index
+  - For each pixel take
+    - fused_z = mean of available layers robust z values ignoring NaNs
+    - If both z_mag and z_grav are present fused_z equals 0.5 times z_mag plus 0.5 times z_grav
+    - If only one layer present fused_z equals that layer z this is acceptable for MVP with provenance noting missing modalities
+  - Store fused_z as float32 in the fused COG
+  - Record per tile stats for fused_z and write to sidecar
+- Edge consistency for tiling
+  - Because normalization is per tile minor discontinuities across tile edges may occur
+  - Validation will check seam line statistics and global outlier rates
+  - A future enhancement may add global or regional rolling normalization windows
+
+### PMTiles Export Strategy
+<a id="global-open-fusion-mvp-pmtiles-export-strategy"></a>
+
+- Objective
+  - Deliver a web friendly PMTiles archive of the fused anomaly index
+- Source data
+  - COGs at 0.1° resolution in EPSG 4326
+- Web tiling projection and zooms
+  - Target web projection is Web Mercator EPSG 3857 during tile generation
+  - Choose minzoom 0 and maxzoom 7 for MVP which preserves approximate native scale of 0.1° near the equator without excessive oversampling
+- Encoding
+  - For web rasters typical viewers expect 8 bit or 16 bit tiles
+  - MVP approach
+    - Linearly map fused_z range minus 6 to plus 6 to 0 to 255 and emit 8 bit PNG tiles for web delivery
+    - Preserve analytic float32 data in COGs for scientific use the PMTiles is primarily for visualization
+  - Store scale and offset metadata in the PMTiles metadata
+- Build pipeline options choose one based on available tooling
+  1. COG mosaic to MBTiles to PMTiles
+     - Build a VRT or mosaic index over fused COGs
+     - Use gdal2tiles or gdaladdo with gdal translate workflows to generate MBTiles at zooms 0 to 7 with average resampling
+     - Convert MBTiles to PMTiles using a pmtiles converter
+  2. Direct COG to PMTiles using a cog to pmtiles utility
+     - Use a tool that reads COGs and writes PMTiles directly building a tile pyramid eg cog2pmtiles utilities
+- Output
+  - ./data/outputs/pmtiles/fused_global_z0p1d_z0_z7.pmtiles
+  - Include a small JSON metadata file describing scale offset and color ramp recommendations for clients
+
+### Batching and Resume plus Storage Layout
+<a id="global-open-fusion-mvp-batching-and-resume-plus-storage-layout"></a>
+
+- Tiling work queue
+  - Enumerate all tile_ids from the latitude and longitude band lists
+  - Support inclusion exclusion lists for testing eg only tiles that intersect a bounding box
+- Idempotent processing and resume
+  - Before processing a tile check for the existence of the target COG and sidecar and validate their SHA256 checksums and stats presence
+  - If valid skip tile else reprocess
+  - Maintain a state file with processed tiles timestamps and versions at ./data/outputs/state/global_mvp_state.json
+- Storage layout summary
+  - Inputs
+    - ./data/raw/emag2
+    - ./data/raw/gravity
+  - Intermediates optional
+    - ./data/outputs/work/&lt;tile_id&gt; to hold scratch grids and VRTs can be deleted after success
+  - Per layer COGs
+    - ./data/outputs/cog/mag/z0p1d/tiles/&lt;tile_id&gt;.tif
+    - ./data/outputs/cog/grav/z0p1d/tiles/&lt;tile_id&gt;.tif
+    - ./data/outputs/cog/fused/z0p1d/tiles/&lt;tile_id&gt;.tif
+  - Metadata and manifests
+    - ./data/outputs/metadata/&lt;tile_id&gt;_mag.json etc
+    - ./data/outputs/manifest inputs and outputs manifest JSON files
+    - ./data/outputs/state run state and resume pointers
+  - Web delivery
+    - ./data/outputs/pmtiles/fused_global_z0p1d_z0_z7.pmtiles
+  - Optional quicklooks for QA
+    - ./data/outputs/quicklook/&lt;tile_id&gt;_fused.png
+
+### Logging Manifests and Validation Checkpoints
+<a id="global-open-fusion-mvp-logging-manifests-and-validation-checkpoints"></a>
+
+- Logging
+  - Structured JSON logs to ./logs/global_open_fusion_mvp.log and console
+  - Required fields
+    - timestamp level stage tile_id duration_ms message
+    - stage values include download reproject resample cog_write normalize fuse pmtiles_export validate
+- Manifests
+  - Master manifest for the run at ./data/outputs/manifest/global_mvp_manifest.json
+  - Captures configuration snapshot input artifacts output artifacts and checksums
+- Validation checkpoints automated
+  1. Input integrity
+     - SHA256 for downloaded inputs matches recorded values
+     - Raster CRS is EPSG 4326 after reprojection
+  2. Grid alignment
+     - Verify raster geotransform equals -180 0.1 0 90 0 -0.1 within a small epsilon
+     - Pixel count equals 100×100 per tile and bounds match the tile envelope
+  3. Statistics sanity
+     - For each tile compute count min max mean std median mad and ensure finite non NaN count is above a threshold eg 90 percent for oceans tiles may be sparser for some modalities
+  4. Seam checks
+     - For adjacent tiles compute difference along shared edges and report mean and std small values expected slight jumps tolerated due to per tile normalization
+  5. COG compliance
+     - gdalinfo like checks for COG structure internal tiling overviews compression tags
+  6. PMTiles integrity
+     - Validate tile count zoom coverage and metadata presence scale offset and min max
+- Failure handling
+  - If a validation step fails mark tile as failed in state file and continue others
+  - Summarize failed tiles at the end for rerun
+
+### MVP Flow Diagram
+<a id="global-open-fusion-mvp-flow-diagram"></a>
+
+```mermaid
+flowchart LR
+    A[Raw downloads EMAG2 v3] --> B[Reproject resample to 0.1 deg EPSG 4326]
+    A2[Raw downloads Gravity GOCE EGM2008 derived] --> B
+    B --> C[Tile into 10x10 deg macro tiles]
+    C --> D[Write COG mag and grav with overviews and metadata]
+    D --> E[Per tile robust z normalize clamp]
+    E --> F[Equal weight fuse to fused_z]
+    F --> G[Write fused COG and sidecar]
+    G --> H[Build web tile pyramid and PMTiles]
+    H --> I[Outputs under ./data/outputs PMTiles plus COGs]
+```
+
+Notes and constraints
+- This MVP prioritizes openness reproducibility and simplicity equal weighting and per tile normalization
+- All file paths are relative to the repository and are designed to be platform independent
+- Future refinements may add global normalization more sophisticated fusion weights uncertainty layers and sea land specific handling
