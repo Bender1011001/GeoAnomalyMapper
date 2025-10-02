@@ -955,3 +955,318 @@ class InSARFetcher(DataSource):
                 shutil.rmtree(tmpdir, ignore_errors=True)
             except Exception:
                 pass
+
+
+def load_data_sources() -> Dict[str, Dict[str, Any]]:
+    """
+    Load data sources from YAML file relative to the project root.
+    
+    Returns
+    -------
+    Dict[str, Dict[str, Any]]
+        Loaded sources dictionary.
+    
+    Raises
+    ------
+    FileNotFoundError
+        If data_sources.yaml not found.
+    yaml.YAMLError
+        If YAML parsing fails.
+    """
+    project_root = Path(__file__).parents[3]  # Assuming gam/ingestion is 2 levels deep in GeoAnomalyMapper
+    yaml_path = project_root / "data_sources.yaml"
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"data_sources.yaml not found at {yaml_path}")
+    
+    with open(yaml_path, 'r') as f:
+        sources = yaml.safe_load(f)
+    
+    if not isinstance(sources, dict):
+        raise ValueError("data_sources.yaml must contain a dictionary at root level")
+    
+    return sources
+
+
+def compute_sha256(file_path: Path) -> str:
+    """
+    Compute SHA256 checksum of a file.
+    
+    Parameters
+    ----------
+    file_path : Path
+        Path to the file.
+    
+    Returns
+    -------
+    str
+        Hexdigest of SHA256.
+    
+    Raises
+    ------
+    IOError
+        If file cannot be read.
+    """
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+
+def verify_checksum(file_path: Path, expected_sha256: str) -> bool:
+    """
+    Verify the SHA256 checksum of a file against an expected value.
+    
+    Parameters
+    ----------
+    file_path : Path
+        Path to the file.
+    expected_sha256 : str
+        Expected SHA256 hexdigest.
+    
+    Returns
+    -------
+    bool
+        True if checksum matches, False otherwise.
+    
+    Raises
+    ------
+    ValueError
+        If expected_sha256 is empty or invalid.
+    """
+    if not expected_sha256 or expected_sha256.strip() == "":
+        raise ValueError("Expected SHA256 cannot be empty for verification")
+    
+    actual_sha256 = compute_sha256(file_path)
+    return actual_sha256 == expected_sha256.strip()
+
+
+def log_to_jsonl(entry: Dict[str, Any], log_path: Path) -> None:
+    """
+    Append a JSON entry to a JSONL log file.
+    
+    Parameters
+    ----------
+    entry : Dict[str, Any]
+        Log entry dictionary.
+    log_path : Path
+        Path to the JSONL log file.
+    
+    Raises
+    ------
+    IOError
+        If writing to log fails.
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, 'a') as f:
+        f.write(json.dumps(entry) + '\n')
+
+
+def download_dataset(dataset_id: str, force: bool = False, timeout: int = 60, retries: int = 3, skip_checksum: bool = False) -> str:
+    """
+    Download a dataset by ID from data_sources.yaml.
+    
+    Streams download with retries and resumable support (Range headers).
+    Verifies checksum if provided in YAML; computes and logs if not.
+    Writes to target_dir/expected_filename.
+    
+    Parameters
+    ----------
+    dataset_id : str
+        Dataset key (e.g., 'emag2_v3').
+    force : bool, optional
+        Overwrite existing file if True (default False).
+    timeout : int, optional
+        Request timeout in seconds (default 60).
+    retries : int, optional
+        Number of retry attempts (default 3).
+    skip_checksum : bool, optional
+        Skip checksum verification if True (default False).
+    
+    Returns
+    -------
+    str
+        Final local path to downloaded file.
+    
+    Raises
+    ------
+    ValueError
+        If dataset_id not found or invalid config.
+    requests.RequestException
+        On download failure after retries.
+    IOError
+        On file write failure.
+    """
+    sources = load_data_sources()
+    if dataset_id not in sources:
+        raise ValueError(f"Dataset '{dataset_id}' not found in data_sources.yaml")
+    
+    source = sources[dataset_id]
+    urls: list = source.get('urls', [])
+    if not urls:
+        raise ValueError(f"No URLs provided for '{dataset_id}'")
+    
+    expected_filename: str = source.get('expected_filename', f"{dataset_id}.tif")
+    target_dir: str = source.get('target_dir', './data/raw')
+    target_path = Path(target_dir) / expected_filename
+    expected_sha256: str = source.get('sha256', '').strip()
+    
+    # Create target directory
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Check if exists and not force
+    if target_path.exists() and not force:
+        logger.info(f"File already exists at {target_path}; skipping download. Use --force to overwrite.")
+        if expected_sha256:
+            if verify_checksum(target_path, expected_sha256):
+                logger.info(f"Checksum verified for {target_path}")
+            else:
+                logger.warning(f"Checksum mismatch for {target_path}; consider --force")
+        else:
+            computed = compute_sha256(target_path)
+            logger.info(f"Computed SHA256 for existing {target_path}: {computed}")
+        return str(target_path)
+    
+    # Try URLs in order
+    selected_url = None
+    for url in urls:
+        try:
+            logger.info(f"Attempting download from {url} for {dataset_id}")
+            
+            # Check server Range support
+            head_resp = requests.head(url, timeout=timeout)
+            supports_range = 'bytes' in head_resp.headers.get('Accept-Ranges', '')
+            file_size = int(head_resp.headers.get('Content-Length', 0))
+            
+            # Resumable: get partial size if exists
+            partial_size = target_path.stat().st_size if target_path.exists() and supports_range else 0
+            headers = {'Range': f'bytes={partial_size}-'} if partial_size > 0 and supports_range else {}
+            
+            resp = requests.get(url, stream=True, timeout=timeout, headers=headers)
+            resp.raise_for_status()
+            
+            # Log start
+            log_entry = {
+                'stage': 'fetch',
+                'dataset_id': dataset_id,
+                'url': url,
+                'status': 'started',
+                'bytes': 0,
+                'sha256': '',
+                'path': str(target_path)
+            }
+            log_to_jsonl(log_entry, Path('./logs/global_open_fusion_mvp.log'))
+            
+            # Download with progress
+            downloaded_bytes = partial_size
+            sha256_hash = hashlib.sha256()
+            with open(target_path, 'ab' if partial_size > 0 else 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        sha256_hash.update(chunk)
+                        downloaded_bytes += len(chunk)
+            
+            # Update log on success
+            final_sha256 = sha256_hash.hexdigest()
+            log_entry.update({
+                'status': 'success',
+                'bytes': downloaded_bytes,
+                'sha256': final_sha256,
+                'path': str(target_path)
+            })
+            log_to_jsonl(log_entry, Path('./logs/global_open_fusion_mvp.log'))
+            
+            selected_url = url
+            logger.info(f"Downloaded {downloaded_bytes} bytes from {url} to {target_path}")
+            
+            # Verify if expected_sha256 provided and not skipped
+            if expected_sha256 and not skip_checksum:
+                if verify_checksum(target_path, expected_sha256):
+                    logger.info(f"SHA256 verified: {final_sha256}")
+                else:
+                    raise ValueError(f"SHA256 mismatch for {dataset_id}: expected {expected_sha256}, got {final_sha256}")
+            elif expected_sha256:
+                logger.info(f"Checksum verification skipped for {dataset_id}")
+            else:
+                logger.info(f"Computed SHA256 for {dataset_id}: {final_sha256}")
+            
+            break  # Success, exit loop
+            
+        except (Timeout, RequestException) as e:
+            logger.warning(f"Failed to download from {url}: {e}")
+            if url == urls[-1]:  # Last URL
+                raise
+            continue  # Try next URL
+        except Exception as e:
+            logger.error(f"Unexpected error downloading from {url}: {e}")
+            raise
+    
+    if not selected_url:
+        raise ValueError(f"All URLs failed for '{dataset_id}'")
+    
+    # Write manifest (meta from source)
+    meta = {
+        'license': source.get('license', ''),
+        'citation': source.get('citation', ''),
+        'attribution': source.get('attribution', ''),
+        'description': source.get('description', ''),
+        'notes': source.get('notes', '')
+    }
+    write_manifest(
+        dataset_id=dataset_id,
+        selected_url=selected_url,
+        final_path=str(target_path),
+        sha256=final_sha256 if not expected_sha256 else expected_sha256,
+        size=downloaded_bytes,
+        meta=meta
+    )
+    
+    return str(target_path)
+
+
+def write_manifest(dataset_id: str, selected_url: str, final_path: str, sha256: str, size: int, meta: Dict[str, Any]) -> None:
+    """
+    Write a JSON manifest for the downloaded dataset.
+    
+    Parameters
+    ----------
+    dataset_id : str
+        Dataset ID.
+    selected_url : str
+        URL used for download.
+    final_path : str
+        Local path to file.
+    sha256 : str
+        SHA256 checksum.
+    size : int
+        File size in bytes.
+    meta : Dict[str, Any]
+        Additional metadata (license, citation, etc.).
+    
+    Raises
+    ------
+    IOError
+        If manifest directory or file cannot be written.
+    """
+    manifest_dir = Path('./data/outputs/manifest')
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = manifest_dir / f"{dataset_id}.json"
+    
+    manifest = {
+        'source_url': selected_url,
+        'final_path': final_path,
+        'size': size,
+        'sha256': sha256,
+        'acquired_at': datetime.now().isoformat(),
+        'license': meta.get('license', ''),
+        'citation': meta.get('citation', ''),
+        'attribution': meta.get('attribution', ''),
+        'description': meta.get('description', ''),
+        'notes': meta.get('notes', '')
+    }
+    
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest, f, indent=2)
+    
+    logger.info(f"Manifest written to {manifest_path}")

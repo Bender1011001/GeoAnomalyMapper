@@ -37,3 +37,29 @@ insar:
   polarisation: "VV"
   # Authentication: Set ESA_USERNAME and ESA_PASSWORD environment variables for secure credential management.
   # Post-configuration update, credentials must be provided via environment variables; config fallbacks are deprecated and will fail if absent.
+
+emag2_v3:
+  description: NOAA NCEI EMAG2 v3 global magnetic anomaly grid
+  urls:
+    - "https://www.ncei.noaa.gov/data/earth-magnetic-model-2020/emag2_v3/EMAG2_V3_World.tif"  # Primary GeoTIFF download
+    - "https://www.ncei.noaa.gov/data/earth-magnetic-model-2020/emag2_v3/EMAG2_V3_World.nc"  # Alternative NetCDF
+  expected_filename: EMAG2_V3_global.tif
+  target_dir: ./data/raw/emag2
+  license: Public Domain (NOAA/NCEI)
+  citation: "Maus, S., et al. (2009). EMAG2: A new era in exploration of the global magnetic field. Geochemistry, Geophysics, Geosystems, 10(6). Updated to v3 (2020)."
+  attribution: "Data provided by NOAA National Centers for Environmental Information (NCEI)"
+  notes: "Global grid at 2 arc-min resolution; units nT. Prefer GeoTIFF for rasterio compatibility."
+  sha256: ""
+
+gravity_goce_egm2008_derivative:
+  description: Open global gravity anomaly derivative (free-air) computed from GOCE/EGM2008
+  urls:
+    - "https://icgem.gfz-potsdam.de/home/showdoc?lang=en&contentid=17&doc=EGM2008.gfc"  # ICGEM EGM2008 coefficients (requires conversion to grid)
+    - "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/data/bathymetry/egm2008/Gravity_Anomaly_World.tif"  # Alternative NOAA-derived global gravity anomaly GeoTIFF mirror
+  expected_filename: gravity_global.tif
+  target_dir: ./data/raw/gravity
+  license: Public Domain (NASA/EGM2008)
+  citation: "Pavlis, N. K., et al. (2012). The Development and Evaluation of the Earth Gravitational Model 2008 (EGM2008). Journal of Geophysical Research: Solid Earth, 117(B4)."
+  attribution: "Data derived from EGM2008 model by NGA and NASA"
+  notes: "Global free-air gravity anomalies at 5 arc-min resolution; units mGal. Use GeoTIFF if available; coefficients need gridding tool for .gfc."
+  sha256: ""
