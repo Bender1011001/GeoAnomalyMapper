@@ -164,7 +164,24 @@ class ResourceUtils:
         except ImportError:
             logger.warning("psutil not installed; returning dummy resources")
             return ResourceInfo(cpu_percent=0.0, memory_percent=0.0, available_memory_gb=0.0)
-from pyproj import Transformer, CRS
+from typing import TYPE_CHECKING
+
+
+def _require_pyproj():
+    """Import pyproj lazily only when needed, with a clear error if missing."""
+    try:
+        import pyproj as _pyproj
+        return _pyproj
+    except Exception as e:
+        raise ImportError(
+            "pyproj is required to execute coordinate transformations; "
+            "install pyproj to use this feature."
+        ) from e
+
+
+if TYPE_CHECKING:
+    # For type checkers only; avoids runtime import cost
+    from pyproj import Transformer as _Transformer, CRS as _CRS  # noqa: F401
 
 
 def transform_coordinates(lons, lats, source_crs='EPSG:4326', target_crs='EPSG:32633'):
@@ -198,12 +215,16 @@ def transform_coordinates(lons, lats, source_crs='EPSG:4326', target_crs='EPSG:3
         - Dependencies: pyproj >=3.0.0.
         - Reference: PyProj documentation for Transformer.
     """
+    import numpy as np
+
     if not hasattr(lons, '__len__') or not hasattr(lats, '__len__'):
         lons = np.array([lons])
         lats = np.array([lats])
     elif len(lons) != len(lats):
         raise ValueError("lons and lats must have same length")
-    transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
+
+    _py = _require_pyproj()
+    transformer = _py.Transformer.from_crs(_py.CRS(source_crs), _py.CRS(target_crs), always_xy=True)
     x, y = transformer.transform(lons, lats)
     return x, y
 def reverse_transform_coordinates(xs, ys, source_crs='EPSG:32633', target_crs='EPSG:4326'):
@@ -225,6 +246,7 @@ def reverse_transform_coordinates(xs, ys, source_crs='EPSG:32633', target_crs='E
         ValueError: If CRS invalid or shapes mismatch.
 
     Examples:
+        >>> import numpy as np
         >>> xs = np.array([500000.0])
         >>> ys = np.array([5700000.0])
         >>> lons, lats = reverse_transform_coordinates(xs, ys)
@@ -235,12 +257,15 @@ def reverse_transform_coordinates(xs, ys, source_crs='EPSG:32633', target_crs='E
         - Dependencies: pyproj >=3.0.0.
         - Reference: PyProj Transformer for inverse projections.
     """
+    import numpy as np
+
     if not hasattr(xs, '__len__') or not hasattr(ys, '__len__'):
         xs = np.array([xs])
         ys = np.array([ys])
     elif len(xs) != len(ys):
         raise ValueError("xs and ys must have same length")
-    from pyproj import Transformer, CRS
-    transformer = Transformer.from_crs(CRS(source_crs), CRS(target_crs), always_xy=True)
+
+    _py = _require_pyproj()
+    transformer = _py.Transformer.from_crs(_py.CRS(source_crs), _py.CRS(target_crs), always_xy=True)
     lons, lats = transformer.transform(xs, ys)
     return lons, lats
