@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   gam-api:
@@ -13,7 +13,7 @@ services:
       - gam-data:/app/data
       - gam-results:/app/results
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/openapi.json"]
       interval: 30s
       timeout: 10s
       retries: 3
