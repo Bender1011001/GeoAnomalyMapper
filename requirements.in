@@ -38,6 +38,7 @@ pyyaml>=6.0.2
 tenacity>=8.2.0
 dask[complete]>=2024.8.0
 sqlalchemy>=1.4.0
+python-dotenv  # For loading environment variables from .env files
 
 # No additional core dependencies found in requirements.txt or setup.py beyond these.
 # Transitive dependencies (e.g., affine from rasterio) will be resolved by pip-tools.

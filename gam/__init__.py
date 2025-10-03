@@ -73,58 +73,9 @@ logging.basicConfig(
 log = logging.getLogger('gam')
 log.info(f"GAM {__version__} initialized")
 
-# High-level API: GAMPipeline from core
-from .core.pipeline import GAMPipeline
-
-# Low-level APIs: Managers from each module
-from .ingestion import (
-    IngestionManager, RawData, HDF5CacheManager,
-    GravityFetcher, SeismicFetcher, MagneticFetcher, InSARFetcher,
-    DataSource
-)
-from .preprocessing import (
-    PreprocessingManager, ProcessedGrid, Preprocessor,
-    GravityPreprocessor, MagneticPreprocessor, SeismicPreprocessor, InSARPreprocessor,
-    DaskPreprocessor
-)
-try:
-    from .modeling import (
-        ModelingManager, InversionResults, AnomalyOutput, Inverter,
-        GravityInverter, MagneticInverter, SeismicInverter, InSARInverter,
-        JointInverter, AnomalyDetector, MeshGenerator
-    )
-except Exception as e:
-    ModelingManager = None  # type: ignore
-    InversionResults = None  # type: ignore
-    AnomalyOutput = None  # type: ignore
-    Inverter = None  # type: ignore
-    GravityInverter = None  # type: ignore
-    MagneticInverter = None  # type: ignore
-    SeismicInverter = None  # type: ignore
-    InSARInverter = None  # type: ignore
-    JointInverter = None  # type: ignore
-    AnomalyDetector = None  # type: ignore
-    MeshGenerator = None  # type: ignore
-    log.warning(
-        "Modeling components not available. Reason: %s. "
-        "Install optional dependencies (e.g., simpeg) to enable modeling.", str(e)
-    )
-try:
-    from .visualization import VisualizationManager
-except Exception as e:
-    VisualizationManager = None
-    log.warning(
-        "Visualization components not available: %s. Install optional dependencies (PyGMT/PyVista) to enable visualization.",
-        str(e)
-    )
-
-# Core utilities (config, exceptions, etc.)
-from .core.config import GAMConfig
-from .core.exceptions import GAMError, PipelineError
-from .core.utils import validate_bbox
-
-# CLI entry (if using Click/Argparse in core.cli)
-# from .core.cli import cli  # TODO: Implement CLI in core/cli.py for direct invocation
+# Lazy export strategy to keep import-time light (no heavy geospatial deps required for CLI --help)
+from typing import TYPE_CHECKING
+import importlib
 
 __all__ = [
     # High-level
@@ -136,3 +87,80 @@ __all__ = [
     # Core
     'GAMConfig', 'GAMError', 'PipelineError', 'validate_bbox'
 ]
+
+# Map attribute names to (module_path, symbol_name) for lazy resolution
+_lazy_exports = {
+    # High-level
+    'GAMPipeline': ('gam.core.pipeline', 'GAMPipeline'),
+
+    # Ingestion
+    'IngestionManager': ('gam.ingestion.manager', 'IngestionManager'),
+    'RawData': ('gam.ingestion.data_structures', 'RawData'),
+    'HDF5CacheManager': ('gam.ingestion.cache_manager', 'HDF5CacheManager'),
+    'GravityFetcher': ('gam.ingestion.fetchers', 'USGSGravityFetcher'),
+    'SeismicFetcher': ('gam.ingestion.fetchers', 'SeismicFetcher'),
+    'MagneticFetcher': ('gam.ingestion.fetchers', 'USGSMagneticFetcher'),
+    'InSARFetcher': ('gam.ingestion.fetchers', 'ESAInSARFetcher'),
+    'DataSource': ('gam.ingestion.base', 'DataSource'),
+
+    # Preprocessing
+    'PreprocessingManager': ('gam.preprocessing.manager', 'PreprocessingManager'),
+    'ProcessedGrid': ('gam.preprocessing.data_structures', 'ProcessedGrid'),
+    'Preprocessor': ('gam.preprocessing.base', 'Preprocessor'),
+    'GravityPreprocessor': ('gam.preprocessing.processors', 'GravityPreprocessor'),
+    'MagneticPreprocessor': ('gam.preprocessing.processors', 'MagneticPreprocessor'),
+    'SeismicPreprocessor': ('gam.preprocessing.processors', 'SeismicPreprocessor'),
+    'InSARPreprocessor': ('gam.preprocessing.processors', 'InSARPreprocessor'),
+    'DaskPreprocessor': ('gam.preprocessing.parallel', 'DaskPreprocessor'),
+
+    # Modeling (optional; may raise ImportError when accessed if extras missing)
+    'ModelingManager': ('gam.modeling.manager', 'ModelingManager'),
+    'InversionResults': ('gam.modeling.data_structures', 'InversionResults'),
+    'AnomalyOutput': ('gam.modeling.data_structures', 'AnomalyOutput'),
+    'Inverter': ('gam.modeling.base', 'Inverter'),
+    'GravityInverter': ('gam.modeling', 'GravityInverter'),
+    'MagneticInverter': ('gam.modeling', 'MagneticInverter'),
+    'SeismicInverter': ('gam.modeling', 'SeismicInverter'),
+    'InSARInverter': ('gam.modeling', 'InSARInverter'),
+    'JointInverter': ('gam.modeling', 'JointInverter'),
+    'AnomalyDetector': ('gam.modeling.anomaly_detection', 'AnomalyDetector'),
+    'MeshGenerator': ('gam.modeling.mesh', 'MeshGenerator'),
+
+    # Visualization (optional)
+    'VisualizationManager': ('gam.visualization.manager', 'VisualizationManager'),
+
+    # Core utilities
+    'GAMConfig': ('gam.core.config', 'GAMConfig'),
+    'GAMError': ('gam.core.exceptions', 'GAMError'),
+    'PipelineError': ('gam.core.exceptions', 'PipelineError'),
+    'validate_bbox': ('gam.core.utils', 'validate_bbox'),
+}
+
+if TYPE_CHECKING:
+    # Optionally expose types to static analyzers without importing at runtime
+    pass
+
+
+def __getattr__(name: str):
+    """Lazily import attributes on first access to avoid heavy deps at import-time."""
+    target = _lazy_exports.get(name)
+    if target is None:
+        raise AttributeError(f"module 'gam' has no attribute {name!r}")
+    module_path, symbol = target
+    try:
+        module = importlib.import_module(module_path)
+    except Exception as e:
+        raise ImportError(
+            f"Failed to import '{name}' from '{module_path}'. "
+            f"Install required optional dependencies to use this feature."
+        ) from e
+    try:
+        return getattr(module, symbol)
+    except AttributeError as e:
+        raise AttributeError(
+            f"Attribute '{symbol}' not found in module '{module_path}'."
+        ) from e
+
+
+def __dir__():
+    return sorted(list(globals().keys()) + __all__)

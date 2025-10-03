@@ -1,65 +1,291 @@
+# ======================================================
 # Data Sources Configuration for GAM Ingestion Module
-# Load with: import yaml; with open('data_sources.yaml', 'r') as f: sources = yaml.safe_load(f)
-# Then use in fetchers: e.g., for gravity: requests.get(sources['gravity']['base_url'].format(bbox=bbox_str), params=sources['gravity']['default_params'])
-# For auth: Use os.getenv('VAR_NAME') for placeholders like ${VAR}; set in .env (ignored by .gitignore).
-# Public sources require no keys; private (e.g., ESA) need free account—register at respective sites.
-# Implement rate limiting in fetchers.py (e.g., time.sleep(config['core']['rate_limit_delay'])) to avoid API bans.
-# Add new modalities by extending this YAML.
+# ======================================================
+# Usage:
+#   import yaml
+#   with open("data_sources.yaml") as f:
+#       sources = yaml.safe_load(f)
+#
+# Structure:
+# - Each modality has one or more dataset entries
+# - Keys: description, urls, expected_filename, target_dir, license,
+#   citation, notes, update policy
+#
+# Update Policies:
+#   static      = never changes (one-time fetch)
+#   periodic    = occasional updates (annual or less)
+#   monthly     = regular releases (check monthly)
+#   regenerate  = regenerate from coefficients/harmonics when new versions released
+#
+# Authentication:
+# - Use os.getenv("VAR_NAME") for any auth fields
+# - Place credentials in .env (gitignored)
+# - Public sources need no auth
+#
+# ======================================================
 
+core:
+  rate_limit_delay: 2   # seconds between API calls to avoid bans
+  cache_dir: ./data/raw
+
+# -----------------------------
+# Gravity Datasets
+# -----------------------------
 gravity:
-  base_url: "https://mrdata.usgs.gov/services/gravity?bbox={bbox}&format=geojson"
-  client_type: "requests"  # Use requests.get(base_url.format(...))
-  default_params: {}  # Additional query params if needed (e.g., minyear=2020)
-  auth: null  # Public USGS API; no authentication required
+  usgs_mrdata:
+    description: USGS MRData Gravity (vector service, limited global)
+    base_url: "https://mrdata.usgs.gov/services/gravity?bbox={bbox}&format=geojson"
+    client_type: "requests"
+    default_params: {}
+    auth: null
+    license: Public (USGS)
+    update: periodic
 
+  egm2008:
+    description: NGA/NASA Earth Gravitational Model 2008
+    urls:
+      - "https://icgem.gfz-potsdam.de/root_folder/models/EGM2008/g087cof"   # harmonics
+    expected_filename: EGM2008.gfc
+    target_dir: ./data/raw/gravity/egm2008
+    license: Free (NGA/NASA)
+    citation: "Pavlis, N. K., et al. (2012). JGR: Solid Earth, 117(B4)."
+    notes: "Spherical harmonics to degree 2190. Grid with pyshtools/icgem."
+    update: regenerate
+
+  egm2020:
+    description: NGA Earth Gravitational Model 2020
+    urls:
+      - "https://earth-info.nga.mil/php/download.php?file=egm2020/EGM2020.gfc"
+    expected_filename: EGM2020.gfc
+    target_dir: ./data/raw/gravity/egm2020
+    license: Free (NGA/NASA)
+    citation: "NGA EGM Development Team (2020). EGM2020."
+    notes: "Higher resolution than EGM2008. Grid with pyshtools/icgem."
+    update: regenerate
+
+  grace:
+    description: GRACE / GRACE-FO monthly gravity fields
+    urls:
+      - "https://podaac-tools.jpl.nasa.gov/drive/files/allData/grace/L3/mascon/RL06/v02"
+    expected_filename: grace_monthly_*.nc
+    target_dir: ./data/raw/gravity/grace
+    license: NASA Public
+    citation: "Save, H. et al. (2016). GRACE RL06 Mascon Solutions."
+    notes: "Monthly hydrology/mass transport. Units: cm water equivalent."
+    update: monthly
+
+  sio_v31:
+    description: Scripps V31 Global Marine Gravity (Sandwell & Smith)
+    urls:
+      - "https://topex.ucsd.edu/marine_gravity/"
+    expected_filename: grav_sio_v31.nc
+    target_dir: ./data/raw/gravity/sio_v31
+    license: Free with attribution (Scripps)
+    citation: "Sandwell, D. T., Smith, W. H. F. (2009). Marine Gravity Field."
+    notes: "1 arc-min resolution over oceans."
+    update: periodic
+
+  wgm2012:
+    description: WGM2012 Global Bouguer Anomaly
+    urls:
+      - "https://www.earthbyte.org/webdav/ftp/Data_collections/2012_gravity/WGM2012/"
+    expected_filename: wgm2012_global.grd
+    target_dir: ./data/raw/gravity/wgm2012
+    license: CC-BY-NC (GFZ)
+    citation: "Bonvalot, S., et al. (2012). WGM2012. GFZ Data Services."
+    notes: "5 arc-min global Bouguer anomaly."
+    update: static
+
+# -----------------------------
+# Magnetic Datasets
+# -----------------------------
 magnetic:
-  base_url: "https://mrdata.usgs.gov/services/magnetic?bbox={bbox}&format=geojson"
-  client_type: "requests"
-  default_params: {}  # Similar to gravity; adjust for magnetic surveys
-  auth: null  # Public
+  usgs_mrdata:
+    description: USGS MRData Magnetics (vector service)
+    base_url: "https://mrdata.usgs.gov/services/magnetic?bbox={bbox}&format=geojson"
+    client_type: "requests"
+    default_params: {}
+    auth: null
+    license: Public (USGS)
+    update: periodic
 
+  emag2_v3:
+    description: NOAA NCEI EMAG2 v3 global magnetic anomaly grid
+    urls:
+      - "https://www.ngdc.noaa.gov/mgg/global/emag2_v3/EMAG2_V3_Sea_Level.tif"
+    expected_filename: EMAG2_V3_global.tif
+    target_dir: ./data/raw/magnetics/emag2
+    license: Public Domain (NOAA/NCEI)
+    citation: "Maus, S., et al. (2009). G3, 10(6). Updated v3 (2020)."
+    notes: "2 arc-min global raster in nT."
+    update: static
+
+  wdmam_v2_1:
+    description: World Digital Magnetic Anomaly Map v2.1
+    urls:
+      - "https://geomag.bgs.ac.uk/data_service/models_compass/wdmam.html"
+    expected_filename: wdmam_v2_1_global.tif
+    target_dir: ./data/raw/magnetics/wdmam
+    license: CC-BY 4.0
+    citation: "Lesur, V., et al. (2016). Earth, Planets and Space."
+    notes: "2 arc-min global raster; updated compilation."
+    update: static
+
+  swarm_chaos:
+    description: ESA Swarm CHAOS lithospheric magnetic field model
+    urls:
+      - "https://www.space.dtu.dk/english/Research/Scientific_data_and_models/Magnetic_Field_Models/CHAOS"
+    expected_filename: chaos_model.cof
+    target_dir: ./data/raw/magnetics/swarm
+    license: ESA Public
+    citation: "Finlay, C. C., et al. (2020). CHAOS-7 model. Earth Planets Space."
+    notes: "Higher fidelity lithospheric anomalies; coefficients require gridding."
+    update: regenerate
+
+# -----------------------------
+# Seismic Datasets
+# -----------------------------
 seismic:
-  client_type: "obspy"  # Use obspy.clients.fdsn.Client(sources['seismic']['fdsn_server'])
-  fdsn_server: "IRIS"  # FDSN web service provider
-  default_params:
-    network: "*"  # Wildcard for all networks
-    station: "*"
-    location: "*"
-    channel: "BH?"  # Broadband horizontal channels
-    starttime: "2020-01-01"  # UTCDateTime string
-    endtime: "2025-09-22"
-  auth: null  # Public FDSN; no key needed, but respect usage policies
+  iris_fdsn:
+    client_type: "obspy"
+    fdsn_server: "IRIS"
+    default_params:
+      network: "*"
+      station: "*"
+      location: "*"
+      channel: "BH?"
+      starttime: "2020-01-01"
+      endtime: "2025-12-31"
+    auth: null
+    license: Public (IRIS)
+    update: monthly
 
+  usgs_anss:
+    description: USGS ANSS Earthquake Catalog
+    base_url: "https://earthquake.usgs.gov/fdsnws/event/1/query"
+    client_type: "requests"
+    default_params:
+      format: "geojson"
+      starttime: "2020-01-01"
+    auth: null
+    license: Public Domain (USGS)
+    update: daily
+
+  tomography_sl2013:
+    description: Global shear-wave velocity model SL2013
+    urls:
+      - "http://ds.iris.edu/spud/tomography/1539627"
+    expected_filename: sl2013.nc
+    target_dir: ./data/raw/seismic/tomography
+    license: Free (IRIS)
+    citation: "Schaeffer, A. J., Lebedev, S. (2013). JGR: Solid Earth."
+    notes: "1° global tomography model. NetCDF format."
+    update: static
+
+# -----------------------------
+# InSAR / Deformation
+# -----------------------------
 insar:
-  source: "esa_copernicus"
-  api_url: "https://apihub.copernicus.eu/apihub"
-  product_type: "GRD"
-  polarisation: "VV"
-  # Authentication: Set ESA_USERNAME and ESA_PASSWORD environment variables for secure credential management.
-  # Post-configuration update, credentials must be provided via environment variables; config fallbacks are deprecated and will fail if absent.
+  sentinel1:
+    source: "esa_copernicus"
+    api_url: "https://apihub.copernicus.eu/apihub"
+    product_type: "GRD"
+    polarisation: "VV"
+    auth:
+      username: ${ESA_USERNAME}
+      password: ${ESA_PASSWORD}
+    license: Free (ESA)
+    update: daily
 
-emag2_v3:
-  description: NOAA NCEI EMAG2 v3 global magnetic anomaly grid
-  urls:
-    - "https://www.ncei.noaa.gov/data/earth-magnetic-model-2020/emag2_v3/EMAG2_V3_World.tif"  # Primary GeoTIFF download
-    - "https://www.ncei.noaa.gov/data/earth-magnetic-model-2020/emag2_v3/EMAG2_V3_World.nc"  # Alternative NetCDF
-  expected_filename: EMAG2_V3_global.tif
-  target_dir: ./data/raw/emag2
-  license: Public Domain (NOAA/NCEI)
-  citation: "Maus, S., et al. (2009). EMAG2: A new era in exploration of the global magnetic field. Geochemistry, Geophysics, Geosystems, 10(6). Updated to v3 (2020)."
-  attribution: "Data provided by NOAA National Centers for Environmental Information (NCEI)"
-  notes: "Global grid at 2 arc-min resolution; units nT. Prefer GeoTIFF for rasterio compatibility."
-  sha256: ""
+  comet_lics:
+    description: COMET LiCSAR velocity products
+    urls:
+      - "https://comet.earth/data/lics/"
+    expected_filename: lics_velocity_*.tif
+    target_dir: ./data/raw/insar/comet
+    license: CC-BY 4.0
+    citation: "COMET LiCSAR Team (2018). COMET LiCS database."
+    notes: "Global/regional velocity patches at ~100 m."
+    update: periodic
 
-gravity_goce_egm2008_derivative:
-  description: Open global gravity anomaly derivative (free-air) computed from GOCE/EGM2008
-  urls:
-    - "https://icgem.gfz-potsdam.de/home/showdoc?lang=en&contentid=17&doc=EGM2008.gfc"  # ICGEM EGM2008 coefficients (requires conversion to grid)
-    - "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/data/bathymetry/egm2008/Gravity_Anomaly_World.tif"  # Alternative NOAA-derived global gravity anomaly GeoTIFF mirror
-  expected_filename: gravity_global.tif
-  target_dir: ./data/raw/gravity
-  license: Public Domain (NASA/EGM2008)
-  citation: "Pavlis, N. K., et al. (2012). The Development and Evaluation of the Earth Gravitational Model 2008 (EGM2008). Journal of Geophysical Research: Solid Earth, 117(B4)."
-  attribution: "Data derived from EGM2008 model by NGA and NASA"
-  notes: "Global free-air gravity anomalies at 5 arc-min resolution; units mGal. Use GeoTIFF if available; coefficients need gridding tool for .gfc."
-  sha256: ""
+  aria:
+    description: NASA JPL ARIA standard InSAR products
+    urls:
+      - "https://aria-products.jpl.nasa.gov/products"
+    expected_filename: aria_insar_*.nc
+    target_dir: ./data/raw/insar/aria
+    license: NASA Public
+    citation: "ARIA Team (2019). JPL/Caltech ARIA project."
+    notes: "Pre-processed InSAR products for global deformation."
+    update: monthly
+
+# -----------------------------
+# Terrain / Bathymetry
+# -----------------------------
+terrain:
+  etopo2022:
+    description: NOAA ETOPO2022 Global Relief
+    urls:
+      - "https://www.ncei.noaa.gov/data/ocean-floor/topography/etopo2022/ETOPO_2022_v1.tif"
+    expected_filename: etopo2022_global.tif
+    target_dir: ./data/raw/terrain/etopo2022
+    license: Public Domain (NOAA)
+    update: static
+
+  gebco2024:
+    description: GEBCO 2024 global bathymetry
+    urls:
+      - "https://download.gebco.net/release/2024/gebco_2024.nc.gz"
+    expected_filename: gebco_2024.nc
+    target_dir: ./data/raw/terrain/gebco2024
+    license: CC-BY 4.0
+    update: periodic
+
+  srtm:
+    description: NASA SRTM 1 arc-sec global topography
+    api_url: "https://earthexplorer.usgs.gov/"
+    auth:
+      username: ${EARTHDATA_USER}
+      password: ${EARTHDATA_PASS}
+    license: Free (NASA/USGS)
+    update: static
+
+  copernicus_dem:
+    description: Copernicus GLO-30 DEM
+    urls:
+      - "https://registry.opendata.aws/copernicus-dem/"
+    expected_filename: copernicus_dem_glo30.tif
+    target_dir: ./data/raw/terrain/copernicus
+    license: Free (Copernicus)
+    update: static
+
+# -----------------------------
+# Geoid / Crustal Models
+# -----------------------------
+auxiliary:
+  egm2008_geoid:
+    description: EGM2008 geoid grids
+    urls:
+      - "https://earth-info.nga.mil/php/download.php?file=egm2008/egm2008_geoid.grd"
+    expected_filename: egm2008_geoid.grd
+    target_dir: ./data/raw/aux/geoid
+    license: Free (NGA)
+    update: static
+
+  crust1:
+    description: CRUST1.0 global crustal model
+    urls:
+      - "https://igppweb.ucsd.edu/~gabi/crust1.tar.gz"
+    expected_filename: crust1.tar.gz
+    target_dir: ./data/raw/aux/crust
+    license: Free (Laske et al.)
+    update: static
+
+  litho1:
+    description: LITHO1.0 global lithospheric model
+    urls:
+      - "http://geodynamics.org/litho1"
+    expected_filename: litho1.nc
+    target_dir: ./data/raw/aux/crust
+    license: Free
+    update: static

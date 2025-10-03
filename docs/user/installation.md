@@ -170,6 +170,23 @@ After installation:
    - `GAM_CACHE_DIR`: Override default cache location (e.g., `export GAM_CACHE_DIR=/path/to/cache`).
    - `DASK_SCHEDULER`: For custom Dask clusters (e.g., `'distributed'` for cloud).
 
+### Environment variables (.env)
+
+GAM supports loading credentials from a `.env` file for sensitive API keys. The CLI and ingestion modules auto-load this file using python-dotenv.
+
+1. Copy the example file:
+   ```bash
+   cp GeoAnomalyMapper/.env.example GeoAnomalyMapper/.env
+   ```
+
+2. Fill in your credentials in `GeoAnomalyMapper/.env`:
+   - `ESA_USERNAME`: Your ESA username
+   - `ESA_PASSWORD`: Your ESA password
+   - `EARTHDATA_USER`: Your Earthdata username
+   - `EARTHDATA_PASS`: Your Earthdata password
+
+The `.env` file is automatically ignored by Git (see `.gitignore`).
+
 4. **Update PATH** (if CLI not found):
    Ensure your virtual environment's bin/Scripts is in PATH.
 

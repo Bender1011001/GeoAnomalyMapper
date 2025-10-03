@@ -158,13 +158,12 @@ def grid_spec_0p1() -> Dict:
     - crs: "EPSG:4326"
     """
     minx, miny, maxx, maxy = WORLD_BOUNDS
-    pixel_size = (RESOLUTION_0P1, RESOLUTION_0P1)
     transform: Affine = from_origin(minx, maxy, RESOLUTION_0P1, RESOLUTION_0P1)
     width = int(round((maxx - minx) / RESOLUTION_0P1))
     height = int(round((maxy - miny) / RESOLUTION_0P1))
     return {
         "transform": transform,
-        "pixel_size": pixel_size,
+        "pixel_size": (RESOLUTION_0P1, RESOLUTION_0P1),
         "bounds": WORLD_BOUNDS,
         "width": width,
         "height": height,
