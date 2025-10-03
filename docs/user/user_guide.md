@@ -147,6 +147,7 @@ Results in `output_dir/`:
 - **3D Volumes**: PyVista isosurfaces of anomaly density. Export VTK for external viewers.
 - **Interactive**: Folium maps with popups (lat/lon/confidence). Embed in Jupyter.
 - **Custom**: API allows `generate_visualization(anomalies, type='custom', kwargs={'cmap': 'coolwarm'})`.
+- **3D Globe**: CesiumJS-based global viewer for anomaly heatmaps and entities. See the [3D Globe Viewer](globe_viewer.md) for interactive navigation, layer controls, and export options. Without `CESIUM_TOKEN`, terrain is disabled; the globe still loads with ellipsoid rendering.
 
 **Export Formats**:
 - **CSV/SQL**: Tabular for GIS/DB import.

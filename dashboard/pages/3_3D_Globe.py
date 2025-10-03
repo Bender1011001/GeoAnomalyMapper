@@ -104,7 +104,13 @@ else:
     min_lon, min_lat, max_lon, max_lat = data["bbox"]
 
     # Build GlobeViewer scene
-    token = (st.secrets.get("CESIUM_TOKEN", None) or os.getenv("CESIUM_TOKEN") or "")
+    # Prefer environment variable to avoid touching st.secrets when secrets.toml is absent
+    token = os.getenv("CESIUM_TOKEN") or ""
+    if not token:
+        try:
+            token = st.secrets["CESIUM_TOKEN"]  # may raise if secrets.toml is not mounted
+        except Exception:
+            token = ""
     gv = GlobeViewer(cesium_token=token)
 
     # Add heatmap overlay with user-controlled opacity; colormap 'hot' by default

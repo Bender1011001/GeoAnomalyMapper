@@ -190,23 +190,85 @@ The `.env` file is automatically ignored by Git (see `.gitignore`).
 4. **Update PATH** (if CLI not found):
    Ensure your virtual environment's bin/Scripts is in PATH.
 
-### Dashboard (3D Globe) dependencies
+## Install with Dashboard Extras
 
-These dashboard-specific Python dependencies are defined in [`requirements-dashboard.in`](GeoAnomalyMapper/requirements-dashboard.in) and compiled to a locked set in [`requirements-dashboard.txt`](GeoAnomalyMapper/requirements-dashboard.txt) using pip-tools.
+### Prerequisites
+- Python 3.10 or higher
+- pip (included with Python)
 
-Compile the dashboard requirements:
+Note: GDAL is optional and not required for the Globe quickstart.
+
+### Installation Options
+
+#### A) Extras Approach (Preferred)
+Install GAM in editable mode with dashboard extras:
+
+**Linux/macOS:**
+```bash
+pip install -e .[dashboard]
+```
+
+#### B) Requirements File Approach
+Use the provided requirements files:
+
+```bash
+pip install -r GeoAnomalyMapper/requirements-dashboard.txt
+```
+
+If building from source constraints, use `requirements-dashboard.in` and compile with `pip-tools`:
 ```bash
 pip-compile GeoAnomalyMapper/requirements-dashboard.in -o GeoAnomalyMapper/requirements-dashboard.txt
+pip install -r GeoAnomalyMapper/requirements-dashboard.txt
 ```
 
-Sync your environment (base + dashboard):
+### Dashboard dependencies and Cesium token
+Install dashboard requirements:
 ```bash
-pip-sync GeoAnomalyMapper/requirements.txt GeoAnomalyMapper/requirements-dashboard.txt
+pip install -r [requirements-dashboard.txt](GeoAnomalyMapper/requirements-dashboard.txt)
 ```
 
-Notes:
-- numpy and matplotlib may already be present in the base set; pip-compile will deduplicate when resolving constraints across your inputs, and pip-sync will install a consistent set.
-- Secrets: Provide your Cesium ion access token via the CESIUM_TOKEN environment variable (documented in [`GeoAnomalyMapper/.env.example`](GeoAnomalyMapper/.env.example)). For local Streamlit development, you may optionally create [`GeoAnomalyMapper/dashboard/.streamlit/secrets.toml`](GeoAnomalyMapper/dashboard/.streamlit/secrets.toml) containing CESIUM_TOKEN; do not commit secrets.toml. Commit only [`GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml`](GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml).
+#### Option A — Environment variable (preferred)
+The dashboard reads `CESIUM_TOKEN` from the environment first.
+
+Windows PowerShell:
+```powershell
+$env:CESIUM_TOKEN="YOUR_ION_TOKEN"
+```
+
+Windows CMD:
+```
+set CESIUM_TOKEN=YOUR_ION_TOKEN
+```
+
+Linux/macOS (bash/zsh):
+```bash
+export CESIUM_TOKEN="YOUR_ION_TOKEN"
+```
+
+You can also set it via a `.env` file by copying the example and filling the value:
+```bash
+cp GeoAnomalyMapper/.env.example .env
+# then edit .env to set: CESIUM_TOKEN=YOUR_ION_TOKEN
+```
+
+#### Option B — Streamlit secrets (fallback)
+When the environment variable is not set, Streamlit secrets are used.
+
+Copy the example and set the token:
+```bash
+cp GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml GeoAnomalyMapper/dashboard/.streamlit/secrets.toml
+```
+
+In the project-local file `GeoAnomalyMapper/dashboard/.streamlit/secrets.toml` or in your user Streamlit config directory, add the following minimal snippet (see [dashboard/.streamlit/secrets.example.toml](GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml) for the full example):
+```toml
+CESIUM_TOKEN = "YOUR_ION_TOKEN"
+```
+
+Precedence: the dashboard uses the environment variable `CESIUM_TOKEN` first; if not set, it falls back to Streamlit secrets (`st.secrets['CESIUM_TOKEN']`). If the token is missing, terrain and online Cesium assets are disabled, but the viewer still opens without terrain.
+
+### Verification
+- The Streamlit dashboard app is at [app.py](GeoAnomalyMapper/dashboard/app.py).
+- The FastAPI app is at [main.py](GeoAnomalyMapper/gam/api/main.py) and can be run with `uvicorn GeoAnomalyMapper.gam.api.main:app`.
 
 ## Troubleshooting Common Installation Issues
 

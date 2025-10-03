@@ -10,14 +10,14 @@ This guide covers deploying GeoAnomalyMapper (GAM) for local development, produc
 - **Containerization**: Docker for consistent environments.
 - **Scaling**: Dask clusters for parallelism; monitor with dashboard.
 
-For configuration, see [Config Reference](config_reference.md). Ensure GAM installed with extras: `pip install geoanomalymapper[geophysics,visualization]`.
+For configuration, see [`config_reference.md`](configuration/config_reference.md). Ensure GAM installed with extras: `pip install geoanomalymapper[geophysics,visualization]`.
 
 ## Local Deployment Options
 
 For development or small-scale analysis (e.g., regional bbox).
 
 1. **Basic Setup**:
-   - Install as per [Installation Guide](../user/installation.md).
+   - Install as per [`installation.md`](../user/installation.md).
    - Run via CLI: `gam run --config local_config.yaml`.
    - Or Jupyter: Use tutorials in [docs/tutorials/](.. /tutorials/).
 
@@ -27,7 +27,7 @@ For development or small-scale analysis (e.g., regional bbox).
    - Monitor: `dask dashboard` for task graphs.
 
 3. **Example Local Run**:
-   ```bash
+   ```
    conda activate gam
    gam run --bbox 29.9 30.0 31.1 31.2 --modalities all --output local_results/
    ```
@@ -46,7 +46,7 @@ For global or high-compute needs, deploy on cloud platforms. Use Dask for distri
    - Storage: EBS 100GB+ for cache.
 
 2. **Install GAM**:
-   ```bash
+   ```
    # SSH to instance
    conda create -n gam python=3.12
    conda activate gam
@@ -57,7 +57,7 @@ For global or high-compute needs, deploy on cloud platforms. Use Dask for distri
 3. **Dask Cluster on EMR** (for global):
    - Create EMR cluster (m5.xlarge master, 4x m5.xlarge core).
    - Install GAM on bootstrap script:
-     ```bash
+     ```
      #!/bin/bash
      conda install -c conda-forge gdal obspy
      pip install geoanomalymapper[all]
@@ -95,7 +95,7 @@ For global or high-compute needs, deploy on cloud platforms. Use Dask for distri
    - Image: Ubuntu with Python.
 
 2. **Install**:
-   ```bash
+   ```
    az vm ssh
    # Conda/pip as above
    ```
@@ -111,10 +111,113 @@ For global or high-compute needs, deploy on cloud platforms. Use Dask for distri
 
 ## Docker Containerization
 
-Docker for reproducible environments, especially geospatial deps.
+Docker for reproducible environments, especially geospatial deps. The provided Docker Compose stack includes an NGINX reverse proxy in front of the Streamlit dashboard and FastAPI API.
+
+See [`docker-compose.yml`](deployment/docker/docker-compose.yml) and [`nginx.conf`](deployment/docker/nginx.conf).
+
+### Routing
+- `/` → dashboard
+- `/analysis` → API
+- `/tiles` → API
+
+### Prerequisites
+- Docker and Docker Compose installed.
+- A Cesium Ion token (optional for initial load, required for terrain). Reference:
+  - [`installation.md`](../user/installation.md)
+  - [`quickstart.md`](../user/quickstart.md)
+
+### Quick Start: Docker Compose
+- Environment file setup (verify variable name CESIUM_TOKEN is used in compose):
+  ```
+  cp GeoAnomalyMapper/deployment/docker/.env.example .env
+  # Edit .env and set:
+  # CESIUM_TOKEN=your_token_here
+  ```
+- Bring up the stack (ensure the compose path is correct):
+  ```
+  docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml up -d
+  ```
+- Access URLs:
+  - Dashboard: http://localhost:8080/
+  - API docs (proxied): http://localhost:8080/analysis/docs
+  - Tiles (proxied): http://localhost:8080/tiles
+- Verification examples:
+  - Tileset manifest (replace myset with an actual tileset):
+    - URL: http://localhost:8080/tiles/myset/tileset.json
+    - Curl:
+      ```
+      curl -I http://localhost:8080/tiles/myset/tileset.json
+      ```
+  - Scene artifact (replace your analysis id):
+    - URL: http://localhost:8080/analysis/<analysis_id>/scene.json
+    - Curl:
+      ```
+      curl -s http://localhost:8080/analysis/<analysis_id>/scene.json | jq .
+      ```
+
+  - **New Lightweight Scene Endpoint**: `GET /api/scene/{analysis_id}`
+    Returns the scene configuration JSON directly.
+    - **Response**: Raw JSON object from `data/outputs/state/{analysis_id}/scene.json`.
+    - **Status**: 200 OK, 404 if not found.
+
+    **Example URL** (API server at `localhost:8000`):
+    - Scene JSON: `http://localhost:8000/api/scene/voids_carlsbad`
+
+    **cURL example**:
+      ```
+      curl -s http://localhost:8000/api/scene/voids_carlsbad
+      ```
+
+### Service Responsibilities
+- Dashboard container runs Streamlit app from [`app.py`](dashboard/app.py) and consumes CESIUM_TOKEN from environment.
+- API container runs FastAPI app from [`main.py`](gam/api/main.py). Tiles are served under /tiles. Scenes are under /analysis/<id>/scene.json, per [`api_reference.md`](../developer/api_reference.md).
+
+### Reverse Proxy Details (NGINX)
+Key locations from [`nginx.conf`](deployment/docker/nginx.conf):
+- `/` → dashboard upstream
+- `/analysis` → API upstream
+- `/api/scene` → API upstream (new lightweight endpoint)
+- `/tiles` → API upstream
+
+### Configuration and Environment
+- Passing CESIUM_TOKEN:
+  - Preferred via .env used by Docker Compose, or by exporting in shell before running compose.
+  - Example:
+    - Linux/macOS:
+      ```
+      export CESIUM_TOKEN="your_token_here"
+      docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml up -d
+      ```
+    - Windows PowerShell:
+      ```
+      $Env:CESIUM_TOKEN = "your_token_here"
+      docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml up -d
+      ```
+- Optional: Mention you can set additional variables found in [`docker-compose.yml`](deployment/docker/docker-compose.yml) (ports, volumes) and that tiles live under data/outputs/tilesets by default.
+
+### Common Operations
+- Rebuild images after code changes (verify flags):
+  ```
+  docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml build --no-cache
+  docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml up -d
+  ```
+- Tail logs:
+  ```
+  docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml logs -f
+  ```
+- Stop stack:
+  ```
+  docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml down
+  ```
+
+### Troubleshooting
+- 404 for /tiles/... → Confirm tileset exists under data/outputs/tilesets and API container mounts that path. See [`main.py`](gam/api/main.py) and [`api_reference.md`](../developer/api_reference.md).
+- 404 for /api/scene/<id> or /analysis/<id>/scene.json → Confirm analysis artifacts are present per [`artifacts.py`](gam/core/artifacts.py).
+- Missing CESIUM_TOKEN → Globe loads without terrain; set token via .env or environment. See [`globe_viewer.md`](../user/globe_viewer.md).
+- Reverse proxy mismatch → Inspect [`nginx.conf`](deployment/docker/nginx.conf).
 
 1. **Dockerfile** (create in root):
-   ```dockerfile
+   ```
    FROM condaforge/mambaforge:latest
 
    COPY environment.yml /tmp/environment.yml
@@ -129,7 +232,7 @@ Docker for reproducible environments, especially geospatial deps.
    ```
 
 2. **environment.yml**:
-   ```yaml
+   ```
    name: gam
    channels:
      - conda-forge
@@ -145,7 +248,7 @@ Docker for reproducible environments, especially geospatial deps.
    ```
 
 3. **Build and Run**:
-   ```bash
+   ```
    docker build -t gam .
    docker run -v $(pwd)/data:/app/data gam run --config config.yaml --output /app/data/output
    ```
@@ -168,12 +271,35 @@ Docker for reproducible environments, especially geospatial deps.
 - **Cost/Perf Tradeoffs**: Use spot/preemptible instances; auto-scale clusters.
 
 **Example Global Docker Run**:
-```bash
+```
 docker run -v cache:/app/data/cache gam run --global --modalities gravity --tile-size 30
 ```
 
 For HPC, integrate with SLURM/PBS via dask-jobqueue.
 
 ---
+*Last Updated: 2025-10-03 | GAM v1.0.0*
 
-*Last Updated: 2025-09-23 | GAM v1.0.0*
+### Local API Runbook
+
+For direct API testing (bypassing Docker):
+
+```bash
+uvicorn GeoAnomalyMapper.gam.api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+**Verification cURL Examples**:
+
+- Scene endpoint:
+  ```bash
+  curl -s http://127.0.0.1:8000/api/scene/voids_carlsbad
+  ```
+
+- Tiles head (replace `your/tileset` with actual path):
+  ```bash
+  curl -I http://127.0.0.1:8000/tiles/your/tileset/tileset.json
+  ```
+
+### Reverse Proxy Alignment Note
+
+When using a reverse proxy (e.g., NGINX), ensure `/api/scene` and `/tiles` are routed to the FastAPI service, mapping `/tiles` to the `data/outputs/tilesets` directory. Align with the provided [`nginx.conf`](deployment/docker/nginx.conf) snippet for Docker deployments, but no changes to Docker files are needed.

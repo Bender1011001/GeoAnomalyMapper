@@ -119,6 +119,7 @@ class GlobeViewer:
 
         layer = {
             "kind": "singleTile",
+            "type": "singleTile",
             "name": name,
             "imageBase64": img_b64,
             "bbox": {"w": float(bbox[0]), "s": float(bbox[1]), "e": float(bbox[2]), "n": float(bbox[3])},
@@ -168,6 +169,7 @@ class GlobeViewer:
 
         layer = {
             "kind": "entities",
+            "type": "entities",
             "name": name,
             "entities": entities,
         }
@@ -188,6 +190,7 @@ class GlobeViewer:
         """
         layer = {
             "kind": "3dtiles",
+            "type": "3dtiles",
             "name": name,
             "url": tiles_url,
             "opacity": float(opacity),
@@ -272,10 +275,10 @@ class GlobeViewer:
 
     const viewer = new Cesium.Viewer('cesiumContainer', {
       terrain: Cesium.Terrain.fromWorldTerrain(),
-      timeline: true,
-      animation: true,
+      timeline: false,
+      animation: false,
       sceneModePicker: true,
-      baseLayerPicker: true
+      baseLayerPicker: false
     });
 
     // Helper: add single-tile imagery (PNG over bbox)
@@ -315,6 +318,111 @@ class GlobeViewer:
       }
     }
 
+    // Helper: add polylines (load-if-present)
+    function addPolylines(viewer, items) {
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        const pts = item.positions;
+        if (!pts || pts.length === 0) continue;
+        const hasHeights = Array.isArray(pts[0]) && pts[0].length >= 3;
+        const flat = [];
+        for (const p of pts) {
+          const lon = Number(p[0]);
+          const lat = Number(p[1]);
+          if (hasHeights) {
+            const h = Number(p[2]);
+            flat.push(lon, lat, h);
+          } else {
+            flat.push(lon, lat);
+          }
+        }
+        const positions = hasHeights
+          ? Cesium.Cartesian3.fromDegreesArrayHeights(flat)
+          : Cesium.Cartesian3.fromDegreesArray(flat);
+
+        const width = (item.width !== undefined) ? Number(item.width) : 2;
+        const c = item.color || {};
+        const r = (c.r !== undefined) ? Number(c.r) : 255;
+        const g = (c.g !== undefined) ? Number(c.g) : 255;
+        const b = (c.b !== undefined) ? Number(c.b) : 0;
+        const a = (c.a !== undefined) ? Number(c.a) : 0.8;
+        const aByte = Math.max(0, Math.min(255, Math.round(a * 255)));
+
+        viewer.entities.add({
+          polyline: {
+            positions: positions,
+            width: width,
+            material: Cesium.Color.fromBytes(
+              Math.max(0, Math.min(255, r|0)),
+              Math.max(0, Math.min(255, g|0)),
+              Math.max(0, Math.min(255, b|0)),
+              aByte
+            )
+          }
+        });
+      }
+    }
+
+    // Helper: add polygons (load-if-present; outer ring only)
+    function addPolygons(viewer, items) {
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        const ring = item.hierarchy || item.positions;
+        if (!ring || ring.length === 0) continue;
+        const hasHeights = Array.isArray(ring[0]) && ring[0].length >= 3;
+        const flat = [];
+        for (const p of ring) {
+          const lon = Number(p[0]);
+          const lat = Number(p[1]);
+          if (hasHeights) {
+            const h = Number(p[2]);
+            flat.push(lon, lat, h);
+          } else {
+            flat.push(lon, lat);
+          }
+        }
+        const positions = hasHeights
+          ? Cesium.Cartesian3.fromDegreesArrayHeights(flat)
+          : Cesium.Cartesian3.fromDegreesArray(flat);
+
+        const c = item.color || {};
+        const r = (c.r !== undefined) ? Number(c.r) : 0;
+        const g = (c.g !== undefined) ? Number(c.g) : 255;
+        const b = (c.b !== undefined) ? Number(c.b) : 255;
+        const a = (c.a !== undefined) ? Number(c.a) : 0.4;
+        const aByte = Math.max(0, Math.min(255, Math.round(a * 255)));
+        const material = Cesium.Color.fromBytes(
+          Math.max(0, Math.min(255, r|0)),
+          Math.max(0, Math.min(255, g|0)),
+          Math.max(0, Math.min(255, b|0)),
+          aByte
+        );
+
+        const outline = (item.outline !== undefined) ? Boolean(item.outline) : true;
+        const oc = item.outlineColor || {};
+        const orr = (oc.r !== undefined) ? Number(oc.r) : 0;
+        const org = (oc.g !== undefined) ? Number(oc.g) : 0;
+        const orb = (oc.b !== undefined) ? Number(oc.b) : 0;
+        const oaa = (oc.a !== undefined) ? Number(oc.a) : 0.8;
+        const oaByte = Math.max(0, Math.min(255, Math.round(oaa * 255)));
+        const outlineColor = Cesium.Color.fromBytes(
+          Math.max(0, Math.min(255, orr|0)),
+          Math.max(0, Math.min(255, org|0)),
+          Math.max(0, Math.min(255, orb|0)),
+          oaByte
+        );
+
+        viewer.entities.add({
+          polygon: {
+            hierarchy: new Cesium.PolygonHierarchy(positions),
+            material: material,
+            outline: outline,
+            outlineColor: outlineColor
+          }
+        });
+      }
+    }
+
     // Helper: add 3D Tiles with opacity style
     async function add3DTiles(layer) {
       try {
@@ -322,6 +430,7 @@ class GlobeViewer:
         tileset.style = new Cesium.Cesium3DTileStyle({
           color: "color('white'," + ((layer.opacity !== undefined) ? layer.opacity : 1.0) + ")"
         });
+        tileset.show = (layer.show !== undefined) ? Boolean(layer.show) : false;
         viewer.scene.primitives.add(tileset);
       } catch (err) {
         console.error('3D Tiles load failed', err);
@@ -334,11 +443,16 @@ class GlobeViewer:
     (async () => {
       const layers = scene.layers || [];
       for (const layer of layers) {
-        if (layer.kind === 'singleTile') {
+        const kind = layer.type || layer.kind;
+        if (kind === 'singleTile') {
           addSingleTile(layer);
-        } else if (layer.kind === 'entities') {
+        } else if (kind === 'entities') {
           addEntities(layer);
-        } else if (layer.kind === '3dtiles') {
+        } else if (kind === 'polylines') {
+          addPolylines(viewer, layer.items || layer.polylines || []);
+        } else if (kind === 'polygons') {
+          addPolygons(viewer, layer.items || layer.polygons || []);
+        } else if (kind === '3dtiles') {
           await add3DTiles(layer);
         }
       }
@@ -354,6 +468,24 @@ class GlobeViewer:
           },
           duration: 0.0
         });
+      } else {
+        // Fallback: use first singleTile layer's bbox center if available
+        const st = (scene.layers || []).find(l => ((l.type || l.kind) === 'singleTile') && l.bbox);
+        if (st) {
+          const w = st.bbox.w, s = st.bbox.s, e = st.bbox.e, n = st.bbox.n;
+          const lon = (w + e) / 2.0;
+          const lat = (s + n) / 2.0;
+          const height = Math.max(150000.0, 1000.0 * Math.max(Math.abs(e - w), Math.abs(n - s)) * 1000.0);
+          const destination = Cesium.Cartesian3.fromDegrees(lon, lat, height);
+          viewer.camera.flyTo({
+            destination,
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 4.0,
+              roll: 0.0
+            }
+          });
+        }
       }
     })();
   </script>

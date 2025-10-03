@@ -16,8 +16,11 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 
-from gam.api.main import app, jobs, AnalysisRequest, AnalysisResponse, StatusResponse, ResultsResponse
+from gam.api.main import app, AnalysisRequest, AnalysisResponse, StatusResponse, ResultsResponse
+from gam.api.job_store import job_store as jobs
 from gam.core.pipeline import GAMPipeline
+from starlette.staticfiles import StaticFiles
+from starlette.routing import Mount
 from gam.core.config import GAMConfig
 from gam.core.exceptions import (
     PipelineError, IngestionError, PreprocessingError, 
@@ -529,6 +532,50 @@ class TestErrorHandling:
         
         response = test_client.get(f"/analysis/{sample_job_id}/status")
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestSceneAndTilesEndpoints:
+    """Tests for the new /api/scene endpoint and /tiles mount configuration."""
+
+    def test_scene_endpoint_success(self, test_client, tmp_path, monkeypatch):
+        """Test successful retrieval of scene.json."""
+        # Create temp structure
+        state_dir = tmp_path / "data" / "outputs" / "state"
+        state_dir.mkdir(parents=True)
+        aid = "test_analysis"
+        scene_file = state_dir / aid / "scene.json"
+        scene_file.parent.mkdir(parents=True, exist_ok=True)
+        test_content = {"ok": True, "id": aid}
+        scene_file.write_text(json.dumps(test_content), encoding="utf-8")
+
+        # Change working dir to tmp_path
+        monkeypatch.chdir(tmp_path)
+
+        # GET request
+        response = test_client.get(f"/api/scene/{aid}")
+        assert response.status_code == 200
+        assert response.json() == test_content
+        assert response.headers["content-type"].startswith("application/json")
+
+    def test_scene_endpoint_not_found(self, test_client, tmp_path, monkeypatch):
+        """Test 404 for missing scene.json."""
+        # Empty temp dir
+        monkeypatch.chdir(tmp_path)
+
+        response = test_client.get("/api/scene/some_missing_id")
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Scene not found"}
+
+    def test_tiles_mount_configured(self):
+        """Verify /tiles mount exists with correct configuration."""
+        mount_found = False
+        for route in app.routes:
+            if isinstance(route, Mount) and route.path == "/tiles":
+                assert isinstance(route.app, StaticFiles)
+                assert str(route.app.directory).endswith("data/outputs/tilesets")
+                mount_found = True
+                break
+        assert mount_found, "No /tiles mount found or misconfigured"
 
     def test_invalid_endpoint(self, test_client):
         """Test non-existent endpoint: 404."""

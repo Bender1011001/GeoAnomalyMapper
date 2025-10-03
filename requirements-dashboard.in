@@ -3,6 +3,9 @@
 # Extracted from pyproject.toml dashboard and visualization extras.
 # Excludes core visualization like matplotlib and plotly (already in requirements.in).
 # Excludes API deps like fastapi and uvicorn (in requirements-api.in).
+#
+# Managed via pip-tools; to recompile requirements-dashboard.txt, run:
+#   pip-compile GeoAnomalyMapper/requirements-dashboard.in -o GeoAnomalyMapper/requirements-dashboard.txt
 
 # Streamlit dashboard
 streamlit>=1.38.0

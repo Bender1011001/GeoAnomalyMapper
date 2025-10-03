@@ -14,7 +14,15 @@ def test_scene_build_minimal():
 
     html = gv.render_streamlit_html()
     assert isinstance(html, str)
+    # Core Cesium viewer present
     assert "Cesium.Viewer" in html
+    # Minimal UI toggles off
+    assert "timeline: false" in html
+    assert "animation: false" in html
+    assert "baseLayerPicker: false" in html
+    # Imagery provider helper and camera fallback call present
+    assert "SingleTileImageryProvider" in html
+    assert "viewer.camera.flyTo" in html
 
     s = gv.export_scene_config()
     assert isinstance(s, str)
@@ -33,5 +41,22 @@ def test_export_scene_json_keys():
     s = gv.export_scene_config()
     obj = json.loads(s)
     assert isinstance(obj, dict)
-    assert "layers" in obj
-    assert "camera" in obj
+
+    # Minimal scene structure
+    assert "layers" in obj and isinstance(obj["layers"], list) and len(obj["layers"]) >= 1
+
+    # Find the singleTile layer, prefer 'type' but fallback to 'kind'
+    sl = next(l for l in obj["layers"] if l.get("type") == "singleTile" or l.get("kind") == "singleTile")
+
+    # Required keys on singleTile layer
+    for k in ("imageBase64", "bbox", "opacity"):
+        assert k in sl
+
+    # Bbox subkeys
+    for k in ("w", "s", "e", "n"):
+        assert k in sl["bbox"]
+
+    # Camera presence (explicit camera set in test)
+    assert "camera" in obj and isinstance(obj["camera"], dict)
+    for k in ("lon", "lat", "height"):
+        assert k in obj["camera"]
