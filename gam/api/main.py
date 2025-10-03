@@ -1,5 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException, APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, conlist, validator
 from typing import Dict, List, Optional, Any, Tuple
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -20,14 +20,18 @@ from pathlib import Path
 
 app = FastAPI(title="GeoAnomalyMapper API", version="1.0.0")
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "version": app.version}
+ 
 JOB_STATES = {"QUEUED", "RUNNING", "COMPLETED", "FAILED"}
-
+ 
 # Tiles configuration
 tiles_root = Path("data/outputs/tilesets")
 tiles_root.mkdir(parents=True, exist_ok=True)
 # Reverse proxies should pass through /tiles/* to this service
 app.mount("/tiles", StaticFiles(directory=str(tiles_root)), name="tiles")
-
+ 
 router = APIRouter()
 
 @router.get("/tilesets/{name}/tileset.json")
@@ -68,20 +72,23 @@ def get_scene_config(analysis_id: str):
 
 app.include_router(router)
 
-@app.get("/api/scene/{analysis_id}")
-def get_scene_by_id(analysis_id: str):
-    scene_path = Path("data/outputs/state") / analysis_id / "scene.json"
-    if not scene_path.is_file():
-        raise HTTPException(status_code=404, detail="Scene not found")
-    content = json.loads(scene_path.read_text(encoding="utf-8"))
-    return JSONResponse(content=content, media_type="application/json")
-
 class AnalysisRequest(BaseModel):
-    bbox: List[float]
+    bbox: conlist(float, min_length=4, max_length=4)
     modalities: List[str]
     output_dir: str
     config_path: Optional[str] = None
     verbose: bool = False
+
+    @validator("bbox")
+    def validate_bbox(cls, v):
+        # v is guaranteed length 4 by conlist; enforce numeric and reasonable ranges
+        if any(not isinstance(x, (int, float)) for x in v):
+            raise ValueError("bbox must contain only numeric values")
+        # enforce ordering: [min_lon, min_lat, max_lon, max_lat]
+        min_lon, min_lat, max_lon, max_lat = v
+        if min_lon >= max_lon or min_lat >= max_lat:
+            raise ValueError("bbox must be [min_lon, min_lat, max_lon, max_lat] with min < max")
+        return v
 
 class AnalysisResponse(BaseModel):
     job_id: str
@@ -126,8 +133,8 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
         # Create pipeline instance
         pipeline = GAMPipeline(
             config=config,
-            use_dask=config.use_parallel,
-            n_workers=config.n_workers,
+            use_dask=config.parallel.backend == 'dask',
+            n_workers=config.parallel.n_workers,
             cache_dir=Path(config.cache_dir)
         )
 
@@ -140,8 +147,6 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
             modalities=request.modalities,
             output_dir=str(job_output_dir),
             use_cache=True,
-            global_mode=False,
-            tiles=10,
             progress_callback=progress_callback
         )
 
@@ -154,7 +159,7 @@ async def run_analysis_job(job_id: str, request: AnalysisRequest):
                 "raw_data": results.raw_data,
                 "processed_data": results.processed_data,
                 "inversion_results": results.inversion_results,
-                "anomalies": results.anomalies,
+                "anomalies": results.anomalies.to_dict(orient='records'),
                 "visualizations": {k: str(v) for k, v in results.visualizations.items()}
             },
             "output_files": {k: str(v) for k, v in results.visualizations.items()},
@@ -238,78 +243,3 @@ async def get_results(job_id: str):
         results=job["results"],
         output_files=job["output_files"]
     )
-
-
-def run_analysis(request: AnalysisRequest, verbose: bool = False) -> Dict[str, Any]:
-    """
-    Synchronous wrapper for analysis pipeline (for direct/CLI use).
-    
-    Parameters:
-    -----------
-    request : AnalysisRequest
-        Analysis parameters (bbox, modalities, etc.)
-    verbose : bool
-        Enable verbose logging
-    
-    Returns:
-    --------
-    Dict[str, Any]
-        Pipeline results including anomalies, visualizations, etc.
-    
-    Raises:
-    -------
-    PipelineError
-        If any stage fails
-    """
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    # Create output directory
-    base_output_dir = Path(request.output_dir)
-    base_output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Load config
-    config = GAMConfig.from_yaml(request.config_path) if request.config_path else GAMConfig()
-    
-    # Create pipeline
-    pipeline = GAMPipeline(
-        config=config,
-        use_dask=config.use_parallel,
-        n_workers=config.n_workers,
-        cache_dir=Path(config.cache_dir)
-    )
-    
-    try:
-        # Convert bbox
-        bbox_tuple: Tuple[float, float, float, float] = tuple(request.bbox)
-        
-        # Run synchronously
-        results = pipeline.run_analysis(
-            bbox=bbox_tuple,
-            modalities=request.modalities,
-            output_dir=str(base_output_dir),
-            use_cache=True,
-            global_mode=False,
-            tiles=10,
-            verbose=verbose
-        )
-        
-        # Convert results to dict
-        result_dict = {
-            "raw_data": results.raw_data,
-            "processed_data": results.processed_data,
-            "inversion_results": results.inversion_results,
-            "anomalies": results.anomalies,
-            "visualizations": {k: str(v) for k, v in results.visualizations.items()}
-        }
-        
-        if verbose:
-            logger.info(f"Analysis completed. Found {len(results.anomalies)} anomalies.")
-        
-        return result_dict
-        
-    except Exception as e:
-        logger.error(f"Analysis failed: {e}")
-        raise PipelineError(f"Pipeline execution failed: {str(e)}") from e
-    finally:
-        pipeline.close()
