@@ -1,21 +1,72 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, APIRouter
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any, Tuple
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import uuid
 import asyncio
+import json
+import os
 from datetime import datetime
 from .job_store import job_store
 from gam.core.pipeline import GAMPipeline
 from gam.core.config import GAMConfig
 from gam.core.exceptions import (
-    PipelineError, IngestionError, PreprocessingError, 
+    PipelineError, IngestionError, PreprocessingError,
     ModelingError, VisualizationError
 )
+from gam.core.artifacts import load_scene_config, scene_json_path
 from pathlib import Path
 
 app = FastAPI(title="GeoAnomalyMapper API", version="1.0.0")
 
 JOB_STATES = {"QUEUED", "RUNNING", "COMPLETED", "FAILED"}
+
+# Tiles configuration
+tiles_root = Path("data/outputs/tilesets")
+tiles_root.mkdir(parents=True, exist_ok=True)
+# Reverse proxies should pass through /tiles/* to this service
+app.mount("/tiles", StaticFiles(directory=str(tiles_root)), name="tiles")
+
+router = APIRouter()
+
+@router.get("/tilesets/{name}/tileset.json")
+def get_tileset_json(name: str):
+    ts_path = tiles_root / name / "tileset.json"
+    if not ts_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Tileset '{name}' not found")
+    try:
+        with ts_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Invalid tileset.json in '{name}'")
+    return JSONResponse(content=data)
+
+@router.get("/tiles/tilesets.json")
+def list_tilesets():
+    tilesets = []
+    if tiles_root.exists():
+        for entry in os.listdir(tiles_root):
+            full = tiles_root / entry
+            if full.is_dir() and (full / "tileset.json").is_file():
+                tilesets.append({"name": entry, "url": f"/tiles/{entry}/tileset.json"})
+    tilesets.sort(key=lambda x: x["name"])
+    return {"tilesets": tilesets}
+
+@router.get("/analysis/{analysis_id}/scene.json")
+def get_scene_config(analysis_id: str):
+    path = scene_json_path(analysis_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Scene not found")
+    try:
+        text = load_scene_config(analysis_id)
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        # Persisted by our utility should be valid JSON; if not, surface server error.
+        raise HTTPException(status_code=500, detail="Invalid scene.json content")
+    return JSONResponse(content=data)
+
+app.include_router(router)
 
 class AnalysisRequest(BaseModel):
     bbox: List[float]
