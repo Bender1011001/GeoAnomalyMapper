@@ -809,3 +809,169 @@ Notes and constraints
 - This MVP prioritizes openness reproducibility and simplicity equal weighting and per tile normalization
 - All file paths are relative to the repository and are designed to be platform independent
 - Future refinements may add global normalization more sophisticated fusion weights uncertainty layers and sea land specific handling
+
+## 3D Tiles Pipeline
+
+### 1) Overview
+
+The 3D Tiles Pipeline converts anomaly analysis outputs into Cesium 3D Tiles for scalable visualization in the 3D Globe viewer. This enables interactive rendering of point-based anomaly data as 3D cylinders or other primitives on a global scale.
+
+Key components:
+- Visualization engine: [globe_viewer.py](GeoAnomalyMapper/gam/visualization/globe_viewer.py) – Builds and renders CesiumJS scenes with layers, entities, and 3D tiles.
+- Dashboard integration: [3_3D_Globe.py](GeoAnomalyMapper/dashboard/pages/3_3D_Globe.py) – Streamlit page embedding the GlobeViewer, supporting heatmap overlays, point entities, and 3D tilesets.
+
+The pipeline transforms 2D anomaly grids into 3D point clouds, generates tilesets using py3dtiles, serves them via FastAPI, and references them in the UI via scene artifacts for reproducibility.
+
+### 2) Data Preparation: anomalies_to_points
+
+Anomaly outputs (2D grids) are transformed into point features using the `anomalies_to_points` function defined in [tiles_builder.py](GeoAnomalyMapper/gam/visualization/tiles_builder.py).
+
+- **Function Signature**:
+  ```python
+  def anomalies_to_points(
+      anom: np.ndarray,
+      bbox: Tuple[float, float, float, float],
+      z_scale: float = 1000.0,
+  ) -> np.ndarray:
+  ```
+  - `anom`: 2D array (ny, nx) of anomaly intensities (may contain NaNs).
+  - `bbox`: (min_lon, min_lat, max_lon, max_lat) in degrees (EPSG:4326).
+  - `z_scale`: Height scaling factor in meters (default 1000.0) applied to normalized values.
+
+- **Inputs/Outputs**:
+  - Inputs: Anomaly grid and geographic bounds.
+  - Outputs: Array of shape (N, 4) with columns [lon_deg, lat_deg, height_m, value_0_1], where N = ny * nx.
+  - Key Assumptions: Grid covers the bbox uniformly; lon/lat in degrees; heights in meters above ellipsoid; CRS is WGS84 (EPSG:4326). Normalization is NaN-safe using finite values only (min-max to [0,1]).
+
+Example:
+```python
+import numpy as np
+from gam.visualization.tiles_builder import anomalies_to_points
+
+grid = np.array([[0.0, 1.0], [2.0, 3.0]])
+pts = anomalies_to_points(grid, bbox=(-10.0, 50.0, -9.0, 51.0), z_scale=1000.0)
+# pts.shape: (4, 4)
+```
+
+### 3) Coordinate Reference System: ECEF (EPSG:4978)
+
+Geographic coordinates (lon/lat/height, EPSG:4979) are converted to Earth-Centered, Earth-Fixed (ECEF) Cartesian coordinates (X/Y/Z in meters, EPSG:4978) using pyproj for compatibility with py3dtiles, which requires projected/geocentric CRS with meter units.
+
+- **Conversion Function**: `reproject_llh_to_ecef` in [tiles_builder.py](GeoAnomalyMapper/gam/visualization/tiles_builder.py).
+  ```python
+  def reproject_llh_to_ecef(points_llh: np.ndarray) -> np.ndarray:
+      # Uses pyproj.Transformer.from_crs(4979, 4978, always_xy=True)
+      # Input: (N, >=3) [lon_deg, lat_deg, height_m]
+      # Output: (N, 3) [X_m, Y_m, Z_m]
+  ```
+
+- **Pseudocode Snippet**:
+  ```python
+  import pyproj
+  from gam.visualization.tiles_builder import reproject_llh_to_ecef
+
+  pts_llh = np.array([[0.0, 0.0, 0.0], [10.0, 20.0, 1000.0]])  # [lon, lat, h]
+  ecef = reproject_llh_to_ecef(pts_llh)
+  # ecef.shape: (2, 3)
+  ```
+
+- **Common Pitfalls**:
+  - Input order: lon/lat (not lat/lon); always_xy=True in Transformer.
+  - Units: Degrees for lon/lat; meters for height (ellipsoidal).
+  - No radians conversion needed (pyproj handles degrees).
+  - Requires pyproj >=3.6.0; install via `pip install pyproj`.
+
+### 4) 3D Tiles Generation with py3dtiles
+
+py3dtiles is invoked via CLI from `build_3dtiles_from_points` in [tiles_builder.py](GeoAnomalyMapper/gam/visualization/tiles_builder.py). Points are written as `points.xyz` (space-delimited X Y Z), then converted to a basic 3D Tileset.
+
+- **Invocation**: CLI mode (`run_cli=True`).
+  - Command: `py3dtiles convert points.xyz --out {out_dir}`
+  - Batching: Handled externally (e.g., per anomaly cluster); no built-in batching here.
+  - Attributes: Basic XYZ; value_0_1 column not encoded (future: use --attributes for color/height).
+
+- **High-Level Flow**:
+  1. Prepare points via `anomalies_to_points` + `reproject_llh_to_ecef`.
+  2. Call `build_3dtiles_from_points(pts_ecef, out_dir, run_cli=True, assume_ecef=True)`.
+  3. Outputs: `out_dir/tileset.json`, `out_dir/tiles/` (b3dm files).
+
+- **Sample Command** (manual equivalent):
+  ```
+  # Assume points.xyz exists with ECEF X Y Z
+  py3dtiles convert points.xyz --out data/outputs/tilesets/myset
+  ```
+
+- **Notes**: Validates input CRS (warns if lon/lat-like); subprocess.run for CLI execution. Install py3dtiles via `pip install py3dtiles`.
+
+### 5) Serving Tiles from the API at /tiles
+
+Tilesets are served statically via FastAPI in [main.py](GeoAnomalyMapper/gam/api/main.py).
+
+- **Mount**: `app.mount("/tiles", StaticFiles(directory=str(tiles_root)))` where `tiles_root = Path("data/outputs/tilesets")`.
+- **Endpoints**:
+  - Static files: All under `/tiles/{tileset_name}/` (e.g., tileset.json, tiles/*.b3dm).
+  - `/tiles/tilesets.json`: Lists available tilesets with URLs.
+  - `/tilesets/{name}/tileset.json`: Explicit JSON response for tileset.json (with validation).
+
+- **Example URL**: `/tiles/myset/tileset.json`
+  - Curl: `curl http://localhost:8000/tiles/myset/tileset.json`
+
+- **Features**: No caching headers specified (default browser); streaming for large tiles. Validates tileset.json on explicit GET.
+
+### 6) Directory Conventions
+
+Tilesets are written to `data/outputs/tilesets` (verified in [main.py](GeoAnomalyMapper/gam/api/main.py) and [tiles_builder.py](GeoAnomalyMapper/gam/visualization/tiles_builder.py)).
+
+- **Structure**:
+  ```
+  data/outputs/tilesets/
+    myset/          # Tileset name (e.g., analysis_id or custom)
+      tileset.json  # Root tileset JSON
+      tiles/        # Subdirectory for tile files
+        0_0_0.b3dm  # Example tile (implicit hierarchy)
+        ...
+  ```
+
+- **Naming**: `{tileset_name}` (e.g., "myset") used in URLs: `/tiles/myset/tileset.json`.
+- **Creation**: `out_dir.mkdir(parents=True)`; py3dtiles populates contents.
+
+### 7) Referencing Tiles in the Globe
+
+Tilesets are referenced in the 3D Globe via URL in [globe_viewer.py](GeoAnomalyMapper/gam/visualization/globe_viewer.py) and loaded in [3_3D_Globe.py](GeoAnomalyMapper/dashboard/pages/3_3D_Globe.py).
+
+- **Method**: `GlobeViewer.add_3d_tiles(tiles_url: str, opacity: float = 0.6, name: str = "Subsurface")`
+  - `tiles_url`: e.g., "/tiles/myset/tileset.json"
+  - Renders via Cesium.Cesium3DTileset.fromUrl with opacity style.
+
+- **UI Integration**: In Streamlit page, user can input tileset URL or auto-load from scene.json. No explicit control in current [3_3D_Globe.py](GeoAnomalyMapper/dashboard/pages/3_3D_Globe.py), but extensible via sidebar.
+
+- **Auto-Discovery**: Scenes persist tileset URLs; loaded via `load_scene_config` from artifacts (see Section 8).
+
+### 8) Scene Artifacts
+
+Scene configurations (layers, camera, tileset URLs) are persisted as `scene.json` for reproducibility, using [artifacts.py](GeoAnomalyMapper/gam/core/artifacts.py).
+
+- **Path**: `data/outputs/state/{analysis_id}/scene.json` via `scene_json_path(analysis_id)`.
+- **Functions**:
+  - `save_scene_config(analysis_id: str, scene_json: str) -> Path`: Writes pretty-printed JSON.
+  - `load_scene_config(analysis_id: str) -> str`: Reads UTF-8 JSON string.
+
+- **UI Flow**: In [3_3D_Globe.py](GeoAnomalyMapper/dashboard/pages/3_3D_Globe.py), "Download scene.json" button exports via `GlobeViewer.export_scene_config()`. "Save scene.json" persists via `save_scene_config`. Scenes capture camera/layers/settings (including tileset URLs) for reload.
+
+- **API Access**: `/analysis/{analysis_id}/scene.json` serves via `get_scene_config`.
+
+### 9) Reverse Proxy and External Access Notes
+
+In Docker deployment, NGINX routes requests to services as defined in [nginx.conf](GeoAnomalyMapper/deployment/docker/nginx.conf) and [docker-compose.yml](GeoAnomalyMapper/deployment/docker/docker-compose.yml).
+
+- **Routing**:
+  - `/`: Dashboard (Streamlit at port 8501).
+  - `/analysis`: API (FastAPI at port 8000).
+  - `/tiles`: API static mount (for tilesets).
+
+- **Configuration**:
+  - NGINX upstreams: `api` (localhost:8000), `dashboard` (localhost:8501).
+  - Proxy headers: Host, X-Real-IP, X-Forwarded-For/Proto.
+  - Exposed: Proxy on port 8080.
+
+- **Access**: External via `http://localhost:8080/tiles/myset/tileset.json` (proxied to API). Volumes mount `data/` for persistence. Links: [docker-compose.yml](GeoAnomalyMapper/deployment/docker/docker-compose.yml) for services/volumes; [nginx.conf](GeoAnomalyMapper/deployment/docker/nginx.conf) for locations.

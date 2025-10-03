@@ -10,6 +10,7 @@ Welcome to GeoAnomalyMapper's documentation!
    user/installation
    user/quickstart
    user/user_guide
+   user/globe_viewer
    scientific_methods
 
 .. toctree::

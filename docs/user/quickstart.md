@@ -11,6 +11,108 @@ This tutorial assumes you've [installed GAM](installation.md). It should take 15
 - Internet access for data fetching (caches afterward).
 - Sample config: Use the provided [config.yaml](../config.yaml) or create your own.
 
+## Run Locally
+
+### 1. Set Environment
+Provide the Cesium Ion token (required for terrain in 3D Globe):
+
+**Linux/macOS (bash/zsh):**
+```bash
+export CESIUM_TOKEN="your_token_here"
+```
+
+**Windows PowerShell:**
+```powershell
+$env:CESIUM_TOKEN = "your_token_here"
+```
+
+**Windows CMD:**
+```cmd
+set CESIUM_TOKEN=your_token_here"
+```
+
+### 2. Start the API
+Run the FastAPI backend:
+
+```bash
+uvicorn GeoAnomalyMapper.gam.api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Note: Port can be changed; examples use 8000.
+
+### 3. Start the Dashboard
+In a new terminal:
+
+```bash
+streamlit run GeoAnomalyMapper/dashboard/app.py
+```
+
+### 4. Access the Apps
+- Dashboard: Open the URL from Streamlit output (usually http://localhost:8501).
+- API: http://localhost:8000 (if using defaults).
+
+### 5. Run the Globe Dashboard (Demo and Analysis)
+The globe dashboard is powered by the Streamlit entry point at [app.py](GeoAnomalyMapper/dashboard/app.py) and the "3D Globe" page at [3_3D_Globe.py](GeoAnomalyMapper/dashboard/pages/3_3D_Globe.py). If `CESIUM_TOKEN` is absent, the globe loads but terrain is disabled.
+
+#### Optional: Set CESIUM Token (if not already set)
+**Windows CMD:**
+```
+set CESIUM_TOKEN=YOUR_ION_TOKEN
+```
+
+**Windows PowerShell:**
+```
+$env:CESIUM_TOKEN="YOUR_ION_TOKEN"
+```
+
+#### Start the Dashboard
+In a terminal (with environment activated):
+```
+streamlit run GeoAnomalyMapper/dashboard/app.py
+```
+
+#### 30–60 Second Smoke Test
+1. Open http://localhost:8501 in your browser.
+2. In the sidebar, select the “3_3D_Globe” page.
+3. **Demo Mode**: Choose "Demo" in the sidebar radio buttons. Adjust the "Heatmap Opacity" slider (0.0–1.0) and toggle "Show high anomalies as cylinders" to confirm rendering of the built-in example scene (random anomalies near Northern California).
+4. **Load Analysis Mode**: Choose "Load Analysis" and enter `voids_carlsbad` in the "Analysis ID" text input. The viewer loads the scene from `data/outputs/state/voids_carlsbad/scene.json`. Verify the heatmap and entities render.
+
+For advanced checks:
+- Scene API endpoint: See [api_reference.md](GeoAnomalyMapper/docs/developer/api_reference.md) for [`@app.get("/api/scene/{analysis_id}")`](GeoAnomalyMapper/gam/api/main.py:71).
+- Tiles hosting and reverse proxy: See [deployment.md](GeoAnomalyMapper/docs/configuration/deployment.md) for `/tiles` mount and proxy alignment; endpoint is mounted via [`app.mount("/tiles", ...)`](GeoAnomalyMapper/gam/api/main.py:29).
+
+## Run with Docker Compose
+
+### Prerequisites
+- Docker and Docker Compose installed.
+
+### Steps
+
+1. **Set Up Environment File**
+   Copy the example:
+   ```bash
+   cp GeoAnomalyMapper/deployment/docker/.env.example .env
+   ```
+   Edit `.env` to set `CESIUM_TOKEN=your_token_here`. Alternatively, set `CESIUM_TOKEN` in your shell before running `up`.
+
+2. **Start Services**
+   ```bash
+   docker compose -f GeoAnomalyMapper/deployment/docker/docker-compose.yml up -d
+   ```
+
+3. **Access**
+   - Reverse proxy front-end (dashboard): http://localhost/
+   - API proxied: http://localhost/analysis
+   - Tiles proxied: http://localhost/tiles
+
+The proxy routes are defined in [nginx.conf](GeoAnomalyMapper/deployment/docker/nginx.conf). `CESIUM_TOKEN` is passed to the dashboard container via Compose environment.
+
+## Common Pitfalls
+
+- **Missing `CESIUM_TOKEN`**: Terrain disabled in 3D Globe; no crash.
+- **Secrets Without Env**: Supported, but environment variable is preferred to avoid `StreamlitSecretNotFoundError`.
+- **uvicorn Fails**: Ensure `GeoAnomalyMapper.gam.api.main:app` exists in [main.py](GeoAnomalyMapper/gam/api/main.py).
+
 ## Step 1: Verify Installation and Setup
 
 1. **Activate Environment**:

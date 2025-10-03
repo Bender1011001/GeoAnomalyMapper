@@ -288,6 +288,156 @@ except DataFetchError as e:
 
 For internal details, see source code. This API is stable for v1.0+; check changelog for changes.
 
+## Visualization API: Tiles and Scenes
+
+### Overview
+The API serves Cesium 3D Tiles under `/tiles` and provides scene artifact endpoints used by the 3D Globe page. These endpoints support visualization of analysis results in CesiumJS-based globes. Relevant implementation files:
+
+- [`main.py`](GeoAnomalyMapper/gam/api/main.py)
+- [`artifacts.py`](GeoAnomalyMapper/gam/core/artifacts.py)
+- [`globe_viewer.py`](GeoAnomalyMapper/gam/visualization/globe_viewer.py)
+
+### Tiles Endpoints
+The `/tiles` path is mounted as static files from `data/outputs/tilesets`, serving Cesium 3D Tilesets. Individual tileset metadata is available via dedicated endpoints.
+
+- **Base mount**: `GET /tiles/<path:path>`  
+  Serves static files (e.g., `.b3dm`, `.json`) from the tileset directory. Uses FastAPI's `StaticFiles` with automatic caching headers (e.g., `ETag`, `Last-Modified`).
+
+- **Tileset metadata**: `GET /tilesets/{name}/tileset.json`  
+  Returns the `tileset.json` content as JSON for the named tileset.  
+  - **Parameters**: `name` (path param, str) – Tileset directory name.  
+  - **Response**: JSON object (Cesium tileset spec).  
+  - **Status**: 200 OK, 404 if tileset not found, 500 if invalid JSON.
+
+- **Tileset listing**: `GET /tiles/tilesets.json`  
+  Lists available tilesets.  
+  - **Response**: `{"tilesets": [{"name": str, "url": "/tiles/{name}/tileset.json"}]}` (sorted by name).  
+  - **Status**: 200 OK (empty list if no tilesets).
+
+**Example URLs** (API server at `localhost:8000`):  
+- Tileset JSON: `http://localhost:8000/tiles/myset/tileset.json`
+
+**cURL example**:  
+```
+curl -I http://localhost:8000/tiles/myset/tileset.json
+```
+
+### Scene Artifact Endpoints
+Scene configurations (JSON exported from the GlobeViewer) are stored per analysis and retrievable via the API. Saving is handled client-side (e.g., in the dashboard); no upload endpoint is exposed.
+
+- **Read scene**: `GET /analysis/{analysis_id}/scene.json`  
+  Returns the scene configuration JSON for the analysis.  
+  - **Parameters**: `analysis_id` (path param, str) – Analysis identifier.  
+  - **Response**: Raw JSON object (GlobeViewer scene config: layers, camera). Loaded from `data/outputs/state/{analysis_id}/scene.json`.  
+  - **Status**: 200 OK, 404 if scene not found, 500 if invalid JSON.
+
+**Example URL** (API server at `localhost:8000`):  
+- Scene JSON: `http://localhost:8000/analysis/myanalysis/scene.json`
+
+**cURL example**:  
+```
+curl -s http://localhost:8000/analysis/<analysis_id>/scene.json | jq .
+```
+
+### Response Schemas
+Responses use raw JSON (no Pydantic models exposed).  
+
+- **Tileset listing** (`/tiles/tilesets.json`):  
+  ```json
+  {
+    "tilesets": [
+      {
+        "name": "myset",
+        "url": "/tiles/myset/tileset.json"
+      }
+    ]
+  }
+  ```
+
+- **Scene JSON** (`/analysis/{id}/scene.json`):  
+  Arbitrary JSON from GlobeViewer export (e.g., `{"layers": [...], "camera": {...}}`). See [`globe_viewer.py`](GeoAnomalyMapper/gam/visualization/globe_viewer.py) for structure.
+
+### Cross-Origin and Reverse Proxy Notes
+In Docker deployment, NGINX reverse proxy routes requests as follows:  
+- `/` → Dashboard (Streamlit on port 8501)  
+- `/analysis/` → API (FastAPI on port 8000)  
+- `/tiles/` → API (FastAPI on port 8000)  
+
+See [`nginx.conf`](GeoAnomalyMapper/deployment/docker/nginx.conf) and [`docker-compose.yml`](GeoAnomalyMapper/deployment/docker/docker-compose.yml) for configuration. The proxy listens on port 8080.  
+
+**Deployed example URLs** (proxy at `localhost:8080`):  
+- Tileset: `http://localhost/tiles/myset/tileset.json`  
+- Scene: `http://localhost/analysis/<analysis_id>/scene.json`
+
+### Authentication/Config Notes
+No authentication is required for these endpoints by default (open access).  
+
+The 3D Globe visualization requires a Cesium Ion access token configured in the dashboard environment (unrelated to API calls; used client-side for terrain/imagery). See:  
+- [`installation.md`](GeoAnomalyMapper/docs/user/installation.md)  
+- [`quickstart.md`](GeoAnomalyMapper/docs/user/quickstart.md)  
+- [`globe_viewer.md`](GeoAnomalyMapper/docs/user/globe_viewer.md)
+
+### Error Cases and Troubleshooting Pointers
+- **404 on `/tiles/...`**: Verify the tileset directory exists under `data/outputs/tilesets` and contains valid files. Check mount in [`main.py`](GeoAnomalyMapper/gam/api/main.py).  
+- **404 on `/analysis/{id}/scene.json`**: Confirm analysis artifacts are generated and the scene.json file exists at `data/outputs/state/{id}/scene.json`. See [`artifacts.py`](GeoAnomalyMapper/gam/core/artifacts.py) for path logic.  
+- **Reverse proxy path mismatch**: Ensure NGINX routes are correctly configured for `/tiles` and `/analysis`. Inspect logs and verify upstreams in [`nginx.conf`](GeoAnomalyMapper/deployment/docker/nginx.conf).  
+
+For more issues, see [`common_issues.md`](GeoAnomalyMapper/docs/troubleshooting/common_issues.md).
+
+## Tiles Utilities: ECEF Reprojection and py3dtiles Wrapper
+
+These utilities in `gam.visualization.tiles_builder` support 3D tiles generation for Cesium visualization.
+
+### reproject_wgs84_to_ecef(lon: float | np.ndarray, lat: float | np.ndarray, height: float | np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
+
+- **Purpose**: Reprojects coordinates from EPSG:4979 (WGS84 3D: longitude, latitude, ellipsoidal height in meters) to EPSG:4978 (ECEF: Earth-centered, Earth-fixed Cartesian coordinates in meters).
+- **Semantics**: Explicit longitude-first ordering (lon, lat, height); uses `pyproj.Transformer(always_xy=True)` for vectorization support. Inputs can be scalars or array-like (broadcast to common shape).
+- **Dependencies**: Requires `pyproj` at runtime (included in core requirements).
+
+**Minimal Example**:
+```python
+from GeoAnomalyMapper.gam.visualization.tiles_builder import reproject_wgs84_to_ecef
+x, y, z = reproject_wgs84_to_ecef(0.0, 0.0, 0.0)  # x ≈ 6378137 m, y ≈ 0, z ≈ 0
+import numpy as np
+x2, y2, z2 = reproject_wgs84_to_ecef([0, 10], [0, 0], [0, 0])
+assert x2.shape == y2.shape == z2.shape == (2,)
+```
+
+**Implementation**: [`reproject_wgs84_to_ecef()`](GeoAnomalyMapper/gam/visualization/tiles_builder.py:160)
+
+### run_py3dtiles_convert(input_path: str | Path, out_dir: str | Path, threads: int = 1, timeout: int = 300, allow_overwrite: bool = False, extra_args: List[str] = None) -> Dict[str, Any]
+
+- **Purpose**: Safe subprocess wrapper for the `py3dtiles convert` CLI, with guardrails: checks tool availability (via PATH), validates input/output paths, enforces timeout, whitelists flags (only `--overwrite` allowed beyond basics), and structures results.
+- **Parameters**:
+  - `input_path`: Path to input file (e.g., `points.xyz` with space-delimited X Y Z).
+  - `out_dir`: Output directory for tileset (created if needed).
+  - `threads`: Number of threads for conversion (passed as `--threads`).
+  - `timeout`: Seconds before subprocess timeout.
+  - `allow_overwrite`: If True, allows `--overwrite` flag.
+  - `extra_args`: Limited list; only `--overwrite` is whitelisted (others raise ValueError).
+- **Behavior**: Composes command (e.g., `py3dtiles convert input_path --out out_dir --threads N`), runs via `subprocess.run`, captures stdout/stderr, raises on failure.
+- **Returns**: Dict with keys: `command` (list[str]), `returncode` (int), `stdout_tail` (str, last 500 chars), `out_dir` (str).
+- **Exceptions**:
+  - `FileNotFoundError`: If `py3dtiles` not in PATH or input_path missing.
+  - `TimeoutError`: If subprocess exceeds timeout.
+  - `RuntimeError`: If returncode != 0, with stdout/stderr details.
+
+**Minimal Example**:
+```python
+from GeoAnomalyMapper.gam.visualization.tiles_builder import run_py3dtiles_convert
+result = run_py3dtiles_convert("points.xyz", "tiles_out", threads=4, timeout=120, allow_overwrite=True)
+assert result["returncode"] == 0
+```
+
+**Implementation**: [`run_py3dtiles_convert()`](GeoAnomalyMapper/gam/visualization/tiles_builder.py:241)
+
+### Pitfalls/Caveats
+
+- **Lon/Lat Order**: `reproject_wgs84_to_ecef` requires (lon, lat, height) due to `always_xy=True`; lat/lon swap will produce incorrect ECEF.
+- **Height Semantics**: Input height is ellipsoidal (WGS84); orthometric/geoid heights differ by ~30-100m—use consistent datum.
+- **py3dtiles Wrapper Restrictions**: Only safe flags allowed (e.g., no `--attributes` or custom); extend via direct CLI if needed, but wrapper prevents injection.
+- **Runtime Dependencies**: `pyproj` for reprojection (ImportError if missing); `py3dtiles` CLI for conversion (FileNotFoundError if not installed/accessible).
+
 ---
 
-*Generated: 2025-09-23 | For auto-generation, use Sphinx apidoc.*
+*Generated: 2025-09-23 | For auto-generation, use Sphinx apidoc.

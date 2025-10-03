@@ -68,6 +68,14 @@ def get_scene_config(analysis_id: str):
 
 app.include_router(router)
 
+@app.get("/api/scene/{analysis_id}")
+def get_scene_by_id(analysis_id: str):
+    scene_path = Path("data/outputs/state") / analysis_id / "scene.json"
+    if not scene_path.is_file():
+        raise HTTPException(status_code=404, detail="Scene not found")
+    content = json.loads(scene_path.read_text(encoding="utf-8"))
+    return JSONResponse(content=content, media_type="application/json")
+
 class AnalysisRequest(BaseModel):
     bbox: List[float]
     modalities: List[str]

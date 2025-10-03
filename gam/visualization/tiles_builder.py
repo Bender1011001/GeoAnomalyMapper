@@ -23,11 +23,12 @@ See also
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional, Sequence, Union, Dict, List
 
 import logging
 import numpy as np
 import subprocess
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,249 @@ def reproject_llh_to_ecef(points_llh: np.ndarray) -> np.ndarray:
 
     X, Y, Z = transformer.transform(lon, lat, h)
     return np.column_stack((np.asarray(X, dtype=float), np.asarray(Y, dtype=float), np.asarray(Z, dtype=float)))
+
+
+def reproject_wgs84_to_ecef(lon_deg, lat_deg, height_m=0.0):
+    """
+    Reproject WGS84 3D geographic coordinates (EPSG:4979) to Earth-Centered, Earth-Fixed
+    geocentric Cartesian coordinates (ECEF, EPSG:4978) using pyproj with always_xy=True.
+
+    Ordering and units:
+    - Inputs are (lon, lat, height) where longitude and latitude are in degrees, and height
+      is ellipsoidal height above the WGS84 ellipsoid in meters (not orthometric height).
+    - Output is (x, y, z) in meters in an Earth-centered frame (origin at Earth's center).
+
+    Behavior:
+    - Accepts scalars or array-like inputs. Inputs are converted to numpy arrays and
+      broadcast to a common shape. If broadcasting fails due to incompatible shapes,
+      a ValueError is raised that includes the input shapes.
+    - Internally forwards to reproject_llh_to_ecef(), which uses
+      pyproj.Transformer.from_crs("EPSG:4979", "EPSG:4978", always_xy=True) to ensure
+      (lon, lat, h) ordering.
+
+    Parameters
+    ----------
+    lon_deg : float or array-like of float
+        Longitude(s) in degrees.
+    lat_deg : float or array-like of float
+        Latitude(s) in degrees.
+    height_m : float or array-like of float, optional
+        Ellipsoidal height(s) above WGS84 in meters. Default is 0.0.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        (x, y, z) arrays as float64 with the broadcasted shape of the inputs.
+
+    Raises
+    ------
+    ValueError
+        If lon_deg, lat_deg, height_m cannot be broadcast to a common shape.
+
+    Notes
+    -----
+    - CRS: EPSG:4979 (WGS84 3D lon/lat/ellipsoidal height) -> EPSG:4978 (WGS84 geocentric/ECEF).
+    - Numerical note: ECEF uses Earth's center as origin, with axes fixed to Earth.
+      WGS84 reference ellipsoid has an equatorial radius of approximately 6378137.0 meters.
+
+    Examples
+    --------
+    Scalar example:
+    >>> x, y, z = reproject_wgs84_to_ecef(0.0, 0.0, 0.0)
+    >>> round(x.item(), 3), round(y.item(), 3), round(z.item(), 3)
+    (6378137.0, 0.0, 0.0)
+
+    Vectorized example:
+    >>> import numpy as np
+    >>> x, y, z = reproject_wgs84_to_ecef([0, 10], [0, 0], [0, 0])
+    >>> x.shape == y.shape == z.shape == (2,)
+    True
+    """
+    # Convert to arrays and validate broadcastability
+    lon_arr = np.asarray(lon_deg, dtype=float)
+    lat_arr = np.asarray(lat_deg, dtype=float)
+    h_arr = np.asarray(height_m, dtype=float)
+
+    try:
+        lon_b, lat_b, h_b = np.broadcast_arrays(lon_arr, lat_arr, h_arr)
+    except ValueError as e:
+        raise ValueError(
+            f"lon_deg, lat_deg, height_m are not broadcastable: "
+            f"shapes {lon_arr.shape}, {lat_arr.shape}, {h_arr.shape}"
+        ) from e
+
+    # Flatten to (N, 3) for underlying conversion, then reshape back
+    llh = np.column_stack((lon_b.ravel(), lat_b.ravel(), h_b.ravel()))
+    xyz = reproject_llh_to_ecef(llh)  # (N, 3)
+
+    out_shape = lon_b.shape
+    x = np.asarray(xyz[:, 0], dtype=float).reshape(out_shape)
+    y = np.asarray(xyz[:, 1], dtype=float).reshape(out_shape)
+    z = np.asarray(xyz[:, 2], dtype=float).reshape(out_shape)
+    return x, y, z
+
+
+def run_py3dtiles_convert(
+    input_path,
+    out_dir,
+    threads: Optional[int] = None,
+    timeout: float = 600.0,
+    allow_overwrite: bool = False,
+    extra_args: Optional[Sequence[str]] = None,
+) -> dict:
+    """
+    Safe wrapper around the py3dtiles "convert" CLI with strict guardrails.
+
+    Purpose
+    -------
+    Provides a robust, minimal, and explicit interface to invoke:
+      py3dtiles convert <input_path> --out <out_dir>
+    while enforcing:
+    - Tool availability checks
+    - Input/output path validation and out_dir creation
+    - A very limited safe-flag whitelist (no arbitrary passthrough)
+    - Controlled parallelism via threads -> "--jobs"
+    - Timeouts, structured result, and clear exceptions
+
+    Parameters
+    ----------
+    input_path : str or os.PathLike
+        Path to a point file (e.g., XYZ/CSV/PLY) or directory accepted by py3dtiles.
+        Must exist; otherwise FileNotFoundError is raised.
+    out_dir : str or os.PathLike
+        Output directory for tiles. Created with mkdir(parents=True, exist_ok=True).
+        If creation fails, a RuntimeError is raised.
+    threads : Optional[int], default None
+        If provided, mapped to the py3dtiles parallelism flag: "--jobs <threads>".
+    timeout : float, default 600.0
+        Seconds to wait for the subprocess before timing out. On timeout, a TimeoutError is raised.
+    allow_overwrite : bool, default False
+        If True, appends the safe flag "--overwrite" to the command.
+    extra_args : Optional[Sequence[str]], default None
+        Additional flags are strictly controlled by a whitelist. Allowed values: ["--overwrite"] only.
+        Any value not in the whitelist raises ValueError. This is intentionally restrictive to avoid
+        unexpected side effects; use explicit parameters instead of arbitrary pass-through.
+
+    Command Construction
+    --------------------
+    Base:
+        ["py3dtiles", "convert", str(input_path), "--out", str(out_dir)]
+    threads:
+        If provided -> ["--jobs", str(threads)]
+    overwrite:
+        If allow_overwrite -> ["--overwrite"]
+        If extra_args includes "--overwrite", it will be de-duplicated (added only once).
+    extra_args:
+        Only allowed values are appended; others raise ValueError.
+
+    Subprocess Semantics
+    --------------------
+    - Executed with shell=False and cwd set to out_dir for stable relative outputs.
+    - capture_output=True, text=True, check=False.
+    - On timeout: logs error and raises TimeoutError including the timeout and the command.
+    - On nonzero return code: logs stderr at error level and raises RuntimeError including the return code,
+      a tail of stderr, and the command string.
+    - On success: returns a structured dict with fields:
+        {
+          "command": cmd (list[str]),
+          "returncode": 0,
+          "stdout_tail": last 1000 chars of stdout,
+          "out_dir": str(out_dir),
+        }
+
+    Example
+    -------
+    >>> result = run_py3dtiles_convert("points.xyz", "tiles_out", threads=4, timeout=120, allow_overwrite=True)
+    >>> result["returncode"] == 0
+    True
+    """
+    # Validate CLI availability
+    if shutil.which("py3dtiles") is None:
+        raise FileNotFoundError("py3dtiles CLI not found on PATH. Install py3dtiles and ensure it is on your PATH.")
+
+    in_path = Path(input_path)
+    out_path = Path(out_dir)
+
+    # Validate input existence
+    if not in_path.exists():
+        raise FileNotFoundError(f"Input path does not exist: {in_path.resolve()}")
+
+    # Ensure output directory exists or can be created
+    try:
+        out_path.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        # Explicitly re-raise as RuntimeError to provide actionable context
+        raise RuntimeError(f"Failed to create output directory '{out_path}': {e}") from e
+
+    # Validate and normalize extra_args (strict whitelist)
+    allowed: set[str] = {"--overwrite"}
+    validated_extra: List[str] = []
+    if extra_args is not None:
+        for arg in extra_args:
+            if arg not in allowed:
+                raise ValueError(f"Unsupported extra argument '{arg}'. Allowed: {sorted(allowed)}")
+            validated_extra.append(arg)
+
+    # Build command
+    cmd: List[str] = ["py3dtiles", "convert", str(in_path), "--out", str(out_path)]
+    if threads is not None:
+        # Convert to int in case a numeric-like value is provided
+        try:
+            cmd.extend(["--jobs", str(int(threads))])
+        except Exception:
+            # Keep minimal assumptions; let py3dtiles handle invalid values if str(int(threads)) fails
+            cmd.extend(["--jobs", str(threads)])
+    # Add overwrite if allowed and not already present from validated extras
+    if allow_overwrite and "--overwrite" not in validated_extra:
+        cmd.append("--overwrite")
+    # Append validated extras, de-duplicating if needed
+    for arg in validated_extra:
+        if arg not in cmd:
+            cmd.append(arg)
+
+    # Execute subprocess with timeout and without shell
+    logger.info("Invoking py3dtiles: %s", " ".join(cmd))
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(out_path),
+            capture_output=True,
+            text=True,
+            timeout=float(timeout),
+            check=False,
+        )
+    except subprocess.TimeoutExpired as e:
+        logger.error("py3dtiles timed out after %.1f seconds: %s", float(timeout), " ".join(cmd))
+        raise TimeoutError(f"py3dtiles convert timed out after {timeout:.1f}s: {' '.join(cmd)}") from e
+    except Exception as e:
+        # Unexpected execution failure (e.g., permissions)
+        logger.error("Failed to execute py3dtiles: %s", e)
+        raise
+
+    stdout = proc.stdout or ""
+    stderr = proc.stderr or ""
+
+    if proc.returncode != 0:
+        tail = stderr[-1000:]
+        logger.error("py3dtiles failed (code %s). stderr tail:\n%s", proc.returncode, tail)
+        if stdout:
+            logger.debug("py3dtiles stdout:\n%s", stdout)
+        raise RuntimeError(
+            f"py3dtiles convert failed with code {proc.returncode}. "
+            f"stderr tail:\n{tail}\nCommand: {' '.join(cmd)}"
+        )
+
+    # Success path
+    logger.debug("py3dtiles stdout:\n%s", stdout)
+    if stderr:
+        logger.debug("py3dtiles stderr:\n%s", stderr)
+
+    return {
+        "command": cmd,
+        "returncode": 0,
+        "stdout_tail": stdout[-1000:],
+        "out_dir": str(out_path),
+    }
 
 
 def build_3dtiles_from_points(
