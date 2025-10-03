@@ -18,3 +18,9 @@ pygmt>=0.12.0
 pyvista>=0.44.0
 folium>=0.15.0
 vtk>=9.3.0
+# 3D Globe dependencies (Phase 1)
+pydeck
+simplekml
+py3dtiles
+matplotlib
+numpy

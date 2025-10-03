@@ -190,6 +190,24 @@ The `.env` file is automatically ignored by Git (see `.gitignore`).
 4. **Update PATH** (if CLI not found):
    Ensure your virtual environment's bin/Scripts is in PATH.
 
+### Dashboard (3D Globe) dependencies
+
+These dashboard-specific Python dependencies are defined in [`requirements-dashboard.in`](GeoAnomalyMapper/requirements-dashboard.in) and compiled to a locked set in [`requirements-dashboard.txt`](GeoAnomalyMapper/requirements-dashboard.txt) using pip-tools.
+
+Compile the dashboard requirements:
+```bash
+pip-compile GeoAnomalyMapper/requirements-dashboard.in -o GeoAnomalyMapper/requirements-dashboard.txt
+```
+
+Sync your environment (base + dashboard):
+```bash
+pip-sync GeoAnomalyMapper/requirements.txt GeoAnomalyMapper/requirements-dashboard.txt
+```
+
+Notes:
+- numpy and matplotlib may already be present in the base set; pip-compile will deduplicate when resolving constraints across your inputs, and pip-sync will install a consistent set.
+- Secrets: Provide your Cesium ion access token via the CESIUM_TOKEN environment variable (documented in [`GeoAnomalyMapper/.env.example`](GeoAnomalyMapper/.env.example)). For local Streamlit development, you may optionally create [`GeoAnomalyMapper/dashboard/.streamlit/secrets.toml`](GeoAnomalyMapper/dashboard/.streamlit/secrets.toml) containing CESIUM_TOKEN; do not commit secrets.toml. Commit only [`GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml`](GeoAnomalyMapper/dashboard/.streamlit/secrets.example.toml).
+
 ## Troubleshooting Common Installation Issues
 
 ### Dependency Conflicts (e.g., GDAL)

@@ -52,6 +52,45 @@ except ImportError as e:
         render_plotter = None
 from matplotlib import cm
 
+# Sidebar — Navigation and Cesium token status
+# Placed early to be consistently visible across views.
+try:
+    st.sidebar.header("Navigation")
+    try:
+        if hasattr(st.sidebar, "page_link"):
+            st.sidebar.page_link("pages/3_3D_Globe.py", label="🌍 3D Globe")
+        elif hasattr(st, "page_link"):
+            # Fallback to top-level page_link within the sidebar context
+            with st.sidebar:
+                st.page_link("pages/3_3D_Globe.py", label="🌍 3D Globe")
+        else:
+            st.sidebar.info("Open the '3_3D_Globe' page from the sidebar Pages menu.")
+    except Exception:
+        # Robust fallback if page_link API is unavailable or errors out
+        st.sidebar.info("Open the '3_3D_Globe' page from the sidebar Pages menu.")
+
+    # Sidebar — Cesium token status
+    try:
+        token = None
+        try:
+            token = st.secrets.get("CESIUM_TOKEN")
+        except Exception:
+            token = None
+        if not token:
+            token = os.getenv("CESIUM_TOKEN")
+
+        if token:
+            st.sidebar.success("Cesium token detected")
+        else:
+            st.sidebar.warning("Cesium token missing — set CESIUM_TOKEN in environment or .streamlit/secrets.toml")
+        st.sidebar.caption("Source: st.secrets or environment")
+    except Exception:
+        # Never fail the page due to status UI
+        pass
+except Exception:
+    # Ensure sidebar initialization never breaks the main app
+    pass
+
 try:
     from .presets import get_all_presets, get_preset
 except ImportError:

@@ -1,16 +1,19 @@
 
 
 services:
-  gam-api:
+  api:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.api
     ports:
       - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - GAM_ENV=production
+      - PYTHONUNBUFFERED=1
     volumes:
-      - gam-data:/app/data
+      - ../../../data:/app/data
       - gam-results:/app/results
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/openapi.json"]
@@ -22,19 +25,25 @@ services:
     networks:
       - gam-network
 
-  gam-dashboard:
+  dashboard:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.dashboard
     ports:
       - "8501:8501"
+    expose:
+      - "8501"
     depends_on:
-      gam-api:
+      api:
         condition: service_healthy
     environment:
       - GAM_ENV=production
-      - GAM_API_URL=http://gam-api:8000
+      - GAM_API_URL=http://api:8000
+      - CESIUM_TOKEN=${CESIUM_TOKEN}
+      - MPLBACKEND=Agg
+      - PYTHONUNBUFFERED=1
     volumes:
+      - ../../../data:/app/data
       - gam-results:/app/results
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/healthz"]
@@ -43,6 +52,18 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - gam-network
+
+  proxy:
+    image: nginx:alpine
+    depends_on:
+      - api
+      - dashboard
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - gam-network
 
