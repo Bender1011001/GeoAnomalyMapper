@@ -1,175 +1,47 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
 [project]
 name = "geoanomalymapper"
 version = "0.1.0"
-description = "Geophysical data fusion for subsurface anomaly detection."
+description = "GeoAnomalyMapper: scientifically sound geophysical anomaly mapping"
 readme = "README.md"
-authors = [{name = "GeoAnomalyMapper Team", email = "team@example.com"}]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.9"
 license = {text = "MIT"}
-keywords = ["geophysics", "anomaly detection", "inversion", "data fusion", "seismic", "gravity", "InSAR", "GIS", "subsurface", "earth science"]
+authors = [{name="GAM Team"}]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Environment :: Console",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Typing :: Typed",
-    "Natural Language :: English",
-    "Topic :: Scientific/Engineering :: GIS",
-    "Topic :: Scientific/Engineering :: Physics",
-    "Topic :: Scientific/Engineering :: Geoscience",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Framework :: Matplotlib",
-    "Framework :: Jupyter",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
 ]
 dependencies = [
-    "numpy==2.3.1",
-    "scipy==1.16.2",
-    "pandas==2.3.2",
-    "scikit-learn==1.7.2",
-    "matplotlib==3.10.6",
-    "seaborn==0.12.2",
-    "plotly==5.24.1",
-    "geopandas==0.14.4",
-    "rasterio==1.4.3",
-    "shapely==2.1.2",
-    "pyproj==3.7.2",
-    "fiona==1.10.1",
-    "xarray==2023.12.0",
-    "netcdf4==1.7.2",
-    "h5py==3.14.0",
-    "tables==3.10.2",
-    "imageio==2.37.0",
-    "pillow==10.4.0",
-    "requests==2.32.5",
-    "pydantic==2.11.9",
-    "click==8.3.0",
-    "tqdm==4.67.1",
-    "joblib==1.5.2",
-    "pyyaml==6.0.3",
-    "tenacity==8.5.0",
-    "dask[complete]==2024.12.1",
-    "sqlalchemy==1.4.54",
-    "python-dotenv",
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "coverage>=7.6.0",
-    "black>=23.9.0",
-    "isort>=5.12.0",
-    "flake8>=6.1.0",
-    "mypy>=1.6.0",
-    "pre-commit>=3.5.0",
-    "sphinx>=7.4.0",
-    "jupyter>=1.0.0",
-    "ipykernel>=6.25.0",
-    "notebook>=7.0.0",
-    "psutil>=6.0.0",
-    "pip-tools>=7.0.0",
-    "fastapi>=0.104.0",
-    "uvicorn>=0.24.0",
-    "streamlit>=1.38.0",
-    "streamlit-folium>=0.17.0",
-    "itkwidgets>=0.13.0",
-    "pyvistaqt>=0.11.0",
-    "stpyvista>=0.1.0",
-    "pygmt>=0.12.0",
-    "pyvista>=0.44.0",
-    "folium>=0.15.0",
-    "vtk>=9.3.0",
-    "simpeg>=0.21.0",
-    "obspy>=1.4.0",
-    "mintpy>=1.6.0",
-    "pygimli>=1.5.0",
-    "sentinelsat>=1.0.0",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "xarray>=2023.1",
+  "pyproj>=3.5",
+  "fastapi>=0.110",
+  "uvicorn>=0.23",
+  "pydantic>=2.0",
+  "typing-extensions>=4.7"
 ]
 
-[project.scripts]
-gam = "gam.core.cli:cli"
+[project.optional-dependencies]
+api = ["fastapi>=0.110", "uvicorn>=0.23"]
+dashboard = ["streamlit>=1.30", "pydeck>=0.8"]
+modeling = ["scipy>=1.10", "scikit-image>=0.22", "pyvista>=0.43"]
+docs = ["sphinx>=7.0", "myst-parser>=2.0", "sphinx-rtd-theme>=2.0"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.5", "mypy>=1.5", "black>=24.0"]
 
 [project.urls]
-Homepage = "https://github.com/GeoAnomalyMapper/GAM"
-Documentation = "https://geoanomalymapper.readthedocs.io"
-Repository = "https://github.com/GeoAnomalyMapper/GAM"
-Issues = "https://github.com/GeoAnomalyMapper/GAM/issues"
+Homepage = "https://example.com/geoanomalymapper"
+Repository = "https://example.com/geoanomalymapper/repo"
 
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+[tool.hatch.build]
+include = ["GeoAnomalyMapper/**", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
 
 [tool.black]
-line-length = 88
-target-version = ['py310']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-known_first_party = ["gam"]
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
-addopts = "-v --tb=short --strict-markers"
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
-]
-
-[tool.coverage.run]
-source = ["gam"]
-omit = [
-    "*/tests/*",
-    "*/test_*",
-    "setup.py",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-]
+line-length = 100

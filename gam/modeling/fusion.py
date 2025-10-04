@@ -6,13 +6,14 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+import xarray as xr
 import numpy.typing as npt
 from scipy import ndimage, optimize
 from scipy.linalg import pinv
 
-from gam.core.exceptions import GAMError
+from gam.core.exceptions import DataValidationError, GAMError
 from gam.modeling.base import Inverter
-from gam.modeling.data_structures import InversionResults
+from gam.modeling.data_structures import InversionResults, ProcessedGrid
 
 
 logger = logging.getLogger(__name__)
@@ -239,4 +240,109 @@ class JointInverter(Inverter):
 
         Raises NotImplementedError for consistency, as joint is primary.
         """
+def fuse_grids(grids: List[ProcessedGrid]) -> InversionResults:
+    """
+    Fuse multiple ProcessedGrid objects into a single InversionResults using robust mean fusion.
+
+    This function implements a scientifically defensible fusion strategy that combines
+    multiple geophysical grids (e.g., gravity, magnetic, seismic) into a unified subsurface
+    model with associated uncertainty estimates. The approach uses simple averaging for
+    the model and Median Absolute Deviation (MAD) for uncertainty quantification,
+    providing robustness to outliers while maintaining computational efficiency.
+
+    The fusion assumes that all input grids are co-registered (same coordinates and CRS)
+    and represent comparable physical quantities (e.g., anomaly values). No normalization
+    or weighting is applied beyond equal contribution from each modality.
+
+    Parameters
+    ----------
+    grids : List[ProcessedGrid]
+        List of at least two ProcessedGrid objects to fuse. All grids must have
+        identical coordinates (lat, lon) and CRS.
+
+    Returns
+    -------
+    InversionResults
+        Fused results containing:
+        - model: xarray.DataArray with mean values across modalities
+        - uncertainty: xarray.DataArray with MAD-based uncertainty estimates
+        - metadata: Dict with fusion parameters and statistics
+
+    Raises
+    ------
+    DataValidationError
+        If fewer than 2 grids provided, or if grids have mismatched coordinates/Crs.
+
+    Notes
+    -----
+    - **Fusion Method**: Simple arithmetic mean across modalities for model values.
+    - **Uncertainty**: MAD = median(|x - median(x)|) across modalities, scaled by 1.4826
+      for consistency with standard deviation under normality assumption.
+    - **Deterministic**: Results are fully reproducible given identical inputs.
+    - **Performance**: O(N_grids * grid_size) time complexity, memory efficient.
+    - **Limitations**: Assumes co-registration; does not handle systematic biases
+      between modalities; equal weighting may not be optimal for all scenarios.
+
+    Examples
+    --------
+    >>> from gam.modeling.data_structures import ProcessedGrid
+    >>> import xarray as xr
+    >>> import numpy as np
+    >>> # Create sample grids
+    >>> coords = {'lat': [40, 41], 'lon': [-120, -119]}
+    >>> grid1 = ProcessedGrid(xr.DataArray(np.random.rand(2, 2), coords=coords, attrs={'crs': 'EPSG:4326'}))
+    >>> grid2 = ProcessedGrid(xr.DataArray(np.random.rand(2, 2), coords=coords, attrs={'crs': 'EPSG:4326'}))
+    >>> result = fuse_grids([grid1, grid2])
+    >>> print(result.model.shape)  # (2, 2)
+    """
+    # Input validation
+    if len(grids) < 2:
+        raise DataValidationError("At least two ProcessedGrid objects required for fusion")
+
+    # Validate all grids have same coordinates and CRS
+    reference_grid = grids[0]
+    reference_coords = (reference_grid.data.lat.values, reference_grid.data.lon.values)
+    reference_crs = reference_grid.data.attrs.get('crs')
+
+    for i, grid in enumerate(grids[1:], 1):
+        grid_coords = (grid.data.lat.values, grid.data.lon.values)
+        grid_crs = grid.data.attrs.get('crs')
+
+        if not np.array_equal(reference_coords[0], grid_coords[0]) or not np.array_equal(reference_coords[1], grid_coords[1]):
+            raise DataValidationError(f"Grid {i} coordinates do not match reference grid")
+        if grid_crs != reference_crs:
+            raise DataValidationError(f"Grid {i} CRS ({grid_crs}) does not match reference CRS ({reference_crs})")
+
+    # Concatenate grids along new "modality" dimension
+    data_arrays = [grid.data for grid in grids]
+    concatenated = xr.concat(data_arrays, dim='modality')
+
+    # Calculate mean across modalities for model
+    model = concatenated.mean(dim='modality')
+
+    # Calculate MAD across modalities for uncertainty
+    # MAD = median(|x - median(x)|)
+    median_values = concatenated.median(dim='modality')
+    deviations = np.abs(concatenated - median_values)
+    mad = deviations.median(dim='modality')
+
+    # Scale MAD by 1.4826 for consistency with std under normality
+    uncertainty = mad * 1.4826
+
+    # Create metadata
+    metadata = {
+        'fusion_method': 'robust_mean_mad',
+        'n_modalities': len(grids),
+        'crs': reference_crs,
+        'coordinates_match': True,
+        'deterministic': True
+    }
+
+    # Create and validate InversionResults
+    result = InversionResults(model=model, uncertainty=uncertainty, metadata=metadata)
+    result.validate()
+
+    logger.info(f"Fused {len(grids)} grids: shape={model.shape}, mean_model={float(model.mean()):.3f}, mean_uncertainty={float(uncertainty.mean()):.3f}")
+
+    return result
         raise NotImplementedError("JointInverter is for fusion; use fuse(models)")

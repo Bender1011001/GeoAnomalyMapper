@@ -60,10 +60,10 @@ class DataSource(ABC):
 
         Raises
         ------
-        DataFetchError
+        IngestionError
             If the data fetch operation fails due to network issues, API errors,
             or invalid parameters.
-        APITimeoutError
+        IngestionError
             If the API request times out.
         ValueError
             If the bounding box is invalid (e.g., min > max).

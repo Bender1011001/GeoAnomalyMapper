@@ -16,9 +16,9 @@ from datetime import datetime, timedelta
 
 from gam.ingestion import (
     RawData, HDF5CacheManager, GravityFetcher, MagneticFetcher,
-    SeismicFetcher, InSARFetcher, IngestionManager, DataFetchError,
-    APITimeoutError, retry_fetch, rate_limit
+    SeismicFetcher, InSARFetcher, IngestionManager, retry_fetch, rate_limit
 )
+from gam.core.exceptions import IngestionError
 
 
 @pytest.fixture
@@ -173,7 +173,7 @@ def test_gravity_fetcher():
     # Empty response
     with responses.RequestsMock() as rsps:
         rsps.add(rsps.GET, 'https://mrdata.usgs.gov/services/gravity', json={"features": []}, status=200)
-        with pytest.raises(DataFetchError, match="No data found"):
+        with pytest.raises(IngestionError, match="No data found"):
             fetcher.fetch_data(bbox)
 
 
@@ -360,7 +360,7 @@ class TestInSARFetcher:
         monkeypatch.setenv('ESA_PASSWORD', 'pass')
         with patch('gam.ingestion.fetchers.SentinelAPI') as mock_api:
             mock_api.return_value.query.return_value = {}
-            with pytest.raises(DataFetchError, match="No SLC products found"):
+            with pytest.raises(IngestionError, match="No SLC products found"):
                 insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01', product_type='SLC')
 
     def test_insar_authentication_failure(self, insar_fetcher, sample_bbox, monkeypatch):
@@ -373,7 +373,7 @@ class TestInSARFetcher:
         # Mock API init fail
         monkeypatch.setenv('ESA_USERNAME', 'invalid')
         monkeypatch.setenv('ESA_PASSWORD', 'invalid')
-        with patch('gam.ingestion.fetchers.SentinelAPI') as mock_api, pytest.raises(DataFetchError):
+        with patch('gam.ingestion.fetchers.SentinelAPI') as mock_api, pytest.raises(IngestionError):
             mock_api.side_effect = Exception("Auth failed")
             insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01')
 
@@ -385,7 +385,7 @@ class TestInSARFetcher:
         mock_sentinel.return_value.query.return_value = mock_products
         mock_sentinel.return_value.download.side_effect = [Timeout(), {}]  # Retry once, then success (but test fail)
         # For pure fail: side_effect = Timeout()
-        with pytest.raises(APITimeoutError):
+        with pytest.raises(IngestionError):
             mock_sentinel.return_value.download.side_effect = Timeout()
             insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01')
         # Assert retry (but decorator handles; mock calls ==3 for max_attempts=3)
@@ -400,14 +400,14 @@ class TestInSARFetcher:
         mock_sentinel.return_value.download.return_value = {'id': {'path': '/tmp/zip.zip'}}
         mock_exists.return_value = True  # Zip exists
         mock_exists.side_effect = [True, False]  # Zip yes, TIFF no
-        with pytest.raises(DataFetchError, match="VV TIFF not found"):
+        with pytest.raises(IngestionError, match="VV TIFF not found"):
             insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01')
 
         # Rasterio fail
         with patch('gam.ingestion.fetchers.rasterio.open') as mock_rasterio:
             mock_rasterio.side_effect = Exception("Invalid TIFF")
             mock_exists.return_value = True  # TIFF exists
-            with pytest.raises(DataFetchError, match="Processing failed"):
+            with pytest.raises(IngestionError, match="Processing failed"):
                 insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01')
 
         # No data in bbox (mask all False)
@@ -420,7 +420,7 @@ class TestInSARFetcher:
             mock_exists.return_value = True
             with patch('gam.ingestion.fetchers.os.walk') as mock_walk:
                 mock_walk.return_value = [('measurement', [], ['vv.tiff'])]
-                with pytest.raises(DataFetchError, match="No data points within bbox"):
+                with pytest.raises(IngestionError, match="No data points within bbox"):
                     insar_fetcher.fetch_data(sample_bbox, start_date='2024-01-01')
 
     @patch('gam.ingestion.fetchers.hashlib.md5')
@@ -626,9 +626,9 @@ def test_retry_fetch():
     @retry_fetch()
     def flaky_func():
         calls.append(1)
-        raise DataFetchError("test", "flaky")
+        raise IngestionError("test", "flaky")
 
-    with pytest.raises(DataFetchError):
+    with pytest.raises(IngestionError):
         flaky_func()
     assert len(calls) == 3  # Retried 3 times
 

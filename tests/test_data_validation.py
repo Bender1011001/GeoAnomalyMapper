@@ -26,8 +26,7 @@ from gam import (
     IngestionManager, PreprocessingManager, ModelingManager, VisualizationManager,
     RawData, ProcessedGrid, InversionResults, AnomalyOutput
 )
-from gam.core.exceptions import PipelineError, GAMError
-from gam.ingestion.exceptions import DataFetchError
+from gam.core.exceptions import PipelineError, GAMError, IngestionError
 
 # Fixtures from conftest.py
 # synthetic_raw_data, test_config, mock_external_apis, test_bbox
@@ -151,18 +150,18 @@ class TestDataValidation:
         Test how errors propagate through the pipeline.
         
         Simulates:
-        - Ingestion failure (DataFetchError)
+        - Ingestion failure (IngestionError)
         - Preprocessing NaN/invalid data
         - Modeling failure (e.g., singular matrix)
         - Graceful degradation and error reporting
         """
         # Case 1: Ingestion error
         def mock_fetch_error(modality, bbox):
-            raise DataFetchError("Mock API failure")
+            raise IngestionError("Mock API failure")
         monkeypatch.setattr(IngestionManager, 'fetch_modality', mock_fetch_error)
         
         pipeline = GAMPipeline.from_config(test_config)
-        with pytest.raises(PipelineError, match="Ingestion failed.*DataFetchError"):
+        with pytest.raises(PipelineError, match="Ingestion failed.*IngestionError"):
             pipeline.run_analysis(bbox=test_bbox, modalities=['gravity'], output_dir=tmp_output_dir, use_cache=False)
         
         # Case 2: Preprocessing invalid data (NaN grid)

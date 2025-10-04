@@ -25,6 +25,7 @@ from simpeg import (
 from discretize import TreeMesh
 
 from gam.core.exceptions import GAMError, InversionConvergenceError
+from gam.core.geodesy import bbox_extent_meters, geodetic_to_projected, ensure_crs
 from gam.modeling.base import Inverter
 from gam.modeling.data_structures import InversionResults
 from gam.modeling.mesh import MeshGenerator
@@ -315,7 +316,10 @@ class JointInverter(Inverter):
             # Surface points from topo
             lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
             elevs = topo.ravel()
-            x_surf, y_surf = self._project_coords(lons.ravel(), lats.ravel()) if self.transformer else (lons.ravel()*111000, lats.ravel()*111000)
+            if self.transformer:
+                x_surf, y_surf = self._project_coords(lons.ravel(), lats.ravel())
+            else:
+                x_surf, y_surf = geodetic_to_projected(lons.ravel(), lats.ravel(), ensure_crs('EPSG:3857'))
             topo_points = np.c_[x_surf, y_surf, elevs]
             actv = active_from_xyz(self.mesh, topo_points, "top")
         logger.info(f"Shared active cells: {actv.sum()} / {self.mesh.nC}")
@@ -334,11 +338,7 @@ class JointInverter(Inverter):
         """Observation locations in projected coords."""
         lons, lats = np.meshgrid(data.ds['lon'].values, data.ds['lat'].values)
         lons_flat, lats_flat = lons.ravel(), lats.ravel()
-        if self.transformer:
-            x, y = self._project_coords(lons_flat, lats_flat)
-        else:
-            x = lons_flat * 111000
-            y = lats_flat * 111000
+        x, y = geodetic_to_projected(lons_flat, lats_flat, ensure_crs('EPSG:3857'))
         return np.column_stack([x, y, np.zeros(len(x))])
 
     def _interpolate_model(self, model_flat: npt.NDArray[np.float64], data: ProcessedGrid) -> npt.NDArray[np.float64]:
@@ -350,11 +350,7 @@ class JointInverter(Inverter):
         lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')
         depths = data.ds['depth'].values
         lat_flat, lon_flat = lats.ravel(), lons.ravel()
-        if self.transformer:
-            x_data, y_data = self._project_coords(lon_flat, lat_flat)
-        else:
-            x_data = lon_flat * 111000
-            y_data = lat_flat * 111000
+        x_data, y_data = geodetic_to_projected(lon_flat, lat_flat, ensure_crs('EPSG:3857'))
         model_3d_list = []
         for d in depths:
             z_data = np.full(len(lat_flat), -d)
