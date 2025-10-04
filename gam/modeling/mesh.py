@@ -20,6 +20,7 @@ import simpeg
 from discretize import TensorMesh, TreeMesh
 
 from gam.core.exceptions import GAMError
+from gam.core.geodesy import bbox_extent_meters, geodetic_to_projected, ensure_crs
 from gam.preprocessing.data_structures import ProcessedGrid
 
 
@@ -156,17 +157,11 @@ class MeshGenerator:
         depth = kwargs.get('depth', 5000.0)
         dimension = kwargs.get('dimension', 3)
 
-        # Project coords if needed
         target_crs = kwargs.get('target_crs', 'EPSG:32633')  # UTM example
-        if self.crs != target_crs:
-            self._setup_transformer(self.crs, target_crs)
-            x, y = self._project_coords(data.ds['lon'].values, data.ds['lat'].values)
-            extent = [x.min(), x.max(), y.min(), y.max()]
-        else:
-            # Scale degrees to m
-            lon_extent = (data.ds['lon'].max() - data.ds['lon'].min()) * 111000
-            lat_extent = (data.ds['lat'].max() - data.ds['lat'].min()) * 111000
-            extent = [0, lon_extent, 0, lat_extent]
+        dst_crs = ensure_crs(target_crs)
+        bbox = (data.ds['lon'].min().values, data.ds['lat'].min().values, data.ds['lon'].max().values, data.ds['lat'].max().values)
+        width, height = bbox_extent_meters(bbox, dst_crs)
+        extent = [0, width, 0, height]
 
         # Add padding: extend extent by hmax * padding_cells
         pad = hmax * padding_cells
@@ -189,8 +184,9 @@ class MeshGenerator:
             tree_mesh = TreeMesh(extent_padded, hmin=hmin)
             # Refine around receivers (data locations)
             if kwargs.get('refine_receivers', True):
-                receiver_x = data.ds['lon'].values * 111000 if self.crs == 'EPSG:4326' else x
-                receiver_y = data.ds['lat'].values * 111000 if self.crs == 'EPSG:4326' else y
+                lon = data.ds['lon'].values
+                lat = data.ds['lat'].values
+                receiver_x, receiver_y = geodetic_to_projected(lon, lat, dst_crs)
                 tree_mesh = self._refine_receivers(tree_mesh, receiver_x, receiver_y, hmin=hmin)
             # Refine near surface/anomalies (top 500m)
             tree_mesh = self._refine_surface(tree_mesh, hmin=hmin)
@@ -227,9 +223,11 @@ class MeshGenerator:
         hmin = kwargs.get('hmin', 5.0)
         depth = kwargs.get('depth', 2000.0)
 
-        # Extent in m
-        x_min, x_max = data.ds['lon'].min() * 111000, data.ds['lon'].max() * 111000
-        y_min, y_max = data.ds['lat'].min() * 111000, data.ds['lat'].max() * 111000
+        dst_crs = ensure_crs('EPSG:3857')
+        bbox = (data.ds['lon'].min().values, data.ds['lat'].min().values, data.ds['lon'].max().values, data.ds['lat'].max().values)
+        width, height = bbox_extent_meters(bbox, dst_crs)
+        x_min, x_max = 0, width
+        y_min, y_max = 0, height
         z_max = depth
 
         if dimension == 2:
@@ -251,8 +249,9 @@ class MeshGenerator:
 
         # Refine
         if kwargs.get('refine_data', True):
-            x_data = data.ds['lon'].values * 111000
-            y_data = data.ds['lat'].values * 111000
+            lon = data.ds['lon'].values
+            lat = data.ds['lat'].values
+            x_data, y_data = geodetic_to_projected(lon, lat, ensure_crs('EPSG:3857'))
             mesh_pg = self._refine_pygimli_data(mesh_pg, x_data, y_data, hmin=hmin)
         if kwargs.get('refine_topo', True) and 'topography' in data.ds.attrs:
             topo = data.ds.attrs['topography']
@@ -305,7 +304,10 @@ class MeshGenerator:
         if topo.ndim == 2:
             lats, lons = np.meshgrid(data.ds['lat'].values, data.ds['lon'].values, indexing='ij')  # Assume data available
             elevs = topo.ravel()
-            x_topo, y_topo = self._project_coords(lons.ravel(), lats.ravel()) if self.transformer else (lons.ravel()*111000, lats.ravel()*111000)
+            if self.transformer:
+                x_topo, y_topo = self._project_coords(lons.ravel(), lats.ravel())
+            else:
+                x_topo, y_topo = geodetic_to_projected(lons.ravel(), lats.ravel(), ensure_crs('EPSG:3857'))
             topo_points = np.column_stack([x_topo, y_topo, elevs])
             # Refine just below each topo point
             for pt in topo_points[::10]:  # Subsample

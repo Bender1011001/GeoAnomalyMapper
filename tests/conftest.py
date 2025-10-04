@@ -173,7 +173,7 @@ def performance_config():
 
 @pytest.fixture(scope="function")
 def mock_external_apis(monkeypatch):
-    from gam.ingestion.exceptions import DataFetchError
+    from gam.core.exceptions import IngestionError
     """Mock external API calls to return synthetic data, avoiding network."""
     def mock_get(url, *args, **kwargs):
         if 'usgs' in url.lower():
@@ -190,7 +190,7 @@ def mock_external_apis(monkeypatch):
                 'displacement': np.random.normal(0, 1, 100).tolist(),
                 'coordinates': [{'lat': 31.0, 'lon': 30.0}] * 100
             })
-        raise DataFetchError(f"Mock failed for {url}")
+        raise IngestionError(f"Mock failed for {url}")
     
     monkeypatch.setattr('requests.get', mock_get)
     

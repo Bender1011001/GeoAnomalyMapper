@@ -2,171 +2,117 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, Tuple, Optional
-from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Any, Dict, Union
+import numpy as np
 import logging
-
+from gam.core.exceptions import DataValidationError
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class RawData:
-    r"""
-    Dataclass representing raw geophysical data fetched from a source.
+    """
+    Dataclass representing raw geophysical data.
 
-    This structure standardizes the representation of raw data across different
-    modalities (gravity, seismic, etc.). It includes metadata for traceability
-    and context, and flexible values for modality-specific data formats.
+    This structure standardizes the representation of raw data fetched from ingestion sources.
+    It contains the core data array, associated metadata, and coordinate reference system information.
 
     Parameters
     ----------
+    data : np.ndarray
+        The raw data array. Must be a NumPy array and not empty.
     metadata : Dict[str, Any]
-        Dictionary containing metadata about the data.
-        Required keys:
-        - 'source': str, the data source (e.g., 'USGS Gravity')
-        - 'timestamp': datetime, when the data was fetched
-        - 'bbox': Tuple[float, float, float, float], (min_lat, max_lat, min_lon, max_lon)
-        - 'parameters': Dict[str, Any], fetch parameters (e.g., date range)
-        Optional keys: 'units', 'resolution', 'count', etc.
-    values : Any
-        The actual data values. Modality-specific format:
-        - Gravity/Magnetic: np.ndarray of shape (n_points,) or (n_points, features)
-        - Seismic: obspy.Stream or list of traces
-        - InSAR: xarray.Dataset or raster array
-        Must be serializable for caching.
+        Dictionary containing metadata about the data (e.g., source, timestamp, units).
+    crs : Union[str, int]
+        Coordinate reference system identifier (e.g., 'EPSG:4326' or integer EPSG code).
 
     Attributes
     ----------
-    metadata : Dict[str, Any]
-        Metadata dictionary.
-    values : Any
+    data : np.ndarray
         Raw data values.
+    metadata : Dict[str, Any]
+        Associated metadata.
+    crs : Union[str, int]
+        CRS identifier.
 
     Methods
     -------
     validate()
-        Validate the data structure and raise ValueError if invalid.
+        Validate the data structure and raise DataValidationError if invalid.
     to_dict()
-        Convert to dictionary for serialization.
+        Convert to dictionary for JSON serialization.
     from_dict(cls, data)
         Classmethod to create instance from dictionary.
-    __str__()
-        String representation for logging/printing.
-    __repr__()
-        Official representation.
 
     Notes
     -----
-    Validation occurs in __post_init__ for basic checks. Full validation via
-    validate() method. This class is immutable post-validation for thread-safety.
+    This class uses DataValidationError from gam.core.exceptions for validation failures.
+    Serialization handles NumPy arrays by converting to lists.
 
     Examples
     --------
-    >>> metadata = {
-    ...     'source': 'USGS Gravity',
-    ...     'timestamp': datetime.now(),
-    ...     'bbox': (29.0, 31.0, 30.0, 32.0),
-    ...     'parameters': {'date': '2023-01-01'}
-    ... }
-    >>> data = RawData(metadata, values=np.array([1.2, 3.4]))
-    >>> data.validate()
-    >>> print(data)
-    RawData(source='USGS Gravity', bbox=(29.0, 31.0, 30.0, 32.0), values=array([1.2, 3.4]))
+    >>> data = np.array([1.2, 3.4, 5.6])
+    >>> metadata = {'source': 'USGS', 'units': 'mGal'}
+    >>> raw = RawData(data, metadata, 'EPSG:4326')
+    >>> raw.validate()
+    >>> raw_dict = raw.to_dict()
     """
-
+    data: np.ndarray
     metadata: Dict[str, Any] = field(default_factory=dict)
-    values: Any = None
+    crs: Union[str, int] = "EPSG:4326"
 
-    def __post_init__(self):
-        """Perform basic validation after initialization."""
-        if self.values is None:
-            raise ValueError("RawData requires non-None values")
-        if not isinstance(self.metadata, dict):
-            raise ValueError("metadata must be a dictionary")
-        # Basic metadata checks; full validation in validate()
-        if 'source' not in self.metadata:
-            logger.warning("Metadata missing 'source' key")
-        if 'timestamp' not in self.metadata or not isinstance(self.metadata['timestamp'], datetime):
-            logger.warning("Metadata missing or invalid 'timestamp'")
-        if 'bbox' not in self.metadata or len(self.metadata['bbox']) != 4:
-            raise ValueError("Metadata 'bbox' must be a 4-tuple")
-
-    def validate(self) -> bool:
-        r"""
+    def validate(self) -> None:
+        """
         Validate the RawData instance.
 
         Checks:
-        - bbox: 4 floats, min_lat < max_lat (-90 <= min_lat < max_lat <= 90),
-                min_lon < max_lon (-180 <= min_lon < max_lon <= 180)
-        - timestamp: datetime object
-        - source: non-empty str
-        - parameters: dict
-        - values: not None, basic type check (e.g., array-like or Dataset)
-
-        Returns
-        -------
-        bool
-            True if valid, raises ValueError if invalid.
+        - data is a NumPy array and not empty
+        - metadata is a dictionary
+        - crs is a non-empty string or integer
 
         Raises
         ------
-        ValueError
+        DataValidationError
             If any validation fails.
-
-        Notes
-        -----
-        This method should be called after construction to ensure data integrity
-        before processing or caching.
-
-        Examples
-        --------
-        >>> data.validate()  # Raises ValueError if invalid
-        True
         """
-        # Validate bbox
-        bbox = self.metadata.get('bbox')
-        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
-            raise ValueError("bbox must be a 4-element tuple/list of floats")
-        min_lat, max_lat, min_lon, max_lon = map(float, bbox)
-        if not (-90 <= min_lat < max_lat <= 90):
-            raise ValueError("Invalid latitude range in bbox")
-        if not (-180 <= min_lon < max_lon <= 180):
-            raise ValueError("Invalid longitude range in bbox")
+        if not isinstance(self.data, np.ndarray):
+            raise DataValidationError("data must be a NumPy array")
+        if self.data.size == 0:
+            raise DataValidationError("data array must not be empty")
+        if not isinstance(self.metadata, dict):
+            raise DataValidationError("metadata must be a dictionary")
+        if not isinstance(self.crs, (str, int)) or (isinstance(self.crs, str) and not self.crs.strip()):
+            raise DataValidationError("crs must be a non-empty string or integer")
+        logger.debug("RawData validation passed")
 
-        # Validate timestamp
-        timestamp = self.metadata.get('timestamp')
-        if not isinstance(timestamp, datetime):
-            raise ValueError("timestamp must be a datetime object")
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert RawData to dictionary for JSON serialization.
 
-        # Validate source
-        source = self.metadata.get('source')
-        if not isinstance(source, str) or not source.strip():
-            raise ValueError("source must be a non-empty string")
-
-        # Validate parameters
-        params = self.metadata.get('parameters', {})
-        if not isinstance(params, dict):
-            raise ValueError("parameters must be a dictionary")
-
-        # Basic values check (extend for specific modalities if needed)
-        if self.values is None:
-            raise ValueError("values cannot be None")
-
-        logger.debug(f"RawData validated successfully for source '{source}'")
-        return True
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary with 'data', 'metadata', and 'crs' keys.
+            NumPy array is converted to list.
+        """
+        return {
+            'data': self.data.tolist(),
+            'metadata': self.metadata,
+            'crs': self.crs
+        }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> RawData:
-        r"""
-        Create RawData instance from a dictionary (e.g., from JSON or cache).
+    def from_dict(cls, data: Dict[str, Any]) -> "RawData":
+        """
+        Create RawData instance from dictionary.
 
         Parameters
         ----------
         data : Dict[str, Any]
-            Dictionary with 'metadata' and 'values' keys.
-            'values' will be reconstructed if serializable.
+            Dictionary with 'data', 'metadata', and 'crs' keys.
+            'data' should be a list convertible to NumPy array.
 
         Returns
         -------
@@ -175,65 +121,17 @@ class RawData:
 
         Raises
         ------
-        ValueError
+        DataValidationError
             If dictionary structure is invalid.
-        TypeError
-            If values cannot be deserialized.
-
-        Notes
-        -----
-        Assumes values are JSON-serializable or use custom deserializer.
-        Timestamp string will be parsed to datetime.
-
-        Examples
-        --------
-        >>> data_dict = {'metadata': {...}, 'values': [1.2, 3.4]}
-        >>> data = RawData.from_dict(data_dict)
         """
-        metadata = data.get('metadata', {})
-        # Parse timestamp if string
-        if 'timestamp' in metadata and isinstance(metadata['timestamp'], str):
-            metadata['timestamp'] = datetime.fromisoformat(metadata['timestamp'])
-        values = data.get('values')
-        instance = cls(metadata, values)
-        instance.validate()
-        return instance
-
-    def to_dict(self) -> Dict[str, Any]:
-        r"""
-        Convert RawData to dictionary for serialization (e.g., JSON, cache).
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary with 'metadata' and 'values'.
-            Timestamp converted to ISO string for JSON compatibility.
-
-        Notes
-        -----
-        Values must be serializable; complex objects (e.g., xarray) may need
-        custom handling (e.g., to_netcdf path).
-
-        Examples
-        --------
-        >>> data_dict = data.to_dict()
-        >>> # Can be json.dumps(data_dict)
-        """
-        metadata = dict(self.metadata)
-        if 'timestamp' in metadata:
-            metadata['timestamp'] = metadata['timestamp'].isoformat()
-        return {
-            'metadata': metadata,
-            'values': self.values  # Assume serializable
-        }
-
-    def __str__(self) -> str:
-        """String representation for logging and printing."""
-        source = self.metadata.get('source', 'Unknown')
-        bbox = self.metadata.get('bbox', 'Unknown')
-        count = len(self.values) if hasattr(self.values, '__len__') else 'N/A'
-        return f"RawData(source='{source}', bbox={bbox}, count={count}, values_type={type(self.values).__name__})"
-
-    def __repr__(self) -> str:
-        """Official representation including all fields."""
-        return f"RawData(metadata={self.metadata}, values={self.values})"
+        try:
+            data_array = np.array(data['data'])
+            metadata = data.get('metadata', {})
+            crs = data.get('crs', 'EPSG:4326')
+            instance = cls(data_array, metadata, crs)
+            instance.validate()
+            return instance
+        except KeyError as e:
+            raise DataValidationError(f"Missing required key in dictionary: {e}")
+        except (ValueError, TypeError) as e:
+            raise DataValidationError(f"Invalid data format: {e}")
