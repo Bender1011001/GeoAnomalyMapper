@@ -336,7 +336,7 @@ class CoordinateAligner:
             raise PreprocessingError(f"Coordinate transformation failed: {e}")
 
         # Update bbox
-        new_bbox = (new_lats.min(), new_lats.max(), new_lons.min(), new_lons.max())
+        new_bbox = (np.min(new_lats), np.max(new_lats), np.min(new_lons), np.max(new_lons))
 
         if isinstance(data, RawData):
             new_metadata = dict(data.metadata)

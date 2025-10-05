@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _validate_input(data: Union[RawData, xr.Dataset, np.ndarray, Stream]) -> Union[xr.Dataset, np.ndarray, Stream]:
     """Internal helper to validate and extract values from input."""
     if isinstance(data, RawData):
-        values = data.values
+        values = data.data
         if not hasattr(values, 'validate'):
             data.validate()
     elif isinstance(data, (xr.Dataset, xr.DataArray)):
@@ -77,7 +77,7 @@ class NoiseFilter:
         mode: str = 'reflect',
         preserve_edge: bool = False
     ):
-        self.sigma = sigma
+        self.sigma = 1.0 / sigma if sigma != 0 else sigma
         self.mode = mode
         self.preserve_edge = preserve_edge
 
@@ -110,12 +110,12 @@ class NoiseFilter:
         try:
             if isinstance(values, xr.Dataset):
                 # Apply to 'data' variable
-                filtered_da = values['data'].data  # Extract ndarray
+                
                 filtered_array = ndimage.gaussian_filter(
-                    filtered_array,
+                    values['data'].data,
                     sigma=self.sigma,
                     mode=self.mode,
-                    preserve_range=self.preserve_edge
+                    
                 )
                 filtered_da = xr.DataArray(filtered_array, dims=values['data'].dims, coords=values['data'].coords)
                 new_ds = values.copy()
@@ -131,10 +131,10 @@ class NoiseFilter:
                     values,
                     sigma=self.sigma,
                     mode=self.mode,
-                    preserve_range=self.preserve_edge
+                    
                 )
                 if isinstance(data, RawData):
-                    result = RawData(data.metadata, result)
+                    result = RawData(result, data.metadata)
 
             logger.info(f"Applied Gaussian filter (sigma={self.sigma}) to data of shape {getattr(values, 'shape', 'N/A')}")
             return result
@@ -216,7 +216,7 @@ class BandpassFilter:
             If input not seismic or filtering fails.
         """
         if isinstance(data, RawData):
-            values = data.values
+            values = data.data
             if not isinstance(values, Stream):
                 raise PreprocessingError("BandpassFilter requires ObsPy Stream")
         elif isinstance(data, Stream):
@@ -235,7 +235,7 @@ class BandpassFilter:
                 corners=self.corners,
                 zerophase=self.zerophase
             )
-            result = RawData(data.metadata, filtered) if isinstance(data, RawData) else filtered
+            result = RawData(filtered, data.metadata) if isinstance(data, RawData) else filtered
 
             logger.info(f"Applied bandpass filter ({self.lowcut}-{self.highcut} Hz) to {len(values)} traces")
             return result
@@ -341,7 +341,13 @@ class OutlierFilter:
             outlier_mask = np.zeros_like(full_array, dtype=bool)
             # Simplified: apply to flattened, but for multi-dim, need per-slice; here assume global
             flat_full = full_array.flatten()
-            flat_full[outliers[:len(flat_full)]] = np.nan if self.replace_with == 'nan' else np.mean(array)
+            if self.replace_with == 'nan':
+                replace_value = np.nan
+            elif self.replace_with == 'mean':
+                replace_value = np.mean(array)
+            else:
+                replace_value = self.replace_with
+            flat_full[outliers[:len(flat_full)]] = replace_value
             result_array = flat_full.reshape(full_array.shape)
 
             if isinstance(values, xr.Dataset):
@@ -351,7 +357,7 @@ class OutlierFilter:
             else:
                 result = result_array
                 if isinstance(data, RawData):
-                    result = RawData(data.metadata, result)
+                    result = RawData(result, data.metadata)
 
             return result
         except Exception as e:
@@ -446,7 +452,7 @@ class SpatialFilter:
                     cval=self.cval
                 )
                 if isinstance(data, RawData):
-                    result = RawData(data.metadata, result)
+                    result = RawData(result, data.metadata)
 
             logger.info(f"Applied median filter (size={self.size}) to data of shape {getattr(values, 'shape', 'N/A')}")
             return result
