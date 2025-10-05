@@ -1,0 +1,17 @@
+app:
+  output_dir: "./data/outputs"
+  cache_dir: "./data/cache"
+  default_modalities: ["gravity", "magnetic"]
+preprocessing:
+  grid_resolution: 0.1
+  filters: ["noise"]
+modeling:
+  fusion_method: "joint_inversion"
+  anomaly_threshold: 95.0
+  max_iterations: 20
+feature_flags:
+  enable_cache: true
+  enable_parallel: false
+data_sources:
+  usgs:
+    api_key: null

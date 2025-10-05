@@ -20,34 +20,68 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_coords_values(data: Union[RawData, xr.Dataset, np.ndarray]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Extract lat, lon, values from input; assume structured if RawData."""
+    """Extract lat, lon, values from input; handle RawData with several internal formats gracefully."""
     if isinstance(data, RawData):
         metadata = data.metadata
         bbox = metadata.get('bbox', (0, 0, 0, 0))
-        if hasattr(data.values, 'coords'):  # xarray-like
-            lats = data.values.coords['lat'].values if 'lat' in data.values.coords else np.linspace(bbox[0], bbox[1], 100)
-            lons = data.values.coords['lon'].values if 'lon' in data.values.coords else np.linspace(bbox[2], bbox[3], 100)
-            values = data.values.values.flatten()
+        dv = data.data
+
+        # xarray Dataset/DataArray input
+        if hasattr(dv, 'coords'):
+            # prefer explicit coords if present
+            lats = dv.coords['lat'].values if 'lat' in dv.coords else np.linspace(bbox[0], bbox[1], dv.sizes.get('lat', 100))
+            lons = dv.coords['lon'].values if 'lon' in dv.coords else np.linspace(bbox[2], bbox[3], dv.sizes.get('lon', 100))
+            # Create meshgrid so lat/lon pairs are matched correctly for gridding
+            grid_lats, grid_lons = np.meshgrid(lats, lons, indexing='ij')
+            points = np.column_stack((grid_lats.ravel(), grid_lons.ravel()))
+            # prefer named variable 'data' if present
+            if 'data' in dv:
+                values = dv['data'].values.ravel()
+            else:
+                # For DataArray or other Dataset contents, flatten values to match points
+                values = dv.values.ravel()
+            # Return early since we already have properly shaped points/values
+            return points, values, (float(np.min(lats)), float(np.max(lats)), float(np.min(lons)), float(np.max(lons)))
+        # NumPy ndarray input
+        elif isinstance(dv, np.ndarray):
+            arr = np.asarray(dv)
+            if arr.ndim == 2 and arr.shape[1] == 3:
+                lats, lons, values = arr[:, 0], arr[:, 1], arr[:, 2]
+            elif arr.ndim == 1:
+                n_points = arr.shape[0]
+                lats = np.linspace(bbox[0], bbox[1], n_points)
+                lons = np.linspace(bbox[2], bbox[3], n_points)
+                values = arr
+            elif arr.ndim == 2 and arr.shape[1] >= 3:
+                # take first three columns as lat, lon, value
+                lats, lons, values = arr[:, 0], arr[:, 1], arr[:, 2]
+            else:
+                raise PreprocessingError("Unsupported ndarray shape for RawData.data")
         else:
-            # Assume values is (n_points, ) or structured; for simplicity, generate regular if not
-            n_points = len(data.values) if hasattr(data.values, '__len__') else 100
-            lats = np.random.uniform(bbox[0], bbox[1], n_points)
-            lons = np.random.uniform(bbox[2], bbox[3], n_points)
-            values = np.asarray(data.values).flatten()
+            # Unsupported RawData.data type
+            raise PreprocessingError(f"Unsupported RawData.data type for gridding: {type(dv)}")
+
     elif isinstance(data, xr.Dataset):
+        # Create meshgrid of coordinates to match the 2D 'data' variable
         lats = data.coords['lat'].values
         lons = data.coords['lon'].values
-        values = data['data'].values.flatten()
+        grid_lats, grid_lons = np.meshgrid(lats, lons, indexing='ij')
+        points = np.column_stack((grid_lats.ravel(), grid_lons.ravel()))
+        values = data['data'].values.ravel()
+        return points, values, (float(np.min(lats)), float(np.max(lats)), float(np.min(lons)), float(np.max(lons)))
+        bbox = (float(lats.min()), float(lats.max()), float(lons.min()), float(lons.max()))
     elif isinstance(data, np.ndarray):
         # Assume shape (n, 3) for [lat, lon, value]
-        if data.shape[1] != 3:
+        if data.ndim == 2 and data.shape[1] == 3:
+            lats, lons, values = data[:, 0], data[:, 1], data[:, 2]
+            bbox = (float(lats.min()), float(lats.max()), float(lons.min()), float(lons.max()))
+        else:
             raise PreprocessingError("ndarray input must be (n_points, 3) for [lat, lon, value]")
-        lats, lons, values = data[:, 0], data[:, 1], data[:, 2]
     else:
         raise PreprocessingError(f"Unsupported input for gridding: {type(data)}")
 
     points = np.column_stack((lats, lons))
-    return points, values, (min(lats), max(lats), min(lons), max(lons))
+    return points, values, (float(np.min(lats)), float(np.max(lats)), float(np.min(lons)), float(np.max(lons)))
 
 
 class RegularGridder:
@@ -137,7 +171,19 @@ class RegularGridder:
                 fill_value=self.fill_value
             )
         except Exception as e:
-            raise PreprocessingError(f"Regular gridding failed: {e}")
+            # Qhull/Delaunay failures can occur for degenerate point sets; fall back to nearest neighbor
+            msg = str(e)
+            if 'Qhull' in msg or 'coplanar' in msg or 'Initial simplex' in msg:
+                logger.warning(f"Regular gridding: Delaunay/Qhull failed ({msg}). Falling back to 'nearest' interpolation.")
+                gridded = griddata(
+                    points,
+                    values,
+                    (grid_lats, grid_lons),
+                    method='nearest',
+                    fill_value=self.fill_value
+                )
+            else:
+                raise PreprocessingError(f"Regular gridding failed: {e}")
 
         # Create DataArray and Dataset
         da = xr.DataArray(

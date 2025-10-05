@@ -70,7 +70,7 @@ class RawData:
         Validate the RawData instance.
 
         Checks:
-        - data is a NumPy array and not empty
+        - data is a NumPy array, xarray.Dataset, or ObsPy Stream and not empty (where applicable)
         - metadata is a dictionary
         - crs is a non-empty string or integer
 
@@ -79,16 +79,32 @@ class RawData:
         DataValidationError
             If any validation fails.
         """
-        if not isinstance(self.data, np.ndarray):
-            raise DataValidationError("data must be a NumPy array")
-        if self.data.size == 0:
-            raise DataValidationError("data array must not be empty")
+        # Accept ndarray, xarray.Dataset, or ObsPy Stream for RawData.data
+        from obspy import Stream as _Stream  # local import to avoid top-level import cycles
+        if not isinstance(self.data, (np.ndarray, xr.Dataset, _Stream)):
+            raise DataValidationError("data must be a NumPy array, xarray.Dataset, or ObsPy Stream")
+
+        # Only check size for ndarray inputs
+        if isinstance(self.data, np.ndarray):
+            if self.data.size == 0:
+                raise DataValidationError("data array must not be empty")
+
+        # For xarray.Dataset, ensure it has some content (optional)
+        if isinstance(self.data, xr.Dataset):
+            # If 'data' variable exists, check its size; otherwise accept (some processors create Dataset)
+            if 'data' in self.data and getattr(self.data['data'], 'size', 0) == 0:
+                raise DataValidationError("xarray Dataset 'data' variable must not be empty")
+
         if not isinstance(self.metadata, dict):
             raise DataValidationError("metadata must be a dictionary")
         if not isinstance(self.crs, (str, int)) or (isinstance(self.crs, str) and not self.crs.strip()):
             raise DataValidationError("crs must be a non-empty string or integer")
         logger.debug("RawData validation passed")
 
+    @property
+    def values(self) -> np.ndarray:
+        """Backward-compatible alias for .data used across preprocessing modules and tests."""
+        return self.data
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert RawData to dictionary for JSON serialization.
