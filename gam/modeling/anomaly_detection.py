@@ -114,3 +114,24 @@ def detect_anomalies(inversion_results: InversionResults, method: str = "percent
 
     logger.info(f"Detected {len(df)} anomalies using {p}th percentile threshold")
     return df
+
+
+class AnomalyDetector:
+    """
+    Lightweight compatibility wrapper providing an object with a `detect` method.
+
+    This class exists to satisfy package-level imports that expect an AnomalyDetector
+    class. It delegates to the module-level `detect_anomalies` when passed an
+    InversionResults instance. For other inputs it raises a GAMError.
+
+    Note: This is intentionally minimal — full-featured detector implementations
+    may replace this with more advanced algorithms.
+    """
+
+    def detect(self, inversion_results: Any, method: str = "percentile", **kwargs) -> pd.DataFrame:
+        # Delegate when passed project InversionResults
+        if isinstance(inversion_results, InversionResults):
+            return detect_anomalies(inversion_results, method=method, **kwargs)
+        # If user passes other types (e.g., numpy arrays) we raise a helpful error to avoid silent failures
+        raise GAMError("AnomalyDetector.detect expects an InversionResults instance. "
+                       "Provide an InversionResults or call detect_anomalies directly.")

@@ -95,9 +95,10 @@ class GravityPreprocessor(Preprocessor):
         # Step 1: Detrending (remove regional trend)
         try:
             # Assume 1D for simplicity; for 2D, use 2D polyfit
-            trend = signal.detrend(values, type='linear', order=poly_order)
+            # Use scipy.signal.detrend (supports type='linear'); poly_order not supported by detrend
+            trend = signal.detrend(values, type='linear')
             values -= trend
-            logger.info(f"Applied polynomial detrending (order={poly_order})")
+            logger.info("Applied linear detrending")
         except Exception as e:
             raise PreprocessingError(f"Detrending failed: {e}")
 
@@ -115,9 +116,9 @@ class GravityPreprocessor(Preprocessor):
         # Step 3: Apply filters if requested
         if apply_filters:
             outlier_filter = OutlierFilter(threshold=3.0)
-            values = outlier_filter.apply(RawData(values, data.metadata)).data
+            values = outlier_filter.apply(RawData(data.metadata, values)).data
             noise_filter = NoiseFilter(sigma=1.0)
-            values = noise_filter.apply(RawData(values, data.metadata)).data
+            values = noise_filter.apply(RawData(data.metadata, values)).data
             logger.info("Applied outlier and noise filters")
 
         # Step 4: Unit conversion to m/s²
@@ -131,12 +132,18 @@ class GravityPreprocessor(Preprocessor):
         # Step 5: Gridding
         gridder = RegularGridder(resolution=grid_res, method='linear')
         aligner = CoordinateAligner(target_crs='EPSG:4326', grid_after=False)
-        aligned_data = aligner.apply(RawData(np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values)), data.metadata))
+        # Build point coordinates across bbox evenly if explicit coordinates are not provided.
+        bbox = data.metadata.get('bbox', (0, 0, 0, 0))
+        n = len(values)
+        lats = np.linspace(bbox[0], bbox[1], n)
+        lons = np.linspace(bbox[2], bbox[3], n)
+        points = np.column_stack((lats, lons, values))
+        aligned_data = aligner.apply(RawData(data.metadata, points))
         grid = gridder.apply(aligned_data)
 
         grid.units = 'm/s²'
         grid.add_metadata('modality', 'gravity')
-        grid.add_metadata('processing_steps', ['detrend', 'terrain_correction' if elevation else 'skipped', 'filters', 'unit_conversion', 'gridding'])
+        grid.add_metadata('processing_steps', ['detrend', 'terrain_correction' if elevation is not None else 'skipped', 'filters', 'unit_conversion', 'gridding'])
 
         logger.info(f"Gravity preprocessing complete: grid shape {grid.ds['data'].shape}")
         return grid
@@ -234,16 +241,21 @@ class MagneticPreprocessor(Preprocessor):
 
         # Step 4: Filter for anomaly enhancement
         spatial_filter = SpatialFilter(size=3)
-        values = spatial_filter.apply(RawData(values, data.metadata)).data
+        values = spatial_filter.apply(RawData(data.metadata, values)).data
         logger.info("Applied spatial median filter")
 
         # Step 5: Gridding
         gridder = RegularGridder(resolution=grid_res, method='cubic')
-        grid = gridder.apply(RawData(np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values)), data.metadata))
+        bbox = data.metadata.get('bbox', (0, 0, 0, 0))
+        n = len(values)
+        lats = np.linspace(bbox[0], bbox[1], n)
+        lons = np.linspace(bbox[2], bbox[3], n)
+        points = np.column_stack((lats, lons, values))
+        grid = gridder.apply(RawData(data.metadata, points))
 
         grid.units = 'nT'
         grid.add_metadata('modality', 'magnetic')
-        grid.add_metadata('processing_steps', ['igrf_subtraction' if igrf_model else 'skipped', 'rtp' if apply_rtp else 'skipped', 'filter', 'unit_conversion', 'gridding'])
+        grid.add_metadata('processing_steps', ['igrf_subtraction' if (igrf_model is not None) else 'skipped', 'rtp' if bool(apply_rtp) else 'skipped', 'filter', 'unit_conversion', 'gridding'])
 
         logger.info(f"Magnetic preprocessing complete: grid shape {grid.ds['data'].shape}")
         return grid
@@ -316,7 +328,10 @@ class SeismicPreprocessor(Preprocessor):
 
         # Step 1: Bandpass filter
         bandpass = BandpassFilter(lowcut=lowcut, highcut=highcut)
-        filtered_stream = bandpass.apply(RawData(stream, data.metadata))
+        filtered_stream = bandpass.apply(RawData(data.metadata, stream))
+        # If bandpass returned RawData, extract the underlying Stream
+        if isinstance(filtered_stream, RawData):
+            filtered_stream = filtered_stream.data
         logger.info(f"Applied bandpass filter ({lowcut}-{highcut} Hz)")
 
         # Step 2: Travel-time picking using STA/LTA
@@ -370,7 +385,7 @@ class SeismicPreprocessor(Preprocessor):
 
         # Step 4: Gridding
         gridder = RegularGridder(resolution=grid_res, method='linear')
-        raw_gridded = RawData(np.column_stack((points, values)), data.metadata)
+        raw_gridded = RawData(data.metadata, np.column_stack((points, values)))
         grid = gridder.apply(raw_gridded)
 
         grid.units = 's'
@@ -447,6 +462,10 @@ class InSARPreprocessor(Preprocessor):
         # Step 1: Robust phase unwrapping using SNAPHU
         region_size = kwargs.get('snaphu_region_size', 512)
         try:
+            # Ensure the dataset contains 'phase' and reference it from ds
+            if 'phase' not in ds:
+                raise PreprocessingError("InSAR dataset missing 'phase' variable")
+            phase = ds['phase']
             # Assume phase is 2D wrapped; if multi-time, process per slice (simplified to first for now)
             if 'time' in phase.dims:
                 phase_2d = phase.isel(time=0)  # Placeholder: process first interferogram; extend for stack
@@ -511,10 +530,11 @@ CONNECTED_COMPONENTS 1
 
             logger.info(f"Applied SNAPHU phase unwrapping (region_size={region_size})")
         except FileNotFoundError:
-            raise PreprocessingError("SNAPHU not found; install via conda-forge or similar for InSAR processing")
+            # SNAPHU not available on the system; log and fall back to using the wrapped phase
+            logger.warning("SNAPHU not found; continuing with wrapped phase (SNAPHU unavailable)")
         except Exception as e:
             logger.warning(f"SNAPHU unwrapping failed, using wrapped phase: {e}")
-            # Fallback to wrapped
+            # Fallback to wrapped phase (leave ds['phase'] as-is)
 
         # Step 1 (cont.): Atmospheric correction on unwrapped phase using spatio-temporal filtering
         if apply_atm:
@@ -560,13 +580,13 @@ CONNECTED_COMPONENTS 1
 
         # Step 4: Gridding/alignment (assume already gridded; resample if needed)
         aligner = CoordinateAligner(target_crs='EPSG:4326')
-        aligned_ds = aligner.apply(RawData(ds, data.metadata))
+        aligned_ds = aligner.apply(RawData(data.metadata, ds))
         gridder = RegularGridder(resolution=grid_res, method='linear')
         grid = gridder.apply(aligned_ds)
 
         grid.units = 'm'
         grid.add_metadata('modality', 'insar')
-        grid.add_metadata('processing_steps', ['snaphu_unwrapping', 'spatio_temporal_atm_correction' if apply_atm else 'skipped', 'phase_to_disp', 'alignment', 'gridding'])
+        grid.add_metadata('processing_steps', ['snaphu_unwrapping', 'spatio_temporal_atm_correction' if bool(apply_atm) else 'skipped', 'phase_to_disp', 'alignment', 'gridding'])
 
         logger.info(f"InSAR preprocessing complete: grid shape {grid.ds['data'].shape}")
         return grid

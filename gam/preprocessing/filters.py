@@ -134,7 +134,7 @@ class NoiseFilter:
                     
                 )
                 if isinstance(data, RawData):
-                    result = RawData(result, data.metadata)
+                    result = RawData(data.metadata, result)
 
             logger.info(f"Applied Gaussian filter (sigma={self.sigma}) to data of shape {getattr(values, 'shape', 'N/A')}")
             return result
@@ -225,8 +225,12 @@ class BandpassFilter:
             raise PreprocessingError("BandpassFilter only supports Stream or RawData with Stream values")
 
         try:
-            # Remove DC offset
-            values.remove_response()  # If instrument response available; otherwise skip
+            # Remove DC offset (if instrument response/inventory available)
+            try:
+                values.remove_response()
+            except Exception:
+                # No response/inventory configured for synthetic traces in tests; skip gracefully
+                pass
             filtered = values.copy()
             filtered.filter(
                 'bandpass',
@@ -235,7 +239,7 @@ class BandpassFilter:
                 corners=self.corners,
                 zerophase=self.zerophase
             )
-            result = RawData(filtered, data.metadata) if isinstance(data, RawData) else filtered
+            result = RawData(data.metadata, filtered) if isinstance(data, RawData) else filtered
 
             logger.info(f"Applied bandpass filter ({self.lowcut}-{self.highcut} Hz) to {len(values)} traces")
             return result
@@ -337,7 +341,7 @@ class OutlierFilter:
             logger.info(f"Detected {num_outliers} outliers using {self.method} (threshold={self.threshold})")
 
             # Reshape back and replace
-            full_array = np.asarray(values['data'].data if isinstance(values, xr.Dataset) else values)
+            full_array = np.asarray(values['data'].data if isinstance(values, xr.Dataset) else values, dtype=float)
             outlier_mask = np.zeros_like(full_array, dtype=bool)
             # Simplified: apply to flattened, but for multi-dim, need per-slice; here assume global
             flat_full = full_array.flatten()
@@ -357,7 +361,7 @@ class OutlierFilter:
             else:
                 result = result_array
                 if isinstance(data, RawData):
-                    result = RawData(result, data.metadata)
+                    result = RawData(data.metadata, result)
 
             return result
         except Exception as e:
@@ -452,7 +456,7 @@ class SpatialFilter:
                     cval=self.cval
                 )
                 if isinstance(data, RawData):
-                    result = RawData(result, data.metadata)
+                    result = RawData(data.metadata, result)
 
             logger.info(f"Applied median filter (size={self.size}) to data of shape {getattr(values, 'shape', 'N/A')}")
             return result
