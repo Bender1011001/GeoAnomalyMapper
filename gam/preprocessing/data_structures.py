@@ -157,6 +157,9 @@ class ProcessedGrid:
     @coordinate_system.setter
     def coordinate_system(self, value: str):
         self.ds.attrs['coordinate_system'] = value
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        return self.ds.attrs
 
     def validate(self) -> bool:
         """

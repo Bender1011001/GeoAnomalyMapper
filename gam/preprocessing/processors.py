@@ -88,7 +88,7 @@ class GravityPreprocessor(Preprocessor):
         poly_order = kwargs.get('poly_order', 2)
         elevation = kwargs.get('elevation', data.metadata.get('elevation'))
 
-        values = np.asarray(data.values).flatten()
+        values = np.asarray(data.data).flatten()
         if len(values) == 0:
             raise PreprocessingError("Empty gravity data")
 
@@ -115,9 +115,9 @@ class GravityPreprocessor(Preprocessor):
         # Step 3: Apply filters if requested
         if apply_filters:
             outlier_filter = OutlierFilter(threshold=3.0)
-            values = outlier_filter.apply(RawData(data.metadata, values)).values
+            values = outlier_filter.apply(RawData(values, data.metadata)).data
             noise_filter = NoiseFilter(sigma=1.0)
-            values = noise_filter.apply(RawData(data.metadata, values)).values
+            values = noise_filter.apply(RawData(values, data.metadata)).data
             logger.info("Applied outlier and noise filters")
 
         # Step 4: Unit conversion to m/s²
@@ -131,7 +131,7 @@ class GravityPreprocessor(Preprocessor):
         # Step 5: Gridding
         gridder = RegularGridder(resolution=grid_res, method='linear')
         aligner = CoordinateAligner(target_crs='EPSG:4326', grid_after=False)
-        aligned_data = aligner.apply(RawData(data.metadata, np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values))))
+        aligned_data = aligner.apply(RawData(np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values)), data.metadata))
         grid = gridder.apply(aligned_data)
 
         grid.units = 'm/s²'
@@ -201,7 +201,7 @@ class MagneticPreprocessor(Preprocessor):
         declination = kwargs.get('declination', data.metadata.get('declination', 0.0))
         apply_rtp = kwargs.get('apply_rtp', True)
 
-        values = np.asarray(data.values).flatten()
+        values = np.asarray(data.data).flatten()
 
         # Step 1: Remove IGRF reference if provided
         if igrf_model is not None:
@@ -234,12 +234,12 @@ class MagneticPreprocessor(Preprocessor):
 
         # Step 4: Filter for anomaly enhancement
         spatial_filter = SpatialFilter(size=3)
-        values = spatial_filter.apply(RawData(data.metadata, values)).values
+        values = spatial_filter.apply(RawData(values, data.metadata)).data
         logger.info("Applied spatial median filter")
 
         # Step 5: Gridding
         gridder = RegularGridder(resolution=grid_res, method='cubic')
-        grid = gridder.apply(RawData(data.metadata, np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values))))
+        grid = gridder.apply(RawData(np.column_stack((data.metadata['bbox'][:2], data.metadata['bbox'][2:], values)), data.metadata))
 
         grid.units = 'nT'
         grid.add_metadata('modality', 'magnetic')
@@ -302,7 +302,7 @@ class SeismicPreprocessor(Preprocessor):
         PreprocessingError
         """
         data.validate()
-        if not isinstance(data.values, Stream):
+        if not isinstance(data.data, Stream):
             raise PreprocessingError("Seismic data must be ObsPy Stream")
 
         grid_res = kwargs.get('grid_resolution', 0.1)
@@ -312,11 +312,11 @@ class SeismicPreprocessor(Preprocessor):
         lta_len = kwargs.get('lta_len', 10.0)
         threshold = kwargs.get('threshold', 3.5)
 
-        stream = data.values.copy()
+        stream = data.data.copy()
 
         # Step 1: Bandpass filter
         bandpass = BandpassFilter(lowcut=lowcut, highcut=highcut)
-        filtered_stream = bandpass.apply(RawData(data.metadata, stream))
+        filtered_stream = bandpass.apply(RawData(stream, data.metadata))
         logger.info(f"Applied bandpass filter ({lowcut}-{highcut} Hz)")
 
         # Step 2: Travel-time picking using STA/LTA
@@ -370,7 +370,7 @@ class SeismicPreprocessor(Preprocessor):
 
         # Step 4: Gridding
         gridder = RegularGridder(resolution=grid_res, method='linear')
-        raw_gridded = RawData(data.metadata, np.column_stack((points, values)))
+        raw_gridded = RawData(np.column_stack((points, values)), data.metadata)
         grid = gridder.apply(raw_gridded)
 
         grid.units = 's'
@@ -435,14 +435,14 @@ class InSARPreprocessor(Preprocessor):
         PreprocessingError
         """
         data.validate()
-        if not isinstance(data.values, xr.Dataset) or 'phase' not in data.values:
+        if not isinstance(data.data, xr.Dataset) or 'phase' not in data.data:
             raise PreprocessingError("InSAR data must be xarray.Dataset with 'phase'")
 
         grid_res = kwargs.get('grid_resolution', 0.1)
         wavelength = kwargs.get('wavelength', 0.056)  # Sentinel-1
         apply_atm = kwargs.get('apply_atm_correction', True)
 
-        ds = data.values.copy()
+        ds = data.data.copy()
 
         # Step 1: Robust phase unwrapping using SNAPHU
         region_size = kwargs.get('snaphu_region_size', 512)
@@ -560,7 +560,7 @@ CONNECTED_COMPONENTS 1
 
         # Step 4: Gridding/alignment (assume already gridded; resample if needed)
         aligner = CoordinateAligner(target_crs='EPSG:4326')
-        aligned_ds = aligner.apply(RawData(data.metadata, ds))
+        aligned_ds = aligner.apply(RawData(ds, data.metadata))
         gridder = RegularGridder(resolution=grid_res, method='linear')
         grid = gridder.apply(aligned_ds)
 

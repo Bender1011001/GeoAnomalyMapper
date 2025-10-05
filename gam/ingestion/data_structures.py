@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 import numpy as np
+import xarray as xr
+from obspy import Stream
 import logging
 from gam.core.exceptions import DataValidationError
 
@@ -21,19 +23,19 @@ class RawData:
 
     Parameters
     ----------
-    data : np.ndarray
-        The raw data array. Must be a NumPy array and not empty.
     metadata : Dict[str, Any]
         Dictionary containing metadata about the data (e.g., source, timestamp, units).
+    data : np.ndarray
+        The raw data array. Must be a NumPy array and not empty.
     crs : Union[str, int]
         Coordinate reference system identifier (e.g., 'EPSG:4326' or integer EPSG code).
 
     Attributes
     ----------
-    data : np.ndarray
-        Raw data values.
     metadata : Dict[str, Any]
         Associated metadata.
+    data : np.ndarray
+        Raw data values.
     crs : Union[str, int]
         CRS identifier.
 
@@ -55,12 +57,12 @@ class RawData:
     --------
     >>> data = np.array([1.2, 3.4, 5.6])
     >>> metadata = {'source': 'USGS', 'units': 'mGal'}
-    >>> raw = RawData(data, metadata, 'EPSG:4326')
+    >>> raw = RawData(metadata, data, 'EPSG:4326')
     >>> raw.validate()
     >>> raw_dict = raw.to_dict()
     """
+    metadata: Dict[str, Any]
     data: np.ndarray
-    metadata: Dict[str, Any] = field(default_factory=dict)
     crs: Union[str, int] = "EPSG:4326"
 
     def validate(self) -> None:
@@ -128,7 +130,7 @@ class RawData:
             data_array = np.array(data['data'])
             metadata = data.get('metadata', {})
             crs = data.get('crs', 'EPSG:4326')
-            instance = cls(data_array, metadata, crs)
+            instance = cls(metadata, data_array, crs)
             instance.validate()
             return instance
         except KeyError as e:

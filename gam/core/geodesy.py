@@ -4,7 +4,7 @@ import pyproj
 import numpy as np
 from typing import Any, Tuple
 
-from gam.core.exceptions import ConfigError
+from gam.core.exceptions import ConfigurationError as ConfigError
 
 
 def ensure_crs(crs_like: Any) -> pyproj.CRS:

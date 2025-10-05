@@ -149,11 +149,11 @@ class HDF5CacheManager:
                     f.attrs['bbox'] = json.dumps(data.metadata['bbox'])
                     f.attrs['parameters'] = json.dumps(data.metadata.get('parameters', {}))
                     # Values as dataset
-                    if isinstance(data.values, np.ndarray):
-                        f.create_dataset('values', data=data.values, compression='gzip')
+                    if isinstance(data.data, np.ndarray):
+                        f.create_dataset('values', data=data.data, compression='gzip')
                     else:
                         # Fallback to JSON for dict/list/str
-                        values_serial = json.dumps(data.values) if hasattr(data.values, '__dict__') or isinstance(data.values, (dict, list)) else str(data.values)
+                        values_serial = json.dumps(data.data) if hasattr(data.data, '__dict__') or isinstance(data.data, (dict, list)) else str(data.data)
                         values_bytes = values_serial.encode('utf-8')
                         f.create_dataset('values', data=values_bytes, compression='gzip')
                 logger.info(f"Saved data to cache: {key} (source: {data.metadata['source']})")
@@ -211,7 +211,7 @@ class HDF5CacheManager:
                         values = json.loads(values_dataset.decode('utf-8'))
                     else:
                         values = values_dataset  # ndarray
-                    data = RawData(metadata, values)
+                    data = RawData(values, metadata)
                     data.validate()
                     logger.debug(f"Loaded data from cache: {key}")
                     return data
@@ -286,7 +286,7 @@ class HDF5CacheManager:
                             ts_str = f.attrs.get('timestamp')
                             if ts_str:
                                 ts = datetime.fromisoformat(ts_str)
-                                if cutoff and ts < cutoff:
+                                if expire_days is None or (cutoff and ts < cutoff):
                                     os.remove(file_path)
                                     deleted += 1
                                     logger.info(f"Deleted expired cache: {key} (fetched {ts})")
