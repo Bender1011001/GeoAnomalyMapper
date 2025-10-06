@@ -9,130 +9,245 @@ Usage: python process_global_map.py
 """
 
 import logging
+import subprocess
 import sys
 from pathlib import Path
+import shutil
 
 import numpy as np
 from tqdm import tqdm
 
-from gam.core.tiles import tiles_10x10_ids, tile_bounds_10x10
-from gam.preprocessing.cog_writer import warp_crop_to_tile, write_cog
-from gam.modeling.fuse_simple import robust_z, fuse_layers
+# Add the gam module to the python path
+# This is a simple way to make the gam package importable without a full install.
+# In a real-world scenario, you'd install the package properly.
+try:
+    from gam.core.tiles import tiles_10x10_ids, tile_bounds_10x10
+    from gam.modeling.fuse_simple import robust_z, fuse_layers
+    from gam.preprocessing.cog_writer import warp_crop_to_tile, write_cog
+except ImportError as e:
+    print("Could not import GAM modules. Make sure the 'gam' directory is in the same directory as this script.")
+    sys.exit(1)
 
-# Configure logging
+
+# --- CONFIGURATION ---
+# All paths and parameters are explicitly defined here. No hidden configuration.
+
+# 1. Base directory of the project
+BASE_DIR = Path(__file__).parent.resolve()
+PROJECT_ROOT = BASE_DIR.parent
+
+# 2. Input data paths
+# IMPORTANT: You must download these files manually and place them here.
+DATA_DIR = PROJECT_ROOT / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+MAG_PATH = RAW_DATA_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff.tif"
+GRAV_PATH = RAW_DATA_DIR / "gravity" / "gravity_disturbance_EGM2008_50491becf3ffdee5c9908e47ed57881ed23de559539cd89e49b4d76635e07266.tiff"
+
+# 3. Output directories
+OUTPUT_DIR = DATA_DIR / "outputs"
+COG_DIR = OUTPUT_DIR / "cog"
+FINAL_PRODUCT_DIR = OUTPUT_DIR / "final"
+LOG_FILE = OUTPUT_DIR / "processing.log"
+
+# 4. Tool paths
+PMTILES_EXE = Path(r'C:/Users/admin/Downloads/go-pmtiles_1.28.1_Windows_x86_64/pmtiles.exe')
+
+# --- LOGGING SETUP ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
-logger = logging.getLogger(__name__)
 
-# Data paths (update if needed)
-MAGNETIC_PATH = Path('data/raw/EMAG2_V3_Sea_Level.tif')
-GRAVITY_PATH = Path('data/raw/EGM2008_Free_Air_Anomaly.tif')
+# --- PROCESSING FUNCTIONS ---
 
-# Output directories
-OUTPUT_BASE = Path('data/outputs/cog')
-MAG_OUTPUT_DIR = OUTPUT_BASE / 'mag'
-GRAV_OUTPUT_DIR = OUTPUT_BASE / 'grav'
-FUSED_OUTPUT_DIR = OUTPUT_BASE / 'fused'
-
-# Ensure output directories exist
-MAG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-GRAV_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-FUSED_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def _verify_system_dependencies():
+    """Checks if required command-line tools (GDAL, pmtiles) are installed."""
+    logging.info("Verifying system dependencies (gdalbuildvrt, pmtiles)...")
+    if not shutil.which("gdalbuildvrt"):
+        logging.error("FATAL: gdalbuildvrt command not found. Is GDAL installed and in your PATH?")
+        sys.exit(1)
+    if not PMTILES_EXE.exists():
+        logging.error(f"FATAL: pmtiles.exe not found at {PMTILES_EXE}")
+        sys.exit(1)
+    logging.info("System dependencies verified.")
 
 
-def process_tile(tile_id: str) -> None:
-    """Process a single 10°×10° tile: warp, normalize, fuse, and write outputs."""
-    logger.info(f"Processing tile {tile_id}")
-
-    # Get tile bounds
-    minx, miny, maxx, maxy = tile_bounds_10x10(tile_id)
-
-    # Warp magnetic data
+def _process_tile(tile_id: str):
+    """
+    Processes a single 10x10 degree tile: warp, normalize, fuse, and write COGs.
+    """
     try:
-        mag_array = warp_crop_to_tile(str(MAGNETIC_PATH), (minx, miny, maxx, maxy))
-        logger.debug(f"Magnetic array shape: {mag_array.shape}")
-    except Exception as e:
-        logger.error(f"Failed to warp magnetic data for {tile_id}: {e}")
-        return
+        # 1. Get tile boundaries
+        bounds = tile_bounds_10x10(tile_id)
 
-    # Warp gravity data
+        # 2. Warp source rasters to the tile grid (0.1 degree resolution -> 100x100 pixels)
+        mag_tile_data = warp_crop_to_tile(str(MAG_PATH), bounds)
+        grav_tile_data = warp_crop_to_tile(str(GRAV_PATH), bounds)
+
+        # Check if the tile has valid data
+        if np.all(np.isnan(mag_tile_data)) and np.all(np.isnan(grav_tile_data)):
+            logging.warning(f"Tile {tile_id}: Both source rasters are empty. Skipping.")
+            return
+
+        # 3. Normalize each layer using a robust z-score
+        norm_mag = robust_z(mag_tile_data)
+        norm_grav = robust_z(grav_tile_data)
+
+        # 4. Fuse the normalized layers by taking the mean
+        fused_anomaly = fuse_layers(norm_mag, norm_grav)
+
+        # 5. Write the processed tiles as COGs
+        write_cog(str(COG_DIR / "mag" / f"{tile_id}.tif"), norm_mag, bounds)
+        write_cog(str(COG_DIR / "grav" / f"{tile_id}.tif"), norm_grav, bounds)
+        write_cog(str(COG_DIR / "fused" / f"{tile_id}.tif"), fused_anomaly, bounds)
+
+    except Exception as e:
+        logging.error(f"Tile {tile_id}: Processing failed. Error: {e}", exc_info=True)
+
+
+def _generate_vrt():
+    """Generates a VRT mosaic from all the fused COG tiles."""
+    logging.info("Generating VRT from fused COG tiles...")
+    vrt_path = FINAL_PRODUCT_DIR / "fused_anomaly.vrt"
+    cog_files_path = COG_DIR / "fused" / "*.tif"
+
+    cmd = [
+        "gdalbuildvrt",
+        str(vrt_path),
+        str(cog_files_path)
+    ]
+    subprocess.run(cmd, check=True)
+    logging.info(f"VRT successfully created at {vrt_path}")
+
+
+def _generate_geotiff():
+    """Converts the VRT mosaic into a single GeoTIFF for PMTiles conversion."""
+    logging.info("Converting VRT to GeoTIFF...")
+    vrt_path = FINAL_PRODUCT_DIR / "fused_anomaly.vrt"
+    geotiff_path = FINAL_PRODUCT_DIR / "fused_anomaly.tif"
+    
+    # Use gdal_translate to convert VRT to GeoTIFF with compression
+    cmd = [
+        "gdal_translate",
+        "-of", "GTiff",
+        "-co", "COMPRESS=DEFLATE",
+        "-co", "PREDICTOR=2",
+        "-co", "TILED=YES",
+        "-co", "BLOCKXSIZE=512",
+        "-co", "BLOCKYSIZE=512",
+        str(vrt_path),
+        str(geotiff_path)
+    ]
+    subprocess.run(cmd, check=True)
+    logging.info(f"GeoTIFF successfully created at {geotiff_path}")
+
+
+def _generate_mbtiles():
+    """Converts the GeoTIFF into MBTiles using gdal2tiles."""
+    logging.info("Generating MBTiles from GeoTIFF using gdal2tiles...")
+    geotiff_path = FINAL_PRODUCT_DIR / "fused_anomaly.tif"
+    mbtiles_path = FINAL_PRODUCT_DIR / "fused_anomaly.mbtiles"
+    
+    # Use gdal2tiles.py to create MBTiles
+    # -z sets the zoom levels (0-10 for global coverage)
+    cmd = [
+        "python",
+        "-m", "gdal2tiles",
+        "-z", "0-8",
+        "--processes=4",
+        str(geotiff_path),
+        str(mbtiles_path).replace('.mbtiles', '')  # gdal2tiles adds the extension
+    ]
+    
     try:
-        grav_array = warp_crop_to_tile(str(GRAVITY_PATH), (minx, miny, maxx, maxy))
-        logger.debug(f"Gravity array shape: {grav_array.shape}")
+        subprocess.run(cmd, check=True)
+        logging.info(f"MBTiles successfully created at {mbtiles_path}")
+        return True
     except Exception as e:
-        logger.error(f"Failed to warp gravity data for {tile_id}: {e}")
+        logging.warning(f"Failed to create MBTiles: {e}")
+        logging.info("Skipping MBTiles generation. GeoTIFF is available for use.")
+        return False
+
+
+def _generate_pmtiles():
+    """Converts MBTiles to PMTiles for web visualization."""
+    mbtiles_path = FINAL_PRODUCT_DIR / "fused_anomaly.mbtiles"
+    
+    # Check if MBTiles exists
+    if not mbtiles_path.exists():
+        logging.info("Skipping PMTiles generation (MBTiles not available)")
+        logging.info(f"Final outputs available:")
+        logging.info(f"  - VRT: {FINAL_PRODUCT_DIR / 'fused_anomaly.vrt'}")
+        logging.info(f"  - GeoTIFF: {FINAL_PRODUCT_DIR / 'fused_anomaly.tif'}")
+        logging.info(f"  - COG tiles: {COG_DIR / 'fused'}")
         return
+    
+    logging.info("Converting MBTiles to PMTiles...")
+    pmtiles_path = FINAL_PRODUCT_DIR / "fused_anomaly.pmtiles"
 
-    # Normalize magnetic
-    mag_norm = robust_z(mag_array)
-
-    # Normalize gravity
-    grav_norm = robust_z(grav_array)
-
-    # Fuse layers
-    fused = fuse_layers(mag_norm, grav_norm)
-
-    # Write outputs
-    tile_bounds = (minx, miny, maxx, maxy)
-
-    mag_out_path = MAG_OUTPUT_DIR / f"{tile_id}.tif"
-    write_cog(str(mag_out_path), mag_norm, tile_bounds)
-
-    grav_out_path = GRAV_OUTPUT_DIR / f"{tile_id}.tif"
-    write_cog(str(grav_out_path), grav_norm, tile_bounds)
-
-    fused_out_path = FUSED_OUTPUT_DIR / f"{tile_id}.tif"
-    write_cog(str(fused_out_path), fused, tile_bounds)
-
-    logger.info(f"Completed tile {tile_id}")
+    cmd = [
+        str(PMTILES_EXE),
+        "convert",
+        str(mbtiles_path),
+        str(pmtiles_path)
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True)
+        logging.info(f"PMTiles successfully created at {pmtiles_path}")
+    except Exception as e:
+        logging.warning(f"Failed to convert to PMTiles: {e}")
+        logging.info("MBTiles file is available for use")
 
 
-def main() -> None:
-    """Main processing loop."""
-    logger.info("Starting global anomaly fusion pipeline")
+def main():
+    """Main script to run the entire global anomaly processing pipeline."""
+    logging.info("--- Starting Global Anomaly Map Processing ---")
 
-    # Get all tile IDs
+    # 1. Verify that GDAL and pmtiles are installed before we start
+    _verify_system_dependencies()
+
+    # 2. Ensure all required directories exist
+    RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    COG_DIR.joinpath("mag").mkdir(parents=True, exist_ok=True)
+    COG_DIR.joinpath("grav").mkdir(parents=True, exist_ok=True)
+    COG_DIR.joinpath("fused").mkdir(parents=True, exist_ok=True)
+    FINAL_PRODUCT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 3. Check for source data
+    if not MAG_PATH.exists() or not GRAV_PATH.exists():
+        logging.error("FATAL: Source data not found!")
+        logging.error(f"Please download the required GeoTIFFs and place them in: {RAW_DATA_DIR}")
+        logging.error(f"Required: {MAG_PATH.name}, {GRAV_PATH.name}")
+        sys.exit(1)
+
+    # 4. Process all tiles
     tile_ids = tiles_10x10_ids()
-    logger.info(f"Processing {len(tile_ids)} tiles")
+    logging.info(f"Found {len(tile_ids)} tiles to process.")
 
-    # Process each tile with progress bar
-    for tile_id in tqdm(tile_ids, desc="Processing tiles"):
-        process_tile(tile_id)
+    with tqdm(total=len(tile_ids), desc="Processing Tiles") as pbar:
+        for tile_id in tile_ids:
+            # Make the process resumable by checking if the final output for this tile exists
+            final_cog_path = COG_DIR / "fused" / f"{tile_id}.tif"
+            if final_cog_path.exists():
+                pbar.update(1)
+                continue
 
-    logger.info("Tile processing complete. Generating final PMTiles...")
+            _process_tile(tile_id)
+            pbar.update(1)
 
-    # Create VRT from fused tiles
-    vrt_path = Path('fused_anomaly.vrt')
-    fused_tiles = list(FUSED_OUTPUT_DIR.glob('*.tif'))
-    if not fused_tiles:
-        logger.error("No fused tiles found!")
-        return
+    # 5. Post-processing: Generate final data products
+    _generate_vrt()
+    _generate_geotiff()
+    _generate_mbtiles()
+    _generate_pmtiles()
 
-    # Use gdalbuildvrt (assumes GDAL is installed)
-    import subprocess
-    cmd_vrt = ['gdalbuildvrt', str(vrt_path)] + [str(p) for p in fused_tiles]
-    try:
-        subprocess.run(cmd_vrt, check=True)
-        logger.info(f"Created VRT: {vrt_path}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to create VRT: {e}")
-        return
-
-    # Convert to PMTiles (assumes pmtiles is installed)
-    pmtiles_path = Path('fused_anomaly.pmtiles')
-    cmd_pmtiles = ['pmtiles', 'convert', str(vrt_path), str(pmtiles_path)]
-    try:
-        subprocess.run(cmd_pmtiles, check=True)
-        logger.info(f"Created PMTiles: {pmtiles_path}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to create PMTiles: {e}")
-        return
-
-    logger.info("Pipeline complete!")
+    logging.info("--- Global Anomaly Map Processing Finished Successfully ---")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
