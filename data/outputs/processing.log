@@ -1,0 +1,24 @@
+2025-10-05 18:04:49,577 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:04:49,577 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:04:49,589 - ERROR - FATAL: pmtiles command not found. Is pmtiles installed and in your PATH?
+2025-10-05 18:06:12,236 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:06:12,236 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:06:12,249 - ERROR - FATAL: pmtiles command not found. Is pmtiles installed and in your PATH?
+2025-10-05 18:11:47,326 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:11:47,326 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:11:47,340 - ERROR - FATAL: pmtiles command not found. Is pmtiles installed and in your PATH?
+2025-10-05 18:11:56,700 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:11:56,700 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:11:56,713 - ERROR - FATAL: pmtiles command not found. Is pmtiles installed and in your PATH?
+2025-10-05 18:14:55,672 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:14:55,672 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:14:55,678 - INFO - System dependencies verified.
+2025-10-05 18:14:55,678 - ERROR - FATAL: Source data not found!
+2025-10-05 18:14:55,678 - ERROR - Please download the required GeoTIFFs and place them in: C:\Users\admin\Downloads\SAR-project\GeoAnomalyMapper\data\raw
+2025-10-05 18:14:55,679 - ERROR - Required: EMAG2_V3_Sea_Level.tif, EGM2008_Free_Air_Anomaly.tif
+2025-10-05 18:46:54,745 - INFO - --- Starting Global Anomaly Map Processing ---
+2025-10-05 18:46:54,746 - INFO - Verifying system dependencies (gdalbuildvrt, pmtiles)...
+2025-10-05 18:46:54,751 - INFO - System dependencies verified.
+2025-10-05 18:46:54,751 - ERROR - FATAL: Source data not found!
+2025-10-05 18:46:54,752 - ERROR - Please download the required GeoTIFFs and place them in: C:\Users\admin\Downloads\SAR-project\GeoAnomalyMapper\data\raw
+2025-10-05 18:46:54,752 - ERROR - Required: EMAG2_V3_Sea_Level.tif, EGM2008_Free_Air_Anomaly.tif
