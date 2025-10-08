@@ -1,11 +1,49 @@
-# GeoAnomalyMapper - Minimal Pipeline
+# GeoAnomalyMapper - Multi-Resolution Geophysical Analysis
 
-**Ultra-lightweight global geophysical anomaly mapper** - just 3 scripts, no framework overhead.
+**Achieve 10-100m resolution using free data** - from global coverage to individual voids.
+
+## 🚀 New: High-Resolution Data Fusion
+
+**See deeper with higher resolution** using free data sources:
+
+| Resolution | Data Source | What You Can Detect |
+|-----------|-------------|---------------------|
+| **10-20m** | Sentinel-1 InSAR | Individual caves, sinkholes, active subsidence |
+| **100m-1km** | Regional gravity + InSAR | Void clusters, karst zones, abandoned mines |
+| **~4km** | XGM2019e gravity model | Mid-depth density anomalies, salt domes |
+| **~11km** | EGM2008 (baseline) | Regional structures, lithospheric features |
+
+**👉 Quick Start:** [QUICKSTART_HIRES.md](QUICKSTART_HIRES.md)
+**📚 Complete Guide:** [HIGH_RESOLUTION_DATA_GUIDE.md](HIGH_RESOLUTION_DATA_GUIDE.md)
+
+### What's New
+
+✨ **Multi-Resolution Fusion Pipeline** ([`multi_resolution_fusion.py`](multi_resolution_fusion.py))
+- Adaptive resampling based on data characteristics
+- Uncertainty-weighted layer combination
+- Spectral fusion preserving fine-scale features
+- Automatic detection of available data sources
+
+✨ **High-Resolution Data Access**
+- Automated Sentinel-1 InSAR downloads (5-20m resolution)
+- XGM2019e gravity model integration (~4km vs 11km)
+- Regional airborne gravity survey support (100m-1km)
+- EGMS pre-processed InSAR for Europe (100m)
+
+✨ **Advanced Void Detection** ([`detect_voids.py`](detect_voids.py))
+- Multi-layer probability mapping
+- Optimized for 20-300 foot (6-100m) depth
+- Combines gravity, InSAR, lithology, and seismic data
+- Identifies high-probability void clusters
+
+---
 
 ## What This Does
 
-Processes global magnetic (EMAG2) and gravity (EGM2008) datasets to create:
-- 648 tiled Cloud-Optimized GeoTIFFs (10°×10° tiles)
+Processes global and regional geophysical datasets to create:
+- **High-resolution fusion maps** (10m-100m with InSAR)
+- **648 tiled Cloud-Optimized GeoTIFFs** (10°×10° global coverage)
+- **Void probability maps** with uncertainty quantification
 - Interactive Google Earth KMZ overlay
 - Web-based Cesium.js globe viewer
 - Statistical analysis and visualizations
@@ -30,8 +68,29 @@ pip install isce2 mintpy
 # Or install everything:
 pip install -e ".[all]"
 ```
+### 2. Configure Credentials (Required for Sentinel-1 Downloads)
 
-### 2. Download Data
+**⚠️ IMPORTANT: Never commit credentials to git!**
+
+1. **Copy the environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Register for free Copernicus account:**
+   - Visit: https://dataspace.copernicus.eu/
+   - Click "Register" and verify your email
+
+3. **Add your credentials to `.env`:**
+   ```bash
+   CDSE_USERNAME=your_email@example.com
+   CDSE_PASSWORD=your_password
+   ```
+
+See [`SECURITY.md`](SECURITY.md) for detailed credential management best practices.
+
+
+### 3. Download Data
 
 Create data directory and download source files:
 
@@ -47,7 +106,7 @@ mkdir -p ../data/raw/gravity
 - **Gravity:** EGM2008 gravity disturbance GeoTIFF → `../data/raw/gravity/`
   - Find from ICGEM or preprocessed sources
 
-### 3. Run Pipeline
+### 4. Run Pipeline
 
 **Basic processing (global gravity/magnetic):**
 ```bash
@@ -59,6 +118,20 @@ python analyze_results.py
 
 # Create interactive globe viewers
 python create_globe_overlay.py
+```
+
+**Maximum resolution data downloader (optional):**
+```bash
+# Download highest resolution free data globally
+# Requires Copernicus credentials in .env file
+python download_geodata.py
+
+# Interactive prompts will guide you through:
+# - Gravity models (XGM2019e - 4km resolution)
+# - Magnetic data (EMAG2v3 - 2 arcmin)
+# - Sentinel-1 InSAR (5-20m resolution, select regions)
+# - EGMS pre-processed InSAR (Europe, 100m)
+# - Regional high-res gravity datasets
 ```
 
 **Advanced void detection (20-300 ft depth):**
