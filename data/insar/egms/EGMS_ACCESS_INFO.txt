@@ -1,0 +1,9 @@
+EGMS Access Information
+============================================================
+
+Portal: https://egms.land.copernicus.eu/
+Resolution: 100 meters
+Coverage: All of Europe
+Data: Pre-processed, ready to use
+
+WMS: https://image.discomap.eea.europa.eu/arcgis/services/GioLandPublic/EGMS/MapServer/WMSServer
