@@ -9,6 +9,9 @@ import sys
 from pathlib import Path
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling as RIOResampling
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend to avoid memory issues
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import simplekml
@@ -56,13 +59,29 @@ def analyze_data_range(geotiff_path: Path) -> Tuple[float, float, float, float]:
     return vmin, vmax, mean, std
 
 
-def create_visualization_png(geotiff_path: Path, output_path: Path, 
-                             vmin: float, vmax: float) -> None:
-    """Create a color-mapped PNG for overlay."""
+def create_visualization_png(geotiff_path: Path, output_path: Path,
+                             vmin: float, vmax: float, max_dimension: int = 8000) -> None:
+    """Create a color-mapped PNG for overlay with intelligent downsampling."""
     logger.info("Creating visualization PNG...")
     
     with rasterio.open(geotiff_path) as src:
-        data = src.read(1, masked=True)
+        # Check if we need to downsample
+        height, width = src.height, src.width
+        
+        # Calculate downsample factor to keep largest dimension under max_dimension
+        downsample_factor = max(1, max(height, width) // max_dimension)
+        
+        if downsample_factor > 1:
+            logger.info(f"Downsampling by factor {downsample_factor} ({width}x{height} -> {width//downsample_factor}x{height//downsample_factor})")
+            # Read with downsampling for memory efficiency
+            data = src.read(
+                1,
+                out_shape=(height // downsample_factor, width // downsample_factor),
+                resampling=RIOResampling.average,
+                masked=True
+            )
+        else:
+            data = src.read(1, masked=True)
     
     # Create diverging colormap (blue-white-red)
     cmap = plt.cm.RdBu_r  # Reversed: red for positive, blue for negative
@@ -84,19 +103,25 @@ def create_visualization_png(geotiff_path: Path, output_path: Path,
     
     colored_data[:, :, 3] = alpha
     
-    # Save as high-resolution PNG
+    # Save as PNG with memory-efficient approach
     height, width = data.shape
-    dpi = 100
-    figsize = (width / dpi, height / dpi)
+    
+    # Limit figure size to avoid memory issues
+    max_fig_dim = 100  # inches
+    dpi = min(100, int(8000 / max(height, width) * 100))  # Adaptive DPI
+    figsize = (min(width / dpi, max_fig_dim), min(height / dpi, max_fig_dim))
+    
+    logger.info(f"Creating figure: {figsize[0]:.1f}x{figsize[1]:.1f} inches at {dpi} DPI")
     
     fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis('off')
     ax.imshow(colored_data, origin='upper', interpolation='bilinear')
     
-    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', 
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight',
                 pad_inches=0, transparent=True)
-    plt.close()
+    plt.close(fig)
+    plt.clf()
     
     logger.info(f"Saved PNG: {output_path}")
 
@@ -167,13 +192,27 @@ Strong Positive: {vmax:.2f}σ
 
 
 def create_preview_image(geotiff_path: Path, output_path: Path,
-                         vmin: float, vmax: float) -> None:
-    """Create a preview image with colorbar."""
+                         vmin: float, vmax: float, max_dimension: int = 4000) -> None:
+    """Create a preview image with colorbar (downsampled for memory efficiency)."""
     logger.info("Creating preview image with colorbar...")
     
     with rasterio.open(geotiff_path) as src:
-        data = src.read(1, masked=True)
         bounds = src.bounds
+        height, width = src.height, src.width
+        
+        # Downsample for preview
+        downsample_factor = max(1, max(height, width) // max_dimension)
+        
+        if downsample_factor > 1:
+            logger.info(f"Preview downsampling by factor {downsample_factor}")
+            data = src.read(
+                1,
+                out_shape=(height // downsample_factor, width // downsample_factor),
+                resampling=RIOResampling.average,
+                masked=True
+            )
+        else:
+            data = src.read(1, masked=True)
     
     # Create figure with colorbar
     fig, ax = plt.subplots(figsize=(12, 8))
