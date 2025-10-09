@@ -15,6 +15,7 @@ Requires-Dist: simplekml>=1.3.6
 Requires-Dist: scipy>=1.7.0
 Requires-Dist: python-dotenv>=0.19.0
 Requires-Dist: requests>=2.25.0
+Requires-Dist: urllib3>=1.26.0
 Provides-Extra: cog
 Requires-Dist: rio-cogeo>=3.0.0; extra == "cog"
 Provides-Extra: insar
@@ -26,14 +27,52 @@ Requires-Dist: isce2>=2.6.0; extra == "all"
 Requires-Dist: mintpy>=1.5.0; extra == "all"
 Dynamic: license-file
 
-# GeoAnomalyMapper - Minimal Pipeline
+# GeoAnomalyMapper - Multi-Resolution Geophysical Analysis
 
-**Ultra-lightweight global geophysical anomaly mapper** - just 3 scripts, no framework overhead.
+**Achieve 10-100m resolution using free data** - from global coverage to individual voids.
+
+## 🚀 New: High-Resolution Data Fusion
+
+**See deeper with higher resolution** using free data sources:
+
+| Resolution | Data Source | What You Can Detect |
+|-----------|-------------|---------------------|
+| **10-20m** | Sentinel-1 InSAR | Individual caves, sinkholes, active subsidence |
+| **100m-1km** | Regional gravity + InSAR | Void clusters, karst zones, abandoned mines |
+| **~4km** | XGM2019e gravity model | Mid-depth density anomalies, salt domes |
+| **~11km** | EGM2008 (baseline) | Regional structures, lithospheric features |
+
+**👉 Quick Start:** [QUICKSTART_HIRES.md](QUICKSTART_HIRES.md)
+**📚 Complete Guide:** [HIGH_RESOLUTION_DATA_GUIDE.md](HIGH_RESOLUTION_DATA_GUIDE.md)
+
+### What's New
+
+✨ **Multi-Resolution Fusion Pipeline** ([`multi_resolution_fusion.py`](multi_resolution_fusion.py))
+- Adaptive resampling based on data characteristics
+- Uncertainty-weighted layer combination
+- Spectral fusion preserving fine-scale features
+- Automatic detection of available data sources
+
+✨ **High-Resolution Data Access**
+- Automated Sentinel-1 InSAR downloads (5-20m resolution)
+- XGM2019e gravity model integration (~4km vs 11km)
+- Regional airborne gravity survey support (100m-1km)
+- EGMS pre-processed InSAR for Europe (100m)
+
+✨ **Advanced Void Detection** ([`detect_voids.py`](detect_voids.py))
+- Multi-layer probability mapping
+- Optimized for 20-300 foot (6-100m) depth
+- Combines gravity, InSAR, lithology, and seismic data
+- Identifies high-probability void clusters
+
+---
 
 ## What This Does
 
-Processes global magnetic (EMAG2) and gravity (EGM2008) datasets to create:
-- 648 tiled Cloud-Optimized GeoTIFFs (10°×10° tiles)
+Processes global and regional geophysical datasets to create:
+- **High-resolution fusion maps** (10m-100m with InSAR)
+- **648 tiled Cloud-Optimized GeoTIFFs** (10°×10° global coverage)
+- **Void probability maps** with uncertainty quantification
 - Interactive Google Earth KMZ overlay
 - Web-based Cesium.js globe viewer
 - Statistical analysis and visualizations
