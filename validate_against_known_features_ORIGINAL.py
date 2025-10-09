@@ -257,22 +257,27 @@ def validate_features(raster_path: Path, features: List[Dict],
         else:
             mean_value = stats['mean']
             
-            # IMPROVED ALGORITHM: Accept both positive AND negative anomalies
-            # Threshold lowered to 0.02σ to catch extremely weak signals
-            # Rationale: Regional geological variations cause sign reversals
-            detection_threshold = 0.02
-            
-            if abs(mean_value) > detection_threshold:
-                # Any significant anomaly (positive or negative) is considered a detection
-                detected_correctly = True
-                sign = "positive" if mean_value > 0 else "negative"
-                explanation = f"✓ Detected {sign} anomaly ({mean_value:.3f}σ, |σ| > {detection_threshold})"
-                correct_detections += 1
-            else:
-                # Anomaly too weak to detect
-                detected_correctly = False
-                explanation = f"✗ Anomaly too weak ({mean_value:.3f}σ, |σ| ≤ {detection_threshold})"
-                incorrect_detections += 1
+            if feature['expected'] == 'negative':
+                # Expect negative anomaly for voids/caves
+                if mean_value < -0.3:  # Threshold for detection
+                    detected_correctly = True
+                    explanation = f"✓ Detected negative anomaly ({mean_value:.3f}σ)"
+                    correct_detections += 1
+                else:
+                    detected_correctly = False
+                    explanation = f"✗ Expected negative, got {mean_value:.3f}σ"
+                    incorrect_detections += 1
+                    
+            elif feature['expected'] == 'positive':
+                # Expect positive anomaly for dense structures
+                if mean_value > 0.3:
+                    detected_correctly = True
+                    explanation = f"✓ Detected positive anomaly ({mean_value:.3f}σ)"
+                    correct_detections += 1
+                else:
+                    detected_correctly = False
+                    explanation = f"✗ Expected positive, got {mean_value:.3f}σ"
+                    incorrect_detections += 1
         
         result = {
             'feature': feature,
@@ -370,12 +375,9 @@ DETAILED RESULTS
     report += "\nINTERPRETATION\n"
     report += "-" * 70 + "\n"
     report += f"""
-A successful detection means ANY significant anomaly (positive or negative) was detected.
-
-IMPROVED ALGORITHM (v2.2):
-- Detection threshold: |0.02σ| (lowered from 0.3σ to catch extremely weak signals)
-- Accepts BOTH positive AND negative anomalies (geological variations cause sign reversals)
-- Rationale: Different regional contexts produce different anomaly signs for same feature type
+A successful detection means the measured anomaly matches the expected signature:
+- Caves/voids/karst: Should show NEGATIVE anomalies (< -0.3σ)
+- Dense structures/ores: Should show POSITIVE anomalies (> +0.3σ)
 
 Success rate of {summary['success_rate']:.1%} indicates the fusion pipeline is
 {'performing well' if summary['success_rate'] > 0.7 else 'needs improvement'} at detecting known subsurface features.
@@ -383,7 +385,7 @@ Success rate of {summary['success_rate']:.1%} indicates the fusion pipeline is
 NOTES:
 - Values in sigma (σ) units = standard deviations from regional mean
 - 2km buffer used for spatial averaging
-- Detection criterion: |anomaly| > 0.02σ (extremely sensitive to any deviation)
+- Threshold: |0.3σ| for detection significance
 """
     
     with open(output_path, 'w', encoding='utf-8') as f:
