@@ -40,11 +40,12 @@ PROJECT_ROOT = BASE_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = DATA_DIR / "outputs" / "void_detection"
 
-# Data paths
-GRAVITY_PATH = DATA_DIR / "outputs" / "final" / "fused_anomaly.tif"
-INSAR_PATH = DATA_DIR / "raw" / "insar"  # User-provided InSAR data
-LITHOLOGY_PATH = DATA_DIR / "raw" / "LiMW_GIS 2015.gdb"  # Global lithology
-SEISMIC_PATH = DATA_DIR / "raw" / "SL2013sv_0.5d-grd_v2.1.tar.bz2"
+# Data paths - using processed data
+GRAVITY_PATH = DATA_DIR / "processed" / "gravity" / "gravity_processed.tif"
+MAGNETIC_PATH = DATA_DIR / "processed" / "magnetic" / "magnetic_processed.tif"
+INSAR_PATH = DATA_DIR / "processed" / "insar" / "insar_processed.tif"
+LITHOLOGY_PATH = DATA_DIR / "processed" / "lithology"  # Directory for lithology
+DEM_PATH = DATA_DIR / "processed" / "dem" / "dem_processed.tif"
 
 # Void detection thresholds
 THRESHOLDS = {
@@ -369,25 +370,40 @@ def process_region(
     logger.info("Loading gravity data...")
     gravity_data = load_and_resample(GRAVITY_PATH, bounds, resolution)
     
+    logger.info("Loading magnetic data (if available)...")
+    magnetic_data = load_and_resample(MAGNETIC_PATH, bounds, resolution)
+    
     logger.info("Loading InSAR data (if available)...")
-    insar_data = None  # Will be loaded from user-provided files
+    insar_data = load_and_resample(INSAR_PATH, bounds, resolution)
     
     logger.info("Loading lithology data (if available)...")
-    lithology_data = None  # Will be processed from geodatabase
+    lithology_data = None  # TODO: Implement lithology loading from processed data
     
     logger.info("Loading seismic data (if available)...")
-    seismic_data = None  # Will be extracted from tar.bz2
+    seismic_data = None  # Seismic data not yet implemented
     
     # Score each layer
     logger.info("Calculating void probability scores...")
     gravity_score = score_gravity(gravity_data)
+    magnetic_score = score_gravity(magnetic_data) if magnetic_data is not None else None  # Magnetic anomalies scored like gravity
     insar_score = score_insar(insar_data)
     lithology_score = score_lithology(lithology_data, {})
     seismic_score = score_seismic(seismic_data)
     
+    # Combine gravity and magnetic if both available
+    if gravity_score is not None and magnetic_score is not None:
+        logger.info("Combining gravity and magnetic scores...")
+        combined_geophysical = (gravity_score + magnetic_score) / 2.0
+    elif gravity_score is not None:
+        combined_geophysical = gravity_score
+    elif magnetic_score is not None:
+        combined_geophysical = magnetic_score
+    else:
+        combined_geophysical = None
+    
     # Calculate combined probability
     probability = calculate_void_probability(
-        gravity_score, insar_score, lithology_score, seismic_score
+        combined_geophysical, insar_score, lithology_score, seismic_score
     )
     
     if probability is None:
@@ -416,6 +432,7 @@ def process_region(
         f.write(f"Resolution: {resolution}° (~{resolution * 111:.0f} km)\n\n")
         f.write(f"Data Layers Used:\n")
         f.write(f"  - Gravity: {'YES' if gravity_data is not None else 'NO'}\n")
+        f.write(f"  - Magnetic: {'YES' if magnetic_data is not None else 'NO'}\n")
         f.write(f"  - InSAR: {'YES' if insar_data is not None else 'NO'}\n")
         f.write(f"  - Lithology: {'YES' if lithology_data is not None else 'NO'}\n")
         f.write(f"  - Seismic: {'YES' if seismic_data is not None else 'NO'}\n\n")
