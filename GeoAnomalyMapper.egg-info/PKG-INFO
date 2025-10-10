@@ -130,10 +130,36 @@ mkdir -p ../data/raw/gravity
 
 **Required files:**
 - **Magnetic:** EMAG2_V3_SeaLevel_DataTiff.tif → `../data/raw/emag2/`
-  - URL: https://www.ngdc.noaa.gov/mgg/global/emag2_v3/EMAG2_V3_Sea_Level.tif
+  - Mirrors: `https://www.ngdc.noaa.gov/geomag/EMag2/EMAG2_V3_20170530.tif.gz`, `https://www.ngdc.noaa.gov/mgg/global/EMAG2_V3_20170530.tif.gz`
+  - The helper automatically decompresses the gzip archive into the expected filename.
 
-- **Gravity:** EGM2008 gravity disturbance GeoTIFF → `../data/raw/gravity/`
-  - Find from ICGEM or preprocessed sources
+- **Gravity:** EGM2008_Free_Air_Anomaly.tif → `../data/raw/gravity/`
+  - Mirrors: `https://topex.ucsd.edu/gravity/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz`, `https://download.csr.utexas.edu/outgoing/legendre/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz`
+  - If the mirrors are offline, request the grid from https://icgem.gfz-potsdam.de/
+
+**Automated missing-data helper:**
+
+If the Final Project Report or processing log lists missing baseline datasets,
+use the helper to download (or at least locate) them automatically:
+
+```bash
+python download_missing_data.py --report data/outputs/processing.log
+```
+
+The script parses the report, fetches recognised datasets when possible, and
+prints manual follow-up instructions if automated downloads are not available.
+
+**Automated missing-data helper:**
+
+If the Final Project Report or processing log lists missing baseline datasets,
+use the helper to download (or at least locate) them automatically:
+
+```bash
+python download_missing_data.py --report data/outputs/processing.log
+```
+
+The script parses the report, fetches recognised datasets when possible, and
+prints manual follow-up instructions if automated downloads are not available.
 
 ### 4. Run Pipeline
 
