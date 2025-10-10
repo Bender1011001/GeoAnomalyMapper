@@ -11,6 +11,7 @@ files.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import logging
 import re
@@ -29,26 +30,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Known baseline datasets required by the processing pipeline.
-DATASET_REGISTRY: Dict[str, Dict[str, Optional[str]]] = {
+DATASET_REGISTRY: Dict[str, Dict[str, object]] = {
     "EMAG2_V3_Sea_Level.tif": {
-        "download_url": "https://www.ngdc.noaa.gov/mgg/global/emag2_v3/EMAG2_V3_Sea_Level.tif",
+        "download_urls": [
+            # NOAA maintains two mirrors for EMAG2v3. Either may be unavailable at
+            # times, so try both before asking for manual follow-up.
+            "https://www.ngdc.noaa.gov/geomag/EMag2/EMAG2_V3_20170530.tif.gz",
+            "https://www.ngdc.noaa.gov/mgg/global/EMAG2_V3_20170530.tif.gz",
+        ],
         "checksum": None,  # Published checksum not provided in the upstream catalog.
         "description": "Global magnetic anomaly grid at sea level (2 arc-min resolution).",
-        "destination": Path("data/raw/magnetic/EMAG2_V3_Sea_Level.tif"),
+        # Align destination with the rest of the pipeline (process_global_map.py).
+        "destination": Path("data/raw/emag2/EMAG2_V3_SeaLevel_DataTiff.tif"),
         "notes": (
             "Large (~1.7 GB) download. NOAA servers occasionally throttle long"
             " transfers—rerun the script if the connection drops."
         ),
+        "decompress": "gzip",
     },
     "EGM2008_Free_Air_Anomaly.tif": {
-        "download_url": "https://topex.ucsd.edu/gravity/EGM2008/EGM2008_Free_Air_Anomaly.tif",
+        "download_urls": [
+            # The UCSD gravity mirrors now distribute the GeoTIFF as a gzip archive.
+            "https://topex.ucsd.edu/gravity/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz",
+            # NASA/JPL mirror (identical contents, occasionally faster for US users).
+            "https://download.csr.utexas.edu/outgoing/legendre/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz",
+        ],
         "checksum": None,
         "description": "EGM2008 global free-air gravity anomaly grid (1 arc-min).",
         "destination": Path("data/raw/gravity/EGM2008_Free_Air_Anomaly.tif"),
         "notes": (
-            "If the UCSD mirror is unavailable, request the GeoTIFF from the ICGEM"
+            "If both automated mirrors fail, request the GeoTIFF from the ICGEM"
             " portal (https://icgem.gfz-potsdam.de/) using the grid download tool."
         ),
+        "decompress": "gzip",
     },
 }
 
@@ -113,35 +127,79 @@ def download_dataset(name: str, force: bool = False) -> bool:
         logger.info("%s already present at %s", name, destination)
         return True
 
-    url = info["download_url"]
-    if not url:
+    urls = info.get("download_urls") or []
+    if not urls:
         logger.error("No automated download URL available for %s", name)
         return False
 
-    logger.info("Downloading %s", name)
-    logger.info("Source: %s", url)
-    logger.info("Destination: %s", destination)
+    errors: List[str] = []
+    for url in urls:
+        logger.info("Downloading %s", name)
+        logger.info("Source: %s", url)
+        logger.info("Destination: %s", destination)
 
-    try:
-        with requests.get(url, stream=True, timeout=60) as response:
-            response.raise_for_status()
-            total = int(response.headers.get("content-length", 0))
-            temp_path = destination.with_suffix(destination.suffix + ".part")
-            with temp_path.open("wb") as fh, tqdm(
-                total=total,
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                desc=name,
-            ) as progress:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if not chunk:
-                        continue
-                    fh.write(chunk)
-                    progress.update(len(chunk))
-            temp_path.replace(destination)
-    except RequestException as exc:
-        logger.error("Failed to download %s: %s", name, exc)
+        temp_path = destination.with_suffix(destination.suffix + ".part")
+        try:
+            with requests.get(url, stream=True, timeout=60) as response:
+                response.raise_for_status()
+                total = int(response.headers.get("content-length", 0))
+                with temp_path.open("wb") as fh, tqdm(
+                    total=total,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc=name,
+                ) as progress:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+                        fh.write(chunk)
+                        progress.update(len(chunk))
+        except RequestException as exc:
+            errors.append(f"{url} -> {exc}")
+            logger.warning("Download attempt failed for %s: %s", url, exc)
+            if temp_path.exists():
+                temp_path.unlink()
+            continue
+        except OSError as exc:
+            errors.append(f"{url} -> {exc}")
+            logger.warning("Failed while writing %s: %s", url, exc)
+            if temp_path.exists():
+                temp_path.unlink()
+            continue
+
+        # Successful download, handle optional decompression before finalising.
+        final_path: Optional[Path] = None
+        try:
+            decompression = info.get("decompress")
+            if decompression == "gzip" or url.endswith(".gz"):
+                final_path = destination.with_suffix(destination.suffix + ".tmp")
+                with gzip.open(temp_path, "rb") as src, final_path.open("wb") as dst:
+                    for chunk in iter(lambda: src.read(1024 * 1024), b""):
+                        if not chunk:
+                            break
+                        dst.write(chunk)
+                temp_path.unlink()
+                final_path.replace(destination)
+            else:
+                temp_path.replace(destination)
+        except OSError as exc:
+            errors.append(f"decompression -> {exc}")
+            logger.warning("Post-processing failed for %s: %s", destination, exc)
+            if temp_path.exists():
+                temp_path.unlink()
+            if final_path and final_path.exists():
+                final_path.unlink()
+            if destination.exists():
+                destination.unlink()
+            continue
+
+        # Completed successfully
+        break
+    else:
+        for failure in errors:
+            logger.error("Attempt summary: %s", failure)
+        logger.error("All download attempts failed for %s", name)
         return False
 
     checksum = info.get("checksum")
