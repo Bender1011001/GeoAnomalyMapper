@@ -7,7 +7,7 @@ Just run this and walk away. It will:
 - Auto-resume if network fails
 - Retry with exponential backoff
 - Download in parallel (4 workers)
-- Save progress continuously
+- Save progress continuousl
 
 NO INTERACTION NEEDED - Just run: python download_usa_auto.py
 """
