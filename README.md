@@ -106,6 +106,18 @@ mkdir -p ../data/raw/gravity
 - **Gravity:** EGM2008 gravity disturbance GeoTIFF → `../data/raw/gravity/`
   - Find from ICGEM or preprocessed sources
 
+**Automated missing-data helper:**
+
+If the Final Project Report or processing log lists missing baseline datasets,
+use the helper to download (or at least locate) them automatically:
+
+```bash
+python download_missing_data.py --report data/outputs/processing.log
+```
+
+The script parses the report, fetches recognised datasets when possible, and
+prints manual follow-up instructions if automated downloads are not available.
+
 ### 4. Run Pipeline
 
 **Basic processing (global gravity/magnetic):**
