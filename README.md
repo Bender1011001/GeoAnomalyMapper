@@ -99,6 +99,27 @@ mkdir -p ../data/raw/emag2
 mkdir -p ../data/raw/gravity
 ```
 
+#### Use the automated data agent (recommended)
+
+The repository now includes a data-aware orchestration script that can inspect
+which datasets are already on disk, trigger the appropriate download helpers,
+and provide manual follow-up instructions when automation is not possible:
+
+```bash
+# Show status of all datasets for the default USA Lower 48 region
+python data_agent.py
+
+# Download every available dataset in phases 1 and 2
+python data_agent.py --download all --phases 1 2
+
+# Target a custom area of interest (Europe example)
+python data_agent.py --preset europe --download copernicus_dem sentinel1
+```
+
+The agent keeps track of progress in `data/agent_status.json` so repeated runs
+are idempotent. Use `--force` to re-download existing data and
+`--json` to emit machine-readable status summaries.
+
 **Required files:**
 - **Magnetic:** EMAG2_V3_SeaLevel_DataTiff.tif → `../data/raw/emag2/`
   - Mirrors: `https://www.ngdc.noaa.gov/geomag/EMag2/EMAG2_V3_20170530.tif.gz`, `https://www.ngdc.noaa.gov/mgg/global/EMAG2_V3_20170530.tif.gz`
