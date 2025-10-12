@@ -55,10 +55,7 @@ data/insar/**/*.SAFE
 *.part
 
 # Processing outputs (can be regenerated)
-data/outputs/cog/
-data/outputs/final/*.tif
-data/outputs/final/*.vrt
-data/outputs/processing.log
+
 
 # Logs
 *.log
