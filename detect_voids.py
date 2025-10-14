@@ -279,15 +279,16 @@ def visualize_void_probability(
     )
     
     # Overlay hotspot boundaries
-    if hotspots is not None:
-        from matplotlib import patches
-        contours = plt.contour(
+    if hotspots is not None and np.any(hotspots):
+        y_coords = np.linspace(bounds[1], bounds[3], hotspots.shape[0])
+        x_coords = np.linspace(bounds[0], bounds[2], hotspots.shape[1])
+        ax.contour(
+            x_coords,
+            y_coords,
             hotspots,
             levels=[0.5],
             colors='blue',
             linewidths=2,
-            extent=[bounds[0], bounds[2], bounds[1], bounds[3]],
-            origin='upper'
         )
     
     # Formatting

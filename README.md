@@ -1,290 +1,156 @@
-# GeoAnomalyMapper - Multi-Resolution Geophysical Analysis
+# GeoAnomalyMapper
 
-**Achieve 10-100m resolution using free data** - from global coverage to individual voids.
+GeoAnomalyMapper contains a small collection of data processing utilities for
+combining publicly available geophysical datasets (gravity, magnetic, DEM and
+optional InSAR products) into consistent analysis-ready rasters. The repository
+keeps the focus on the processing and visualisation code that supports the
+fusion workflow – large datasets, helper downloads and internal documentation
+are deliberately excluded from version control.
 
-## 🚀 New: High-Resolution Data Fusion
+## Key capabilities
 
-**See deeper with higher resolution** using free data sources:
+- **Data preparation (`process_data.py`)** – clips and reprojects raw gravity,
+  magnetic and elevation rasters into a common grid for a chosen area of
+  interest.
+- **InSAR pre-processing (`process_insar_data.py`)** – turns externally
+  generated interferograms into deformation rate grids that match the rest of
+  the pipeline.
+- **Multi-resolution fusion (`multi_resolution_fusion.py`)** – resamples
+  available layers to a shared resolution and combines them using
+  uncertainty-aware weighting.
+- **Void and anomaly assessment (`detect_voids.py`)** – calculates a simple
+  probability score for potential subsurface voids based on the fused
+  geophysical layers.
+- **Visualisation utilities** – `create_visualization.py` and
+  `create_enhanced_visualization.py` create publication-ready PNG, KMZ and
+  summary graphics from GeoTIFF outputs.
+- **Quality checks (`validate_against_known_features.py`)** – samples fused
+  anomaly rasters around known features to provide an objective validation
+  report.
 
-| Resolution | Data Source | What You Can Detect |
-|-----------|-------------|---------------------|
-| **10-20m** | Sentinel-1 InSAR | Individual caves, sinkholes, active subsidence |
-| **100m-1km** | Regional gravity + InSAR | Void clusters, karst zones, abandoned mines |
-| **~4km** | XGM2019e gravity model | Mid-depth density anomalies, salt domes |
-| **~11km** | EGM2008 (baseline) | Regional structures, lithospheric features |
+All scripts are self-contained CLI tools with `--help` descriptions. None of the
+command line utilities download data; obtaining raw datasets remains a manual
+step carried out outside of the repository.
 
-**👉 Quick Start:** [QUICKSTART_HIRES.md](QUICKSTART_HIRES.md)
-**📚 Complete Guide:** [HIGH_RESOLUTION_DATA_GUIDE.md](HIGH_RESOLUTION_DATA_GUIDE.md)
-
-### What's New
-
-✨ **Multi-Resolution Fusion Pipeline** ([`multi_resolution_fusion.py`](multi_resolution_fusion.py))
-- Adaptive resampling based on data characteristics
-- Uncertainty-weighted layer combination
-- Spectral fusion preserving fine-scale features
-- Automatic detection of available data sources
-
-✨ **High-Resolution Data Access**
-- Automated Sentinel-1 InSAR downloads (5-20m resolution)
-- XGM2019e gravity model integration (~4km vs 11km)
-- Regional airborne gravity survey support (100m-1km)
-- EGMS pre-processed InSAR for Europe (100m)
-
-✨ **Advanced Void Detection** ([`detect_voids.py`](detect_voids.py))
-- Multi-layer probability mapping
-- Optimized for 20-300 foot (6-100m) depth
-- Combines gravity, InSAR, lithology, and seismic data
-- Identifies high-probability void clusters
-
----
-
-## What This Does
-
-Processes global and regional geophysical datasets to create:
-- **High-resolution fusion maps** (10m-100m with InSAR)
-- **648 tiled Cloud-Optimized GeoTIFFs** (10°×10° global coverage)
-- **Void probability maps** with uncertainty quantification
-- Interactive Google Earth KMZ overlay
-- Web-based Cesium.js globe viewer
-- Statistical analysis and visualizations
-
-## Quick Start
-
-### 1. Install Dependencies
-
-**Basic (gravity/magnetic processing):**
-```bash
-pip install numpy rasterio affine tqdm matplotlib simplekml scipy
-```
-
-**Optional enhancements:**
-```bash
-# Better COG generation
-pip install rio-cogeo
-
-# InSAR processing (advanced)
-pip install isce2 mintpy
-
-# Or install everything:
-pip install -e ".[all]"
-```
-### 2. Configure Credentials (Required for Sentinel-1 Downloads)
-
-**⚠️ IMPORTANT: Never commit credentials to git!**
-
-1. **Copy the environment template:**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Register for free Copernicus account:**
-   - Visit: https://dataspace.copernicus.eu/
-   - Click "Register" and verify your email
-
-3. **Add your credentials to `.env`:**
-   ```bash
-   CDSE_USERNAME=your_email@example.com
-   CDSE_PASSWORD=your_password
-   ```
-
-See [`SECURITY.md`](SECURITY.md) for detailed credential management best practices.
-
-
-### 3. Download Data
-
-Create data directory and download source files:
-
-```bash
-mkdir -p ../data/raw/emag2
-mkdir -p ../data/raw/gravity
-```
-
-#### Use the automated data agent (recommended)
-
-The repository now includes a data-aware orchestration script that can inspect
-which datasets are already on disk, trigger the appropriate download helpers,
-and provide manual follow-up instructions when automation is not possible:
-
-```bash
-# Show status of all datasets for the default USA Lower 48 region
-python data_agent.py
-
-# Download every available dataset in phases 1 and 2
-python data_agent.py --download all --phases 1 2
-
-# Target a custom area of interest (Europe example)
-python data_agent.py --preset europe --download copernicus_dem sentinel1
-```
-
-The agent keeps track of progress in `data/agent_status.json` so repeated runs
-are idempotent. Use `--force` to re-download existing data and
-`--json` to emit machine-readable status summaries.
-
-**Required files:**
-- **Magnetic:** EMAG2_V3_SeaLevel_DataTiff.tif → `../data/raw/emag2/`
-  - Mirrors: `https://www.ngdc.noaa.gov/geomag/EMag2/EMAG2_V3_20170530.tif.gz`, `https://www.ngdc.noaa.gov/mgg/global/EMAG2_V3_20170530.tif.gz`
-  - The helper automatically decompresses the gzip archive into the expected filename.
-
-- **Gravity:** EGM2008_Free_Air_Anomaly.tif → `../data/raw/gravity/`
-  - Mirrors: `https://topex.ucsd.edu/gravity/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz`, `https://download.csr.utexas.edu/outgoing/legendre/EGM2008/EGM2008_Free_Air_Anomaly.tif.gz`
-  - If the mirrors are offline, request the grid from https://icgem.gfz-potsdam.de/
-
-**Automated missing-data helper:**
-
-If the Final Project Report or processing log lists missing baseline datasets,
-use the helper to download (or at least locate) them automatically:
-
-```bash
-python download_missing_data.py --report data/outputs/processing.log
-```
-
-The script parses the report, fetches recognised datasets when possible, and
-prints manual follow-up instructions if automated downloads are not available.
-
-**Automated missing-data helper:**
-
-If the Final Project Report or processing log lists missing baseline datasets,
-use the helper to download (or at least locate) them automatically:
-
-```bash
-python download_missing_data.py --report data/outputs/processing.log
-```
-
-The script parses the report, fetches recognised datasets when possible, and
-prints manual follow-up instructions if automated downloads are not available.
-
-### 4. Run Pipeline
-
-**Basic processing (global gravity/magnetic):**
-```bash
-# Process all 648 global tiles (resumable)
-python process_global_map.py
-
-# Analyze results and generate statistics
-python analyze_results.py
-
-# Create interactive globe viewers
-python create_globe_overlay.py
-```
-
-**Maximum resolution data downloader (optional):**
-```bash
-# Download highest resolution free data globally
-# Requires Copernicus credentials in .env file
-python download_geodata.py
-
-# Interactive prompts will guide you through:
-# - Gravity models (XGM2019e - 4km resolution)
-# - Magnetic data (EMAG2v3 - 2 arcmin)
-# - Sentinel-1 InSAR (5-20m resolution, select regions)
-# - EGMS pre-processed InSAR (Europe, 100m)
-# - Regional high-res gravity datasets
-```
-
-**Advanced void detection (20-300 ft depth):**
-```bash
-# Detect underground voids using multi-layer analysis
-python detect_voids.py --region "-105.0,32.0,-104.0,33.0" --output my_area_voids
-
-# For InSAR data setup, see INSAR_DATA_GUIDE.md
-```
-
-### 4. View Results
-
-**Google Earth (Recommended):**
-- Open: `../data/outputs/final/fused_anomaly_google_earth.kmz`
-
-**Web Browser:**
-- Open: `../data/outputs/final/globe_viewer.html`
-
-## Files
+## Repository layout
 
 ```
 GeoAnomalyMapper/
-├── process_global_map.py    # Main processing pipeline (standalone)
-├── analyze_results.py        # Statistics and visualization
-├── create_globe_overlay.py   # Interactive globe generators
-├── detect_voids.py           # 🆕 Advanced void detection (multi-layer)
-├── INSAR_DATA_GUIDE.md       # 🆕 How to get InSAR subsidence data
-├── pyproject.toml            # Dependencies
-├── README.md                 # This file
-└── LICENSE                   # MIT license
-
-../data/
-├── raw/                      # Input datasets
-│   ├── emag2/                # Magnetic data
-│   ├── gravity/              # Gravity data
-│   ├── insar/                # 🆕 InSAR subsidence data (optional)
-│   └── LiMW_GIS 2015.gdb     # Lithology database
-└── outputs/
-    ├── cog/fused/            # 648 processed tiles
-    ├── final/                # Final outputs (KMZ, HTML, GeoTIFF)
-    └── void_detection/       # 🆕 Void probability maps
+├── process_data.py
+├── process_insar_data.py
+├── multi_resolution_fusion.py
+├── detect_voids.py
+├── create_visualization.py
+├── create_enhanced_visualization.py
+├── validate_against_known_features.py
+├── pyproject.toml
+├── README.md
+└── LICENSE
 ```
 
-## System Requirements
+The `data/` directory expected by the scripts is not version controlled. Create
+it locally with the following structure once you have gathered source rasters:
 
-- **Python:** 3.9+
-- **GDAL:** Command-line tools (gdalbuildvrt, gdal_translate)
-- **PMTiles:** Optional, for web tile generation
-- **Disk:** ~2GB for outputs
-- **RAM:** 4GB minimum, 8GB recommended
+```
+data/
+├── raw/
+│   ├── gravity/
+│   ├── magnetic/
+│   ├── dem/
+│   └── insar/            # Optional
+└── processed/
+    ├── gravity/
+    ├── magnetic/
+    ├── dem/
+    └── insar/
+```
 
-## Advanced Void Detection 🆕
+## Installation
 
-For detecting underground voids at **20-300 feet depth** with much better resolution:
-
-### What's New:
-
-**Multi-Layer Probability Mapping:**
-- ✅ Gravity anomalies (density deficits = voids)
-- ✅ InSAR subsidence (ground sinking above voids)
-- ✅ Lithology analysis (karst-prone rocks)
-- ✅ Seismic velocity (low velocity = fractures/voids)
-
-**Resolution Improvements:**
-- Global data: ~11 km (regional features)
-- With InSAR: **5-100 meters** (local voids!)
-
-**Detection Capabilities:**
-- Cave systems (20+ ft)
-- Sinkholes (early warning via subsidence)
-- Abandoned mines
-- Salt dome voids
-- Karst collapse zones
-
-### Quick Example:
+GeoAnomalyMapper targets Python 3.9+. Install the dependencies into a virtual
+environment of your choice:
 
 ```bash
-# 1. Get InSAR data (see INSAR_DATA_GUIDE.md)
-# 2. Run void detection for your area:
-python detect_voids.py \
-    --region "lon_min,lat_min,lon_max,lat_max" \
-    --resolution 0.001 \  # ~100m resolution
-    --output my_voids
-
-# Outputs:
-# - my_voids.tif (probability map: 0=no void, 1=very likely)
-# - my_voids.png (visualization)
-# - my_voids_report.txt (statistics & hotspot list)
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
-### Best Practices:
+Optional extras listed under `[project.optional-dependencies]` in
+`pyproject.toml` enable COG creation and advanced InSAR processing. Install them
+with, for example, `pip install .[insar]` if they are required for your
+workflow.
 
-1. **Start with gravity alone** (already have data)
-2. **Add InSAR** for European regions (free EGMS data!)
-3. **Add lithology** (already in data/raw/)
-4. **Combine all layers** for highest accuracy
+## Preparing source data
 
-See [`INSAR_DATA_GUIDE.md`](INSAR_DATA_GUIDE.md) for detailed InSAR setup instructions.
+1. **Gravity and magnetic grids** – download GeoTIFF products such as EGM2008
+   free-air anomaly or EMAG2 magnetic anomaly files that cover your area of
+   interest.
+2. **DEM** – place Copernicus DEM, SRTM or other elevation tiles in
+   `data/raw/dem/`.
+3. **InSAR (optional)** – generate deformation products with ESA SNAP, ISCE or
+   other toolchains outside the repository and export them as GeoTIFF rasters.
+4. Keep the raw files outside of version control. The `.gitignore` shipped with
+   the project already excludes the `data/` directory and related artefacts.
 
----
+If Sentinel or other services require credentials, copy `.env.example` to `.env`
+and populate it locally. Do not commit the resulting file.
 
-## Notes
+## Typical workflow
 
-- Processing is **resumable** - interrupted runs restart automatically
-- Each tile is 100×100 pixels at 0.1° resolution (global data)
-- Void detection can achieve **5-100m resolution** with InSAR
-- Robust z-score normalization handles outliers
-- NaN values preserved for nodata regions
-- All utilities embedded in scripts (minimal external dependencies)
+1. **Process base layers**
+   ```bash
+   python process_data.py --region "-105.5,31.5,-103.5,33.5"
+   ```
+   The script clips available gravity, magnetic and DEM rasters to the supplied
+   bounding box and stores the results under `data/processed/`.
+
+2. **Process InSAR data (optional)**
+   ```bash
+   python process_insar_data.py --input data/raw/insar/my_stack.tif \
+       --output data/processed/insar/insar_processed.tif
+   ```
+
+3. **Run multi-resolution fusion**
+   ```bash
+   python multi_resolution_fusion.py --region "-105.5,31.5,-103.5,33.5" \
+       --output fused_anomaly.tif
+   ```
+
+4. **Create visual outputs**
+   ```bash
+   python create_visualization.py fused_anomaly.tif
+   ```
+
+5. **Validate against known features**
+   ```bash
+   python validate_against_known_features.py fused_anomaly.tif --buffer 3 \
+       --output-dir reports/
+   ```
+
+6. **Optional void probability mapping**
+   ```bash
+   python detect_voids.py --region "-105.5,31.5,-103.5,33.5" --output caverns
+   ```
+
+Each command emits structured logging so processing steps can be audited.
+
+## Validation philosophy
+
+The validation utility samples the fused anomaly raster around a curated list of
+known underground structures. It checks both the strength and the expected sign
+of the anomaly before counting a location as correctly detected. Summary
+statistics and a map are produced in the specified output directory to support
+transparent reporting.
+
+## Contributing
+
+The project intentionally keeps scope narrow. When extending it, favour
+self-contained processing or visualisation utilities over large download or
+orchestration tooling. Please keep additional datasets, notebooks and generated
+artefacts outside of git.
+
+## License
+
+GeoAnomalyMapper is released under the MIT License. See [LICENSE](LICENSE) for
+full details.

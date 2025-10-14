@@ -1,1 +1,0 @@
-USGS Gravity: https://mrdata.usgs.gov/gravity/
