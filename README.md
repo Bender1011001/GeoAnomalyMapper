@@ -135,6 +135,33 @@ and populate it locally. Do not commit the resulting file.
 
 Each command emits structured logging so processing steps can be audited.
 
+## Publishing the interactive viewer
+
+The repository ships with a static website (located in `docs/`) that can be
+deployed through GitHub Pages to let collaborators explore void detections and
+supporting context. The site renders GeoJSON exports from the processing
+pipeline, shows summary statistics, and provides an optional heat map overlay.
+
+### Enable GitHub Pages
+
+1. Push the repository to GitHub if you have not already done so.
+2. Open the repository settings, navigate to the **Pages** tab, and select the
+   `main` branch with the `/docs` folder as the publishing source.
+3. Save the configuration. GitHub will publish the site at
+   `https://<username>.github.io/<repository>/` within a few minutes.
+
+### Update the published data
+
+1. Export your processed detections as a GeoJSON FeatureCollection where every
+   feature represents one void. See `docs/data/sample_voids.geojson` for the
+   expected schema.
+2. Replace `docs/data/voids.geojson` with the freshly exported file.
+3. Commit the change, push to GitHub, and GitHub Pages will automatically deploy
+   the update.
+
+Optional supporting layers (e.g., raster thumbnails or cross-sections) can be
+added to `docs/data/` and surfaced by editing `docs/js/app.js`.
+
 ## Validation philosophy
 
 The validation utility samples the fused anomaly raster around a curated list of
