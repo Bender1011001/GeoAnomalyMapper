@@ -45,6 +45,7 @@ env/
 
 # Downloaded data (large files)
 data/
+!docs/data/
 data/raw/**/*.tif
 data/raw/**/*.tiff
 data/raw/**/*.zip
