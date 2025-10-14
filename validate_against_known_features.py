@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Validate Multi-Resolution Fusion Against Known Underground Features
-Tests if detected anomalies match known caves, voids, and subsurface structures
+Validate multi-resolution fusion outputs against known underground features.
+
+The script samples fused anomaly rasters near a curated list of caves, mines and
+other subsurface structures. A feature counts as correctly detected when the
+average anomaly within the sampling window exceeds a conservative threshold and
+matches the expected sign (negative for voids, positive for dense structures).
 """
 
 import logging
@@ -20,6 +24,10 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+DETECTION_THRESHOLD_SIGMA = 0.5  # Require at least ±0.5σ signal strength
+MIN_VALID_PIXELS = 25            # Ignore samples with insufficient coverage
 
 
 # Known underground features in USA for validation
@@ -231,6 +239,7 @@ def validate_features(raster_path: Path, features: List[Dict],
     incorrect_detections = 0
     out_of_bounds = 0
     no_data = 0
+    insufficient_data = 0
     
     for feature in features:
         logger.info(f"Sampling: {feature['name']}")
@@ -254,24 +263,43 @@ def validate_features(raster_path: Path, features: List[Dict],
             detected_correctly = None
             explanation = "No valid data at location"
             no_data += 1
+        elif stats['valid_pixels'] < MIN_VALID_PIXELS:
+            detected_correctly = None
+            explanation = (
+                f"Insufficient valid pixels ({stats['valid_pixels']} < {MIN_VALID_PIXELS})"
+            )
+            insufficient_data += 1
         else:
-            mean_value = stats['mean']
-            
-            # IMPROVED ALGORITHM: Accept both positive AND negative anomalies
-            # Threshold lowered to 0.02σ to catch extremely weak signals
-            # Rationale: Regional geological variations cause sign reversals
-            detection_threshold = 0.02
-            
-            if abs(mean_value) > detection_threshold:
-                # Any significant anomaly (positive or negative) is considered a detection
-                detected_correctly = True
-                sign = "positive" if mean_value > 0 else "negative"
-                explanation = f"✓ Detected {sign} anomaly ({mean_value:.3f}σ, |σ| > {detection_threshold})"
+            mean_value = float(stats['mean'])
+            expected_sign = feature.get('expected', 'any').lower()
+            threshold = DETECTION_THRESHOLD_SIGMA
+
+            if expected_sign == 'negative':
+                meets_expectation = mean_value <= -threshold
+                requirement = f"≤ -{threshold:.2f}σ"
+                expectation_desc = 'negative'
+            elif expected_sign == 'positive':
+                meets_expectation = mean_value >= threshold
+                requirement = f"≥ {threshold:.2f}σ"
+                expectation_desc = 'positive'
+            else:
+                meets_expectation = abs(mean_value) >= threshold
+                requirement = f"|σ| ≥ {threshold:.2f}"
+                expectation_desc = 'positive or negative'
+
+            detected_correctly = bool(meets_expectation)
+
+            if detected_correctly:
+                explanation = (
+                    f"✓ Mean anomaly {mean_value:.3f}σ meets the {expectation_desc} "
+                    f"requirement ({requirement})."
+                )
                 correct_detections += 1
             else:
-                # Anomaly too weak to detect
-                detected_correctly = False
-                explanation = f"✗ Anomaly too weak ({mean_value:.3f}σ, |σ| ≤ {detection_threshold})"
+                explanation = (
+                    f"✗ Mean anomaly {mean_value:.3f}σ does not satisfy the expected "
+                    f"{expectation_desc} requirement ({requirement})."
+                )
                 incorrect_detections += 1
         
         result = {
@@ -285,12 +313,12 @@ def validate_features(raster_path: Path, features: List[Dict],
         logger.info(f"  {explanation}")
     
     # Calculate success rate
-    testable = len(features) - out_of_bounds - no_data
+    testable = len(features) - out_of_bounds - no_data - insufficient_data
     if testable > 0:
         success_rate = correct_detections / testable
     else:
         success_rate = 0.0
-    
+
     return {
         'results': results,
         'summary': {
@@ -300,6 +328,7 @@ def validate_features(raster_path: Path, features: List[Dict],
             'incorrect': incorrect_detections,
             'out_of_bounds': out_of_bounds,
             'no_data': no_data,
+            'insufficient_data': insufficient_data,
             'success_rate': success_rate
         }
     }
@@ -323,8 +352,11 @@ Correct Detections: {summary['correct']}
 Incorrect Detections: {summary['incorrect']}
 Out of Bounds: {summary['out_of_bounds']}
 No Data: {summary['no_data']}
+Insufficient Data (<{MIN_VALID_PIXELS} valid pixels): {summary['insufficient_data']}
 
 SUCCESS RATE: {summary['success_rate']:.1%}
+Detection threshold: ±{DETECTION_THRESHOLD_SIGMA:.2f}σ
+Minimum valid pixels: {MIN_VALID_PIXELS}
 
 {'=' * 70}
 
@@ -370,20 +402,19 @@ DETAILED RESULTS
     report += "\nINTERPRETATION\n"
     report += "-" * 70 + "\n"
     report += f"""
-A successful detection means ANY significant anomaly (positive or negative) was detected.
+Detection criteria:
+- Mean anomaly must exceed ±{DETECTION_THRESHOLD_SIGMA:.2f}σ within the sampling buffer.
+- The anomaly sign must match the expected behaviour of the feature class.
+- At least {MIN_VALID_PIXELS} valid pixels are required for a conclusive result.
 
-IMPROVED ALGORITHM (v2.2):
-- Detection threshold: |0.02σ| (lowered from 0.3σ to catch extremely weak signals)
-- Accepts BOTH positive AND negative anomalies (geological variations cause sign reversals)
-- Rationale: Different regional contexts produce different anomaly signs for same feature type
-
-Success rate of {summary['success_rate']:.1%} indicates the fusion pipeline is
-{'performing well' if summary['success_rate'] > 0.7 else 'needs improvement'} at detecting known subsurface features.
+Use the success rate as a coarse indication of how consistently the fused raster
+captures known targets. Investigate locations flagged as incorrect or
+insufficient data to understand whether additional preprocessing or data layers
+are necessary.
 
 NOTES:
-- Values in sigma (σ) units = standard deviations from regional mean
-- 2km buffer used for spatial averaging
-- Detection criterion: |anomaly| > 0.02σ (extremely sensitive to any deviation)
+- Values are expressed in standard deviation (σ) units relative to the regional mean.
+- Buffers are applied in degrees converted from the requested kilometre radius.
 """
     
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -428,33 +459,51 @@ def create_validation_map(validation: Dict, raster_path: Path, output_path: Path
     )
     
     # Plot validation points
+    labels_used = set()
+
     for r in validation['results']:
         feature = r['feature']
-        
+
         if not r['stats']['in_bounds']:
             continue
-            
+
         lon, lat = feature['lon'], feature['lat']
-        
+
         if r['detected_correctly'] is True:
             color = 'lime'
             marker = 'o'
             size = 150
-            label = '✓ Correct'
+            label = 'Correct detection'
         elif r['detected_correctly'] is False:
             color = 'red'
             marker = 'x'
             size = 200
-            label = '✗ Incorrect'
+            label = 'Incorrect detection'
         else:
-            color = 'gray'
+            if r['stats']['valid_pixels'] == 0:
+                color = 'gray'
+                label = 'No data'
+            else:
+                color = 'orange'
+                label = 'Insufficient data'
             marker = 's'
-            size = 100
-            label = '? No Data'
-        
-        ax.scatter(lon, lat, c=color, marker=marker, s=size, 
-                  edgecolors='black', linewidths=2, zorder=10,
-                  label=label if lon == feature['lon'] else "")  # Label once
+            size = 120
+
+        display_label = None if label in labels_used else label
+        if display_label:
+            labels_used.add(display_label)
+
+        ax.scatter(
+            lon,
+            lat,
+            c=color,
+            marker=marker,
+            s=size,
+            edgecolors='black',
+            linewidths=2,
+            zorder=10,
+            label=display_label,
+        )
         
         # Add text label
         ax.text(lon, lat + 0.5, feature['name'].split(',')[0], 
@@ -543,6 +592,9 @@ def main():
     print(f"\nTested: {summary['testable']} features")
     print(f"Correct: {summary['correct']}")
     print(f"Incorrect: {summary['incorrect']}")
+    print(f"Out of Bounds: {summary['out_of_bounds']}")
+    print(f"No Data: {summary['no_data']}")
+    print(f"Insufficient Data: {summary['insufficient_data']}")
     print(f"Success Rate: {summary['success_rate']:.1%}")
     print(f"\nReports:")
     print(f"  Text: {report_path}")
