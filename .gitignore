@@ -84,3 +84,7 @@ snap_interferogram_graph.xml
 validate_against_known_features_ORIGINAL.py
 GeoAnomalyMapper.egg-info/
 data/agent_status.json
+
+# Allow GitHub Pages data assets
+!docs/data/
+!docs/data/**

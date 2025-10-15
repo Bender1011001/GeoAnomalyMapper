@@ -135,6 +135,25 @@ and populate it locally. Do not commit the resulting file.
 
 Each command emits structured logging so processing steps can be audited.
 
+## Publishing the interactive void explorer
+
+The repository ships with a GitHub Pages-ready site under `docs/` that renders
+processed void detections on an interactive Leaflet map.
+
+1. Push the repository to GitHub and enable **GitHub Pages** in the repository
+   settings, selecting the **docs/** folder as the publishing source.
+2. Export your processed results as GeoJSON files and copy them into
+   `docs/data/`.
+3. Describe each dataset in `docs/data/datasets.json` by adding entries with an
+   `id`, `name`, `description`, `file` path (relative to `docs/`) and `color`
+   (HEX value). The viewer automatically loads every dataset listed in the
+   configuration, draws it on the map and populates the dataset summary cards.
+4. Commit and push the updated files. GitHub Pages republishes the site within a
+   minute or two.
+
+You can also drag-and-drop new GeoJSON files onto the "Preview a local file"
+control in the published site to check their appearance before committing them.
+
 ## Validation philosophy
 
 The validation utility samples the fused anomaly raster around a curated list of

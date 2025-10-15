@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "name": "Sample Voids",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "void_id": "VOID-001",
+        "confidence": 0.82,
+        "depth_m": 45
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-105.011, 39.755]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "void_id": "VOID-002",
+        "confidence": 0.91,
+        "depth_m": 63
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-104.989, 39.741]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "void_id": "VOID-003",
+        "confidence": 0.74,
+        "depth_m": 52
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-105.02, 39.75],
+            [-105.0, 39.75],
+            [-105.0, 39.77],
+            [-105.02, 39.77],
+            [-105.02, 39.75]
+          ]
+        ]
+      }
+    }
+  ]
+}
