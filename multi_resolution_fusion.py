@@ -37,6 +37,9 @@ from scipy import ndimage, signal
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
 
+# Configuration shim import for optional v2 features
+from utils.config_shim import get_config
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -370,17 +373,33 @@ class SpectralFusion:
 
 def fuse_weighted(
     layers: List[DataLayer],
-    use_uncertainty: bool = True
+    use_uncertainty: bool = True,
+    dynamic: bool = False,
+    target_res: Optional[float] = None
 ) -> DataLayer:
     """
-    Combine multiple layers using uncertainty-weighted averaging.
-    
-    Args:
-        layers: List of DataLayer objects to fuse
-        use_uncertainty: Use uncertainty weighting if available
-    
-    Returns:
-        Fused DataLayer
+    Perform weighted fusion of multiple DataLayer objects.
+
+    Parameters
+    ----------
+    layers : List[DataLayer]
+        List of data layers to be fused. All layers must share the same shape.
+    use_uncertainty : bool, optional
+        If True, incorporate per‑pixel uncertainty weighting when ``dynamic`` is False.
+        Ignored when ``dynamic`` is True because dynamic weighting already accounts for uncertainty.
+    dynamic : bool, optional
+        When True, enable dynamic weighting based on data quality metrics (uncertainty
+        and spatial resolution). This mode is activated via the ``GAM_DYNAMIC_WEIGHTING``
+        configuration flag and is opt‑in only.
+    target_res : float, optional
+        Target resolution (in degrees) of the output grid. Required when ``dynamic`` is True
+        because the resolution factor is computed relative to this value.
+
+    Returns
+    -------
+    DataLayer
+        A new DataLayer containing the fused data, optional fused uncertainty,
+        and metadata inherited from the highest‑resolution input layer.
     """
     if not layers:
         raise ValueError("No layers provided for fusion")
@@ -391,6 +410,15 @@ def fuse_weighted(
         raise ValueError("All layers must have the same shape for fusion")
     
     # Normalize each layer to z-scores for fair comparison
+    # Log which weighting mode is active
+    if dynamic:
+        logger.info("Dynamic weighting mode enabled")
+    else:
+        logger.info("Standard uncertainty‑weighted fusion mode")
+    # If dynamic weighting is requested, compute per‑layer dynamic weights
+    if dynamic:
+        if target_res is None:
+            raise ValueError("target_res must be provided when dynamic weighting is enabled")
     normalized_layers = []
     for layer in layers:
         data = layer.data.copy()
@@ -408,17 +436,33 @@ def fuse_weighted(
         normalized_layers.append(z_score)
     
     # Calculate weights
-    if use_uncertainty:
+    if dynamic:
+        # Dynamic weighting based on data quality (uncertainty & resolution)
         weights = []
         for layer in layers:
+            # Base weight from uncertainty (inverse) if available
             if layer.uncertainty is not None:
-                # Inverse uncertainty weighting
-                w = 1.0 / (layer.uncertainty + 1e-6)
+                # Per-pixel inverse-uncertainty weighting
+                base_w = 1.0 / (layer.uncertainty + 1e-6)
             else:
-                w = np.full(layer.shape, layer.weight)
-            weights.append(w)
+                # Fallback to scalar layer weight broadcast to raster shape
+                base_w = np.full(layer.shape, layer.weight, dtype=np.float32)
+            # Resolution factor: higher resolution (smaller degree) gets higher weight
+            res_factor = target_res / layer.resolution if layer.resolution > 0 else 1.0
+            w = base_w * res_factor
+            weights.append(w.astype(np.float32))
     else:
-        weights = [np.full(layer.shape, layer.weight) for layer in layers]
+        if use_uncertainty:
+            weights = []
+            for layer in layers:
+                if layer.uncertainty is not None:
+                    # Inverse uncertainty weighting
+                    w = 1.0 / (layer.uncertainty + 1e-6)
+                else:
+                    w = np.full(layer.shape, layer.weight)
+                weights.append(w)
+        else:
+            weights = [np.full(layer.shape, layer.weight) for layer in layers]
     
     # Stack arrays
     data_stack = np.stack(normalized_layers, axis=0)
@@ -429,6 +473,9 @@ def fuse_weighted(
         weighted_sum = np.nansum(data_stack * weight_stack, axis=0)
         weight_sum = np.nansum(weight_stack, axis=0)
         fused = weighted_sum / weight_sum
+    # Where total weight is zero or invalid, set fused to NaN
+    zero_w = (weight_sum == 0) | np.isnan(weight_sum)
+    fused[zero_w] = np.nan
     
     # Set to NaN where all inputs are NaN
     all_nan = np.all(np.isnan(data_stack), axis=0)
@@ -436,11 +483,18 @@ def fuse_weighted(
     
     # Estimate fused uncertainty (propagation of uncertainties)
     if use_uncertainty and any(layer.uncertainty is not None for layer in layers):
+        # Use safe weight sum to avoid division by zero; invalid entries propagate as NaN
+        weight_sum_safe = np.where(weight_sum == 0, np.nan, weight_sum)
         fused_uncertainty = np.sqrt(
-            np.nansum((weight_stack / weight_sum)**2 * 
-                     np.stack([l.uncertainty if l.uncertainty is not None 
-                              else np.ones(l.shape) for l in layers], axis=0)**2,
-                     axis=0)
+            np.nansum(
+                (weight_stack / weight_sum_safe) ** 2
+                * np.stack(
+                    [l.uncertainty if l.uncertainty is not None
+                     else np.ones(l.shape, dtype=np.float32) for l in layers],
+                    axis=0
+                ) ** 2,
+                axis=0
+            )
         )
     else:
         fused_uncertainty = None
@@ -574,9 +628,24 @@ def process_multi_resolution(
         logger.error("No data layers available! Please download data first.")
         return
     
-    # Perform fusion
-    logger.info("Performing weighted fusion...")
-    fused_layer = fuse_weighted(layers, use_uncertainty=True)
+    # Determine whether dynamic weighting is enabled via config flag
+    dynamic_flag = get_config('GAM_DYNAMIC_WEIGHTING', 'false').lower() == 'true'
+    if dynamic_flag:
+        logger.info("GAM_DYNAMIC_WEIGHTING enabled – using dynamic weighting fusion")
+    else:
+        logger.info("GAM_DYNAMIC_WEIGHTING disabled – using standard weighted fusion")
+    logger.info("Performing fusion...")
+    if dynamic_flag:
+        # Dynamic weighting mode
+        fused_layer = fuse_weighted(
+            layers,
+            use_uncertainty=True,
+            dynamic=True,
+            target_res=target_resolution
+        )
+    else:
+        # Standard mode (backward compatible)
+        fused_layer = fuse_weighted(layers, use_uncertainty=True)
     
     # Save output
     output_tif = OUTPUT_DIR / f"{output_name}.tif"

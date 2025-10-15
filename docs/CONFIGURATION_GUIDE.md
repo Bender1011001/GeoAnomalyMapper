@@ -179,6 +179,29 @@ config.set('fusion.target_resolution', 0.0005)  # Runtime change
 **In multi_resolution_fusion.py**:
 - Loads fusion/weights; applies dynamic if enabled.
 
+### Feature Flag System
+v2 introduces opt-in feature flags for gradual adoption without breaking v1 workflows. Flags are set via environment variables (in `.env` or exported) and control shim behavior.
+
+**Key Flags**:
+- **GAM_USE_V2_CONFIG** (default: false): Enables full ConfigManager/PathManager. When false, shims fall back to hardcoded defaults and `os.getenv`.
+- **GAM_DYNAMIC_WEIGHTING** (default: true when v2 enabled): Activates adaptive weights in fusion.
+- **GAM_DATA_AGENT_ENABLED** (default: true): Enables gam_data_agent.py for automated downloads.
+- **GAM_VALIDATION_ENABLED** (default: true): Runs post-processing validation.
+
+**Enabling v2 Features**:
+1. Set `GAM_USE_V2_CONFIG=true` in `.env` or export.
+2. Update scripts to import from shims: `from utils import config_shim, paths_shim`.
+3. Gradually enable other flags as needed (e.g., `GAM_DYNAMIC_WEIGHTING=true` for fusion enhancements).
+
+**Example (.env)**:
+```
+GAM_USE_V2_CONFIG=true
+GAM_DYNAMIC_WEIGHTING=true
+GAM_DATA_AGENT_ENABLED=true
+```
+
+This system ensures v1 (default: shims use fallbacks) and v2 (opt-in: full structured config) behaviors coexist. See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for shim details.
+
 ## Validation and Schema
 
 Config includes built-in schema validation (using pydantic or jsonschema):
@@ -267,16 +290,30 @@ python setup_environment.py config-report
 - **Credentials**: Move from scripts to `.env`.
 - **Validation**: Add `ConfigManager.validate()` to entrypoints.
 
+**Gradual Adoption with Shims**:
+Use `utils/config_shim.py` and `utils/paths_shim.py` for compatibility. Existing code imports from shims without changes; set `GAM_USE_V2_CONFIG=true` to opt into v2.
+
 **Script Update Example**:
 ```python
 # Old: hardcoded
 RAW_DIR = './data/raw'
 
-# New:
+# New (via shim for compatibility):
+from utils import config_shim
+RAW_DIR = config_shim.get_data_dir()  # Falls back to './data' if v2 disabled
+
+# Full v2:
 from utils.config import ConfigManager
 config = ConfigManager()
 RAW_DIR = config.get_path('paths.raw_data')
 ```
+
+**Enabling New Capabilities**:
+- **Dynamic Weighting**: Set `GAM_DYNAMIC_WEIGHTING=true`; update fusion calls to use WeightCalculator.
+- **Data Agent**: Run `python gam_data_agent.py download free` after enabling `GAM_DATA_AGENT_ENABLED=true`.
+- No breaking changes: v1 workflows run unchanged (shims default to false).
+
+For detailed v1 vs v2 comparison: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md).
 
 ## Best Practices
 
@@ -285,7 +322,8 @@ RAW_DIR = config.get_path('paths.raw_data')
 - **Documentation**: Inline comments in JSON for complex params.
 - **Testing**: `python -m unittest` includes config validation tests.
 - **Security**: Rotate credentials quarterly; use vault for production.
+- **Feature Flags**: Start with `GAM_USE_V2_CONFIG=true`; enable others incrementally.
 
 For troubleshooting: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-*Updated: October 2025 - v2.0 (Unified Config)*
+*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*

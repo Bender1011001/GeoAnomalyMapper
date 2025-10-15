@@ -25,6 +25,12 @@ python setup_environment.py validate
 pytest tests/utils/  # Run utility tests
 ```
 
+### v2 Integration Overview
+Stages 1-5 introduced modular config/paths, data agent, fusion enhancements, validation, and environment setup. This guide covers extending these for v2.
+
+- **Staged Approach**: v2 uses shims for backward compatibility. Enable via `GAM_USE_V2_CONFIG=true`. Future stages build on this (e.g., Stage 6: docs convergence).
+- **Key Changes**: Structured config replaces hardcoded values; shims allow gradual migration.
+
 ## 1. paths.py - Cross-Platform Path Resolution
 
 ### Purpose
@@ -65,6 +71,22 @@ raw_path = pm.get('paths.raw_data')
 if not raw_path.exists():
     raw_path.mkdir(parents=True)
 ```
+
+### Shim System for Compatibility
+`utils/config_shim.py` and `utils/paths_shim.py` provide v1/v2 bridges:
+- **When v2 disabled** (`GAM_USE_V2_CONFIG=false`): Returns hardcoded defaults (e.g., `get_data_dir() -> Path('data')`).
+- **When enabled**: Delegates to ConfigManager/PathManager.
+- **Gradual Adoption**: Update imports to shims; enable flag to activate v2 without code changes.
+
+**Example**:
+```python
+from utils import config_shim, paths_shim
+
+data_dir = config_shim.get_data_dir()  # v1: 'data'; v2: from config.json
+output_path = paths_shim.get_output_dir() / 'report.txt'
+```
+
+This maintains v1 workflows while allowing opt-in to v2 features like validation and substitution.
 
 ## 2. error_handling.py - Robustness Framework
 
@@ -128,6 +150,7 @@ Provides retry, circuit breaker, and error categorization for reliable operation
 - Log context: Include service/URL in exceptions.
 - Graceful Degradation: Skip non-critical (e.g., optional InSAR).
 - Testing: Use `pytest-mock` to simulate failures; assert retries.
+- **v2 Integration**: Use with config for retry params (e.g., `max_retries = config.get('robustness.max_retries')`).
 
 **Example Extension** (Custom Downloader):
 ```python
@@ -177,6 +200,7 @@ Generates adaptive SNAP Graph XML from Sentinel-1 metadata, replacing static tem
 - Error Handling: Wrap with RobustDownloader for GPT calls.
 - Outputs: Standardize to GeoTIFF with CRS.
 - Testing: Mock XML generation; use sample .SAFE.
+- **v2 Integration**: Load params from config (e.g., `filter_alpha = config.get('snap.template_params.filter_alpha')`).
 
 **Example in Pipeline**:
 ```python
@@ -203,6 +227,7 @@ if config.get('insar.auto_process'):
 - **In Scripts**: Import and use (e.g., data_agent.py uses all three).
 - **External Projects**: `pip install -e .` then import.
 - **Hooks**: Config `"extensions": ["custom_module"]` for plugins.
+- **v2 Guidance**: Use shims for config/paths in new code; enable flags for features like dynamic weighting.
 
 ### Testing and CI
 - Run: `pytest tests/utils/ -v`.
@@ -217,9 +242,10 @@ if config.get('insar.auto_process'):
 - **Documentation**: NumPy-style docstrings; examples in code.
 - **Versioning**: Semantic changes → bump utils version in pyproject.toml.
 - **Security**: No secrets in utils; defer to .env.
+- **Staged Integration**: Follow Stages 1-5 pattern: config first, then paths, robustness, etc. Document shims for compatibility.
 
-For API details: [API_REFERENCE.md](docs/API_REFERENCE.md) (forthcoming).
+For API details: [API_REFERENCE.md](API_REFERENCE.md).
 
 Contribute via PRs; see CONTRIBUTING.md.
 
-*Updated: October 2025 - v2.0 (Modular Utils)*
+*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*

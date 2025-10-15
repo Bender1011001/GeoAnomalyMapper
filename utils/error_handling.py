@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from pathlib import Path
 
 from requests.exceptions import (
     ConnectionError,
@@ -416,6 +417,7 @@ class RobustDownloader:
     ) -> bool:
         """Validate downloaded file integrity."""
         try:
+            import hashlib  # Lazy import for checksum
             size = path.stat().st_size
             if expected_size and size != expected_size:
                 raise IntegrityError(f"Size mismatch: {size} != {expected_size}")

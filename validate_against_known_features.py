@@ -17,7 +17,9 @@ from rasterio.windows import from_bounds
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
+import json
+from utils.config_shim import get_config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -334,9 +336,12 @@ def validate_features(raster_path: Path, features: List[Dict],
     }
 
 
-def generate_validation_report(validation: Dict, output_path: Path):
-    """Generate detailed validation report."""
-    
+def generate_validation_report(validation: Dict, output_path: Path, enhanced_metrics: Optional[Dict] = None):
+    """Generate detailed validation report.
+
+    The default report structure and text are preserved to maintain docs/Pages compatibility.
+    When enhanced_metrics is provided (opt-in), an additional section is appended at the end.
+    """
     summary = validation['summary']
     results = validation['results']
     
@@ -364,7 +369,6 @@ DETAILED RESULTS
 ----------------
 
 """
-    
     # Group by type
     by_type = {}
     for r in results:
@@ -375,17 +379,14 @@ DETAILED RESULTS
     
     for ftype, type_results in sorted(by_type.items()):
         report += f"\n{ftype.upper().replace('_', ' ')}\n{'-' * 70}\n"
-        
         for r in type_results:
             feature = r['feature']
             stats = r['stats']
-            
             report += f"\n{feature['name']}\n"
             report += f"  Location: {feature['lat']:.4f}°N, {abs(feature['lon']):.4f}°W\n"
             report += f"  Type: {feature['type']}\n"
             report += f"  Expected: {feature['expected']} anomaly\n"
             report += f"  Description: {feature['description']}\n"
-            
             if stats['in_bounds']:
                 if stats['valid_pixels'] > 0:
                     report += f"  Measured Anomaly: {stats['mean']:.3f}σ (±{stats['std']:.3f})\n"
@@ -395,7 +396,6 @@ DETAILED RESULTS
                     report += f"  Status: No valid data\n"
             else:
                 report += f"  Status: Outside map bounds\n"
-                
             report += f"  Result: {r['explanation']}\n"
     
     report += f"\n{'=' * 70}\n"
@@ -416,11 +416,87 @@ NOTES:
 - Values are expressed in standard deviation (σ) units relative to the regional mean.
 - Buffers are applied in degrees converted from the requested kilometre radius.
 """
+    # Append enhanced metrics if provided (opt-in, non-breaking)
+    if enhanced_metrics:
+        report += f"\n{'=' * 70}\n"
+        report += "ENHANCED METRICS (opt-in)\n"
+        report += "-" * 70 + "\n"
+        # By-type metrics
+        by_type = enhanced_metrics.get('by_type', {})
+        if by_type:
+            report += "Per-type performance:\n"
+            for ftype, m in sorted(by_type.items()):
+                testable = m.get('testable', 0)
+                correct = m.get('correct', 0)
+                success = (correct / testable) if testable else 0.0
+                avg_abs = m.get('avg_abs_mean', float('nan'))
+                report += f"  - {ftype}: testable={testable}, correct={correct}, success={success:.1%}, avg|mean|={avg_abs:.3f}σ\n"
+        # Sigma bins
+        bins = enhanced_metrics.get('sigma_bins', {})
+        if bins:
+            report += "Signal strength distribution (by |σ|):\n"
+            report += f"  - ≥ 1.0σ: {bins.get('>=1.0', 0)}\n"
+            report += f"  - ≥ 0.5σ and < 1.0σ: {bins.get('>=0.5', 0)}\n"
+            report += f"  - < 0.5σ: {bins.get('<0.5', 0)}\n"
     
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(report)
-    
     logger.info(f"Validation report saved: {output_path}")
+    
+def compute_enhanced_metrics(validation: Dict) -> Dict:
+    """Compute optional enhanced validation metrics (opt-in only).
+    
+    Returns:
+        Dict with:
+          - by_type: {type: {testable, correct, avg_abs_mean}}
+          - sigma_bins: counts by absolute sigma thresholds
+    """
+    by_type: Dict[str, Dict[str, float]] = {}
+    sigma_bins = {'>=1.0': 0, '>=0.5': 0, '<0.5': 0}
+    for r in validation.get('results', []):
+        ftype = r['feature'].get('type', 'unknown')
+        stats = r.get('stats', {})
+        in_bounds = stats.get('in_bounds', False)
+        valid_pixels = stats.get('valid_pixels', 0) or 0
+        mean_val = stats.get('mean', float('nan'))
+        if ftype not in by_type:
+            by_type[ftype] = {'testable': 0, 'correct': 0, 'sum_abs_mean': 0.0}
+        if in_bounds and valid_pixels >= MIN_VALID_PIXELS and not np.isnan(mean_val):
+            by_type[ftype]['testable'] += 1
+            if r.get('detected_correctly') is True:
+                by_type[ftype]['correct'] += 1
+            by_type[ftype]['sum_abs_mean'] += abs(float(mean_val))
+            # Sigma distribution
+            a = abs(float(mean_val))
+            if a >= 1.0:
+                sigma_bins['>=1.0'] += 1
+            elif a >= 0.5:
+                sigma_bins['>=0.5'] += 1
+            else:
+                sigma_bins['<0.5'] += 1
+    # Finalize averages
+    out_by_type: Dict[str, Dict[str, float]] = {}
+    for ftype, m in by_type.items():
+        t = int(m['testable'])
+        avg_abs = (m['sum_abs_mean'] / t) if t > 0 else float('nan')
+        out_by_type[ftype] = {
+            'testable': t,
+            'correct': int(m['correct']),
+            'avg_abs_mean': float(avg_abs),
+        }
+    return {'by_type': out_by_type, 'sigma_bins': sigma_bins}
+
+def to_python(obj):
+    """Convert numpy scalars/arrays within nested structures to native Python types for JSON."""
+    if isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    return obj
 
 
 def create_validation_map(validation: Dict, raster_path: Path, output_path: Path):
@@ -559,6 +635,17 @@ def main():
         default=None,
         help='Output directory for validation results'
     )
+    # Opt-in features (non-breaking; defaults unchanged)
+    parser.add_argument(
+        '--enhanced',
+        action='store_true',
+        help='Enable enhanced validation metrics (opt-in; default: disabled)'
+    )
+    parser.add_argument(
+        '--json-report',
+        action='store_true',
+        help='Also write JSON report alongside text (opt-in; default: disabled)'
+    )
     
     args = parser.parse_args()
     
@@ -573,12 +660,34 @@ def main():
     else:
         output_dir = raster_path.parent
     
+    # Determine opt-in feature flags from CLI or config_shim
+    enhanced_flag = args.enhanced or str(get_config('GAM_VALIDATION_ENHANCED', 'false')).lower() == 'true'
+    json_flag = args.json_report or str(get_config('GAM_VALIDATION_JSON', 'false')).lower() == 'true'
+    logger.info(f"Validation mode: {'ENHANCED' if enhanced_flag else 'STANDARD'}")
+    if json_flag:
+        logger.info("JSON report: ENABLED")
+    
     # Run validation
     validation = validate_features(raster_path, KNOWN_FEATURES, args.buffer)
     
-    # Generate report
+    # Enhanced metrics (opt-in)
+    metrics = compute_enhanced_metrics(validation) if enhanced_flag else None
+    
+    # Generate report (text always; structure unchanged; enhanced section appended only when enabled)
     report_path = output_dir / f"{raster_path.stem}_validation_report.txt"
-    generate_validation_report(validation, report_path)
+    generate_validation_report(validation, report_path, metrics)
+    
+    # Optional JSON report (opt-in)
+    if json_flag:
+        json_path = output_dir / f"{raster_path.stem}_validation_report.json"
+        with open(json_path, 'w', encoding='utf-8') as jf:
+            json.dump(
+                {'summary': to_python(validation['summary']),
+                 'results': to_python(validation['results']),
+                 'enhanced_metrics': to_python(metrics) if metrics else None},
+                jf, indent=2
+            )
+        logger.info(f"Validation JSON saved: {json_path}")
     
     # Create map
     map_path = output_dir / f"{raster_path.stem}_validation_map.png"
@@ -599,6 +708,8 @@ def main():
     print(f"\nReports:")
     print(f"  Text: {report_path}")
     print(f"  Map:  {map_path}")
+    if json_flag:
+        print(f"  JSON: {json_path}")
     print("=" * 70 + "\n")
 
 

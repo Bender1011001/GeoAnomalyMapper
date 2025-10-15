@@ -351,7 +351,8 @@ def write_geotiff(
 def process_region(
     bounds: Tuple[float, float, float, float],
     resolution: float = 0.001,  # ~100m at equator
-    output_base: str = "void_probability"
+    output_base: str = "void_probability",
+    output_dir: Path = OUTPUT_DIR
 ):
     """
     Process region and generate void probability map.
@@ -360,12 +361,14 @@ def process_region(
         bounds: (lon_min, lat_min, lon_max, lat_max)
         resolution: Grid resolution in degrees
         output_base: Output filename base
+        output_dir: Output directory (default: data/outputs/void_detection)
     """
     
     logger.info(f"Processing region: {bounds}")
     logger.info(f"Resolution: {resolution}° (~{resolution * 111:.0f} km)")
+    logger.info(f"Output directory: {output_dir}")
     
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load and resample data layers
     logger.info("Loading gravity data...")
@@ -418,14 +421,14 @@ def process_region(
     logger.info(f"Found {num_hotspots} potential void clusters")
     
     # Save outputs
-    output_tif = OUTPUT_DIR / f"{output_base}.tif"
-    output_png = OUTPUT_DIR / f"{output_base}.png"
+    output_tif = output_dir / f"{output_base}.tif"
+    output_png = output_dir / f"{output_base}.png"
     
     write_geotiff(probability, output_tif, bounds)
     visualize_void_probability(probability, output_png, bounds, hotspots)
     
     # Generate report
-    report_path = OUTPUT_DIR / f"{output_base}_report.txt"
+    report_path = output_dir / f"{output_base}_report.txt"
     with open(report_path, 'w') as f:
         f.write("VOID DETECTION REPORT\n")
         f.write("=" * 70 + "\n\n")
@@ -471,6 +474,12 @@ def main():
         default='void_probability',
         help='Output filename base'
     )
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default=None,
+        help='Output directory (default: data/outputs/void_detection)'
+    )
     
     args = parser.parse_args()
     
@@ -482,8 +491,12 @@ def main():
     
     bounds = tuple(map(float, bounds_str))
     
+    # Resolve output directory (opt-in override; default remains unchanged)
+    out_dir = Path(args.output_dir) if args.output_dir else OUTPUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
     # Process
-    process_region(bounds, args.resolution, args.output)
+    process_region(bounds, args.resolution, args.output, output_dir=out_dir)
 
 
 if __name__ == "__main__":

@@ -52,6 +52,23 @@ Dynamic path resolution using pathlib.
 
 **Integration**: All scripts use PathManager for data I/O.
 
+### Feature Flags and Environment Variables
+v2 integration uses feature flags for gradual adoption. Key flags include:
+
+- **GAM_USE_V2_CONFIG** (default: false): Enables the full ConfigManager and PathManager. When false, falls back to hardcoded defaults and direct `os.getenv` calls via shims.
+- **GAM_DYNAMIC_WEIGHTING** (default: true when v2 enabled): Activates adaptive weights in fusion (see WeightCalculator).
+- **GAM_DATA_AGENT_ENABLED** (default: true): Allows gam_data_agent.py to manage downloads.
+- **GAM_VALIDATION_ENABLED** (default: true): Runs validation hooks post-processing.
+
+**Usage**:
+Set in `.env` or export before running scripts:
+```bash
+export GAM_USE_V2_CONFIG=true
+export GAM_DYNAMIC_WEIGHTING=false  # Disable for testing
+```
+
+These flags ensure v1 compatibility while opting into v2 features. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for details.
+
 ## 2. Dynamic Fusion Capabilities
 
 ### WeightCalculator (multi_resolution_fusion.py)
@@ -181,4 +198,60 @@ downloader.download_with_retry('https://example.com/data.zip', 'data.zip', tm.ge
 
 For full source: See utils/ and scripts. Extend via inheritance.
 
-*Updated: October 2025 - v2.0 (Technical APIs)*
+### CLI Utilities
+
+#### gam_data_agent.py
+Unified data acquisition agent for geophysical datasets.
+
+**CLI Interface**:
+```bash
+python gam_data_agent.py status [--report]
+python gam_data_agent.py download [free|all] [--dataset <key>] [--bbox "lon1,lat1,lon2,lat2"] [--dry-run]
+```
+
+- **status**: Shows download status from `data/data_status.json`.
+- **download**: Fetches datasets (e.g., EMAG2, EGM2008, Sentinel-1). Supports bbox for regional data.
+- Datasets: emag2_magnetic, egm2008_gravity, xgm2019e_gravity, srtm_dem, insar_sentinel1.
+- Integrates RobustDownloader for resilience; respects v2 config for paths.
+
+**Example**:
+```bash
+python gam_data_agent.py download free --bbox "-105,32,-104,33"
+```
+
+Tracks progress in `data/data_status.json`; idempotent runs.
+
+#### setup_environment.py
+Environment diagnostics and optional setup utility.
+
+**CLI Interface**:
+```bash
+python setup_environment.py check [--deep] [--yes] [--network] [--json <file>]
+python setup_environment.py setup [--v2] [--yes]
+python setup_environment.py requirements
+```
+
+- **check**: Runs diagnostics (system, packages, paths, config mode, Stage 1-5 components). `--deep` imports modules (may create dirs); `--network` DNS preflight.
+- **setup**: Creates data/ structure and optional .env copy. `--v2` ensures v2-managed paths.
+- **requirements**: Shows dependency summaries.
+
+**Example**:
+```bash
+python setup_environment.py check --deep --yes --json diag.json
+```
+
+Non-invasive by default; explicit confirmation for side effects.
+
+## Integration and Best Practices
+
+- **Config First**: Always load ConfigManager early.
+- **Path Safety**: Use PathManager for all I/O.
+- **Robust Calls**: Wrap external (requests, subprocess) with retry/circuit.
+- **Validation**: Call validate() post-load.
+- **Logging**: Use `logging.getLogger(__name__)`; config sets level.
+- **Testing**: Mock utils in tests (e.g., patch PathManager).
+- **Shims**: Use `utils/config_shim.py` and `utils/paths_shim.py` for v1/v2 compatibility in legacy code.
+
+For full source: See utils/ and scripts. Extend via inheritance.
+
+*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
