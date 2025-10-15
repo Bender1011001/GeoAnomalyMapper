@@ -1,40 +1,49 @@
 {
   "type": "FeatureCollection",
+  "name": "Sample Voids",
   "features": [
     {
       "type": "Feature",
       "properties": {
-        "id": "VOID-001",
-        "name": "Sample Void A",
-        "confidence": 0.92,
-        "depth_m": 120,
-        "radius_m": 45,
-        "dataset": "InSAR Campaign 2024-02",
-        "timestamp": "2024-02-18",
-        "notes": "Example placeholder void generated for the GitHub Pages viewer.",
-        "region": "Front Range, CO"
+        "void_id": "VOID-001",
+        "confidence": 0.82,
+        "depth_m": 45
       },
       "geometry": {
         "type": "Point",
-        "coordinates": [-105.2705, 40.015]
+        "coordinates": [-105.011, 39.755]
       }
     },
     {
       "type": "Feature",
       "properties": {
-        "id": "VOID-002",
-        "name": "Sample Void B",
-        "confidence": 0.74,
-        "depth_m": 85,
-        "radius_m": 30,
-        "dataset": "LiDAR Sweep 2023-Q4",
-        "timestamp": "2023-11-02",
-        "notes": "Moderate confidence detection from multi-resolution fusion pipeline.",
-        "region": "Wasatch Front, UT"
+        "void_id": "VOID-002",
+        "confidence": 0.91,
+        "depth_m": 63
       },
       "geometry": {
         "type": "Point",
-        "coordinates": [-111.891, 40.7608]
+        "coordinates": [-104.989, 39.741]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "void_id": "VOID-003",
+        "confidence": 0.74,
+        "depth_m": 52
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-105.02, 39.75],
+            [-105.0, 39.75],
+            [-105.0, 39.77],
+            [-105.02, 39.77],
+            [-105.02, 39.75]
+          ]
+        ]
       }
     }
   ]

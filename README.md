@@ -135,32 +135,24 @@ and populate it locally. Do not commit the resulting file.
 
 Each command emits structured logging so processing steps can be audited.
 
-## Publishing the interactive viewer
+## Publishing the interactive void explorer
 
-The repository ships with a static website (located in `docs/`) that can be
-deployed through GitHub Pages to let collaborators explore void detections and
-supporting context. The site renders GeoJSON exports from the processing
-pipeline, shows summary statistics, and provides an optional heat map overlay.
+The repository ships with a GitHub Pages-ready site under `docs/` that renders
+processed void detections on an interactive Leaflet map.
 
-### Enable GitHub Pages
+1. Push the repository to GitHub and enable **GitHub Pages** in the repository
+   settings, selecting the **docs/** folder as the publishing source.
+2. Export your processed results as GeoJSON files and copy them into
+   `docs/data/`.
+3. Describe each dataset in `docs/data/datasets.json` by adding entries with an
+   `id`, `name`, `description`, `file` path (relative to `docs/`) and `color`
+   (HEX value). The viewer automatically loads every dataset listed in the
+   configuration, draws it on the map and populates the dataset summary cards.
+4. Commit and push the updated files. GitHub Pages republishes the site within a
+   minute or two.
 
-1. Push the repository to GitHub if you have not already done so.
-2. Open the repository settings, navigate to the **Pages** tab, and select the
-   `main` branch with the `/docs` folder as the publishing source.
-3. Save the configuration. GitHub will publish the site at
-   `https://<username>.github.io/<repository>/` within a few minutes.
-
-### Update the published data
-
-1. Export your processed detections as a GeoJSON FeatureCollection where every
-   feature represents one void. See `docs/data/sample_voids.geojson` for the
-   expected schema.
-2. Replace `docs/data/voids.geojson` with the freshly exported file.
-3. Commit the change, push to GitHub, and GitHub Pages will automatically deploy
-   the update.
-
-Optional supporting layers (e.g., raster thumbnails or cross-sections) can be
-added to `docs/data/` and surfaced by editing `docs/js/app.js`.
+You can also drag-and-drop new GeoJSON files onto the "Preview a local file"
+control in the published site to check their appearance before committing them.
 
 ## Validation philosophy
 

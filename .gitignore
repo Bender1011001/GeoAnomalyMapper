@@ -161,3 +161,25 @@ pmtiles.exe
 .roo/
 .roomodes
 .netrc
+
+# Legacy/auxiliary content (kept out of repo to avoid clutter)
+AUTOMATED_DOWNLOAD_GUIDE.md
+COMPREHENSIVE_FREE_DATA_CATALOG.md
+HIGH_RESOLUTION_DATA_GUIDE.md
+INSAR_DATA_GUIDE.md
+PROJECT_STATUS.md
+QUICKSTART*.md
+ROBUSTNESS_IMPROVEMENTS.md
+SECURITY.md
+WINDOWS_QUICKSTART.md
+download_*.py
+data_agent.py
+process_insar_batch.bat
+snap_interferogram_graph.xml
+validate_against_known_features_ORIGINAL.py
+GeoAnomalyMapper.egg-info/
+data/agent_status.json
+
+# Allow GitHub Pages data assets
+!docs/data/
+!docs/data/**
