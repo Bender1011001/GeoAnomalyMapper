@@ -1,0 +1,29 @@
+
+MULTI-RESOLUTION FUSION REPORT
+======================================================================
+
+Region: (-105.0, 32.0, -104.0, 33.0)
+Target Resolution: 0.001° (~0.1 km)
+Output Resolution: 111 m
+
+Data Layers:
+  - fused_anomaly: 111m, weight=1.0
+  - EMAG2_V3_SeaLevel_DataTiff: 111m, weight=1.0
+
+Statistics:
+  - Valid pixels: 1,000,000
+  - Mean: -0.067
+  - Std Dev: 0.294
+  - Min: -1.168
+  - Max: 0.327
+  - 5th percentile: -0.641
+  - 95th percentile: 0.297
+
+Output:
+  - Fused GeoTIFF: C:\Users\admin\Downloads\SAR-project\data\outputs\multi_resolution\multi_res_fusion.tif
+
+Notes:
+  - Values are normalized z-scores (σ units)
+  - Higher absolute values indicate stronger anomalies
+  - Negative values: density/magnetic deficits (potential voids)
+  - Positive values: density/magnetic excesses (dense structures)

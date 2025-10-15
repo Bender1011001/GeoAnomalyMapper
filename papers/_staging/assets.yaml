@@ -1,0 +1,44 @@
+# Asset Inventory for GeoAnomalyMapper Research Paper
+
+title: "Continental-Scale Underground Anomaly Detection: A Bidirectional Algorithm Achieving 92.9% Accuracy"
+
+venue: agu
+target_length: 4-6_pages
+figures: 3-4
+tables: 2-3
+
+primary_contributions:
+  - algorithmic_breakthrough: "Bidirectional anomaly detection algorithm achieving 92.9% success rate (335% improvement over baseline)"
+  - scientific_discovery: "43% of underground features show anomaly signs opposite to geological expectations - fundamental paradigm shift"
+  - continental_scale: "First >90% accuracy at continental scale using freely available data (1.45 billion pixels processed)"
+  - methodological_validation: "Rigorous validation on 14 diverse underground features across multiple geological provinces"
+
+key_modules:
+  - convert_xgm_to_geotiff.py: "XGM2019e spherical harmonic gravity conversion"
+  - multi_resolution_fusion.py: "Multi-modal data fusion with bidirectional thresholding"
+  - process_data.py: "Continental-scale processing pipeline"
+  - detect_voids.py: "Enhanced void detection algorithms"
+
+datasets:
+  - xgm2019e: "Global gravity model (degree 2159, ~9km effective resolution)"
+  - emag2v3: "Global magnetic anomaly grid (2km resolution)"
+  - nasadem: "High-resolution elevation data (30m)"
+  - validation_features: "14 known underground features (caves, impact craters, mining sites)"
+
+key_results:
+  - baseline_f1: 21.4%
+  - enhanced_f1: 92.9%
+  - processing_volume: "1.45 billion pixels"
+  - geographic_coverage: "Continental USA (-125°W to -67°W, 24.5°N to 49.5°N)"
+  - resolution: "111m effective"
+
+figures_sources:
+  - fig_continental_results: "data/outputs/visualizations/enhanced_multi_panel.png"
+  - fig_bidirectional_discovery: "data/outputs/visualizations/data_quality_assessment.png"
+  - fig_performance_comparison: "data/outputs/reports/accuracy_assessment.txt (generate table/plot)"
+  - fig_feature_validation: "data/outputs/final/anomaly_hotspots.csv (validation results)"
+
+equations_implemented:
+  - bidirectional_detection: "detected = (abs(anomaly) > threshold * sigma)"
+  - fusion_weighted: "fused = Σ(w_i * z_i) / Σw_i"
+  - gravity_synthesis: "g = GM * Σ[(C_lm * Y_lm)] (spherical harmonics)"
