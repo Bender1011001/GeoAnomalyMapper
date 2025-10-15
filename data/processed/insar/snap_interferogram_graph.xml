@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graph id="InSAR_Processing">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${master}</file>
+    </parameters>
+  </node>
+  
+  <node id="Read(2)">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${slave}</file>
+    </parameters>
+  </node>
+  
+  <node id="TOPSAR-Split">
+    <operator>TOPSAR-Split</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <subswath>IW1</subswath>
+      <selectedPolarisations>VV</selectedPolarisations>
+      <firstBurstIndex>1</firstBurstIndex>
+      <lastBurstIndex>9</lastBurstIndex>
+    </parameters>
+  </node>
+  
+  <node id="TOPSAR-Split(2)">
+    <operator>TOPSAR-Split</operator>
+    <sources>
+      <sourceProduct refid="Read(2)"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <subswath>IW1</subswath>
+      <selectedPolarisations>VV</selectedPolarisations>
+      <firstBurstIndex>1</firstBurstIndex>
+      <lastBurstIndex>9</lastBurstIndex>
+    </parameters>
+  </node>
+  
+  <node id="Apply-Orbit-File">
+    <operator>Apply-Orbit-File</operator>
+    <sources>
+      <sourceProduct refid="TOPSAR-Split"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <orbitType>Sentinel Precise (Auto Download)</orbitType>
+    </parameters>
+  </node>
+  
+  <node id="Apply-Orbit-File(2)">
+    <operator>Apply-Orbit-File</operator>
+    <sources>
+      <sourceProduct refid="TOPSAR-Split(2)"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <orbitType>Sentinel Precise (Auto Download)</orbitType>
+    </parameters>
+  </node>
+  
+  <node id="Back-Geocoding">
+    <operator>Back-Geocoding</operator>
+    <sources>
+      <sourceProduct refid="Apply-Orbit-File"/>
+      <sourceProduct.1 refid="Apply-Orbit-File(2)"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <demName>SRTM 1Sec HGT</demName>
+      <demResamplingMethod>BICUBIC_INTERPOLATION</demResamplingMethod>
+      <resamplingType>BISINC_5_POINT_INTERPOLATION</resamplingType>
+    </parameters>
+  </node>
+  
+  <node id="Interferogram">
+    <operator>Interferogram</operator>
+    <sources>
+      <sourceProduct refid="Back-Geocoding"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <subtractFlatEarthPhase>true</subtractFlatEarthPhase>
+      <srpPolynomialDegree>5</srpPolynomialDegree>
+      <srpNumberPoints>501</srpNumberPoints>
+      <orbitDegree>3</orbitDegree>
+      <includeCoherence>true</includeCoherence>
+    </parameters>
+  </node>
+  
+  <node id="TOPSAR-Deburst">
+    <operator>TOPSAR-Deburst</operator>
+    <sources>
+      <sourceProduct refid="Interferogram"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <selectedPolarisations>VV</selectedPolarisations>
+    </parameters>
+  </node>
+  
+  <node id="TopoPhaseRemoval">
+    <operator>TopoPhaseRemoval</operator>
+    <sources>
+      <sourceProduct refid="TOPSAR-Deburst"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <demName>SRTM 1Sec HGT</demName>
+      <tileExtensionPercent>100</tileExtensionPercent>
+      <outputTopoPhaseBand>false</outputTopoPhaseBand>
+      <outputElevationBand>false</outputElevationBand>
+    </parameters>
+  </node>
+  
+  <node id="GoldsteinPhaseFiltering">
+    <operator>GoldsteinPhaseFiltering</operator>
+    <sources>
+      <sourceProduct refid="TopoPhaseRemoval"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <alpha>1.0</alpha>
+      <FFTSizeString>64</FFTSizeString>
+      <windowSizeString>3</windowSizeString>
+      <useCoherenceMask>false</useCoherenceMask>
+      <coherenceThreshold>0.2</coherenceThreshold>
+    </parameters>
+  </node>
+  
+  <node id="Terrain-Correction">
+    <operator>Terrain-Correction</operator>
+    <sources>
+      <sourceProduct refid="GoldsteinPhaseFiltering"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <demName>SRTM 1Sec HGT</demName>
+      <imgResamplingMethod>BILINEAR_INTERPOLATION</imgResamplingMethod>
+      <pixelSpacingInMeter>10.0</pixelSpacingInMeter>
+      <mapProjection>AUTO:42001</mapProjection>
+      <nodataValueAtSea>false</nodataValueAtSea>
+      <saveDEM>false</saveDEM>
+      <saveLatLon>false</saveLatLon>
+      <saveIncidenceAngleFromEllipsoid>false</saveIncidenceAngleFromEllipsoid>
+      <saveLocalIncidenceAngle>false</saveLocalIncidenceAngle>
+      <saveProjectedLocalIncidenceAngle>false</saveProjectedLocalIncidenceAngle>
+      <saveSelectedSourceBand>true</saveSelectedSourceBand>
+    </parameters>
+  </node>
+  
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="Terrain-Correction"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${output}</file>
+      <formatName>GeoTIFF-BigTIFF</formatName>
+    </parameters>
+  </node>
+  
+  <applicationData id="Presentation">
+    <Description/>
+    <node id="Read"/>
+    <node id="Read(2)"/>
+    <node id="TOPSAR-Split"/>
+    <node id="TOPSAR-Split(2)"/>
+    <node id="Apply-Orbit-File"/>
+    <node id="Apply-Orbit-File(2)"/>
+    <node id="Back-Geocoding"/>
+    <node id="Interferogram"/>
+    <node id="TOPSAR-Deburst"/>
+    <node id="TopoPhaseRemoval"/>
+    <node id="GoldsteinPhaseFiltering"/>
+    <node id="Terrain-Correction"/>
+    <node id="Write"/>
+  </applicationData>
+</graph>
