@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-10-12T03:14:13",
+  "region": [
+    -105.0,
+    32.0,
+    -104.0,
+    33.0
+  ],
+  "results": {
+    "gravity": true,
+    "magnetic": true,
+    "dem": false,
+    "insar": false,
+    "lithology": false
+  }
+}

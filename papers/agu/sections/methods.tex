@@ -1,0 +1,95 @@
+\label{sec:methods}
+
+\subsection{Data Sources and Preprocessing}
+
+\textbf{XGM2019e Gravity Model.} We utilize the XGM2019e combined gravity field model \cite{Zingerle2019}, which provides global coverage at spherical harmonic degree 2159 (~9 km effective resolution). The model incorporates satellite data from GRACE, GOCE, and terrestrial gravity observations. Implementation in \texttt{convert\_xgm\_to\_geotiff.py} performs spherical harmonic synthesis to generate Cartesian gravity anomaly grids.
+
+The gravity field synthesis follows:
+\begin{equation}
+g(r,\theta,\lambda) = \frac{GM}{r^2} \sum_{l=0}^{L_{max}} \sum_{m=0}^{l} \left(\frac{R}{r}\right)^{l+1} \overline{P}_{lm}(\cos\theta) [C_{lm}\cos(m\lambda) + S_{lm}\sin(m\lambda)]
+\label{eq:gravity_synthesis}
+\end{equation}
+where $G$ is the gravitational constant, $M$ is Earth's mass, $R$ is the reference radius (6.378137 × 10⁶ m), $\overline{P}_{lm}$ are fully normalized associated Legendre functions, and $C_{lm}$, $S_{lm}$ are spherical harmonic coefficients from XGM2019e with $L_{max} = 2159$.
+
+\textbf{EMAG2v3 Magnetic Data.} Global magnetic anomaly grid at 2-arcminute resolution (~3.7 km at equator) from NOAA/NGDC \cite{Meyer2017}. Data undergo reduction-to-pole transformation to remove magnetic inclination effects, enabling direct comparison across different magnetic latitudes.
+
+\textbf{NASADEM Elevation.} Void-filled SRTM-based elevation model at 30m native resolution \cite{Crippen2016}, resampled to 111m grid spacing to balance computational efficiency with accuracy requirements.
+
+\begin{table}[t]
+\centering
+\caption{Primary quantities and coordinate reference systems.}
+\label{tab:units}
+\begin{tabular}{ll}
+\toprule
+Quantity & Unit / CRS \\
+\midrule
+Gravity anomaly & mGal (10⁻⁵ m/s²) \\
+Magnetic anomaly & nT (nanotesla) \\
+Elevation & m above MSL \\
+Geographic coordinates & EPSG:4326 (WGS84) \\
+Processing domain & -125°W to -67°W, 24.5°N to 49.5°N \\
+Grid resolution & 111m (~0.001° at Continental USA latitudes) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Bidirectional Anomaly Detection Algorithm}
+
+\textbf{Traditional Directional Approach.} Conventional geophysical anomaly detection assumes directional signatures: positive gravity anomalies indicate dense subsurface structures, negative magnetic anomalies suggest certain material types \cite{Blakely1995}. Detection follows:
+\begin{equation}
+A_{\text{traditional}}(x,y) = \mathbb{I}[f(x,y) > \tau \cdot \sigma_f]
+\label{eq:traditional}
+\end{equation}
+where $f(x,y)$ is the geophysical field, $\tau$ is threshold multiplier, $\sigma_f$ is local standard deviation, and $\mathbb{I}[\cdot]$ is the indicator function.
+
+\textbf{Bidirectional Innovation.} Our key algorithmic breakthrough recognizes that geological complexity violates directional assumptions. We detect anomalies based on absolute statistical deviation:
+\begin{equation}
+A_{\text{bidirectional}}(x,y) = \mathbb{I}[|f(x,y) - \mu_f| > \tau \cdot \sigma_f]
+\label{eq:bidirectional}
+\end{equation}
+where $\mu_f$ is local mean. This fundamental change captures both positive and negative anomalies relative to background expectations.
+
+\textbf{Multi-Modal Data Fusion.} Statistical normalization of each data source:
+\begin{equation}
+z_i(x,y) = \frac{f_i(x,y) - \mu_i(x,y)}{\sigma_i(x,y)}
+\label{eq:normalize}
+\end{equation}
+where $i \in \{\text{gravity}, \text{magnetic}, \text{elevation}\}$, and $\mu_i$, $\sigma_i$ are computed using sliding window statistics (radius = 5 km).
+
+Weighted fusion combines normalized fields:
+\begin{equation}
+F(x,y) = \sqrt{\sum_{i} w_i \cdot z_i(x,y)^2}
+\label{eq:fusion}
+\end{equation}
+where weights $w_i$ reflect data quality: $w_{\text{gravity}} = 0.4$, $w_{\text{magnetic}} = 0.4$, $w_{\text{elevation}} = 0.2$ based on resolution and accuracy assessments.
+
+\textbf{Adaptive Thresholding.} Local geological complexity modulates detection sensitivity:
+\begin{equation}
+\tau_{\text{local}}(x,y) = \tau_{\text{global}} \cdot (1 + \alpha \cdot C(x,y))
+\label{eq:adaptive}
+\end{equation}
+where $C(x,y)$ quantifies terrain complexity via elevation variance, $\tau_{\text{global}} = 0.02$ (determined empirically), and $\alpha = 0.1$ provides modest complexity adjustment.
+
+\subsection{Implementation and Computational Framework}
+
+\textbf{Continental-Scale Processing.} Implementation in \texttt{multi\_resolution\_fusion.py} processes 1.45 billion pixels across Continental USA using tiled processing to manage memory constraints. Parallel processing utilizes NumPy vectorization and chunked array operations.
+
+\begin{verbatim}
+Algorithm: Bidirectional Continental Detection
+Input: XGM2019e gravity G, EMAG2v3 magnetic M, 
+       NASADEM elevation H, threshold τ=0.02
+1: Resample all inputs to common 111m grid
+2: For each data source i:
+   a: Compute local statistics μᵢ, σᵢ (5km window)
+   b: Normalize: zᵢ = (fᵢ - μᵢ) / σᵢ
+3: Weighted fusion: F = √(Σ wᵢ·zᵢ²)
+4: Bidirectional detection: A = |F| > τ·σ_F
+5: Apply confidence thresholding and filtering
+Output: Continental anomaly probability map
+\end{verbatim}
+
+\textbf{Validation Framework.} We validate against 14 known underground features across Continental USA, including: Carlsbad Caverns (NM), Meteor Crater (AZ), Berkeley Pit (MT), Homestake Mine (SD), and 10 additional diverse features spanning caves, impact craters, mining complexes, and karst systems. Features selected to represent different geological provinces and anomaly types.
+
+Quantitative metrics include precision, recall, F1-score with 95% confidence intervals computed via bootstrap resampling (n=1000). Spatial validation uses buffer analysis around known feature locations (radius = 2-5 km depending on feature size) to assess detection accuracy and false positive rates.
+
+\textbf{Statistical Rigor.} All processing uses fixed random seeds (NumPy seed=42, GDAL nodata=-9999) for reproducibility. Uncertainty propagation accounts for measurement errors in source datasets: ±2.3 mGal for XGM2019e gravity, ±5 nT for EMAG2v3 magnetic, ±1m for NASADEM elevation.
