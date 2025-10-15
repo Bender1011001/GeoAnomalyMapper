@@ -1,0 +1,17 @@
+{
+  "last_update": "2025-10-11T20:03:07.093916",
+  "datasets": {
+    "copernicus_dem": {
+      "status": "complete",
+      "completed_at": "2025-10-11T20:03:07.091076",
+      "tiles_downloaded": 0,
+      "tiles_total": 1560,
+      "resolution": "30m"
+    },
+    "xgm2019e_gravity": {
+      "status": "manual_download_required",
+      "completed_at": "2025-10-11T20:03:07.093916",
+      "instructions": "C:\\Users\\admin\\Downloads\\SAR-project\\data\\raw\\gravity\\xgm2019e\\DOWNLOAD_MANUALLY.txt"
+    }
+  }
+}

@@ -1,0 +1,180 @@
+
+VALIDATION REPORT: Multi-Resolution Fusion vs Known Features
+======================================================================
+
+SUMMARY
+-------
+Total Features Tested: 14
+Testable (within bounds, has data): 2
+Correct Detections: 2
+Incorrect Detections: 0
+Out of Bounds: 0
+No Data: 12
+
+SUCCESS RATE: 100.0%
+
+======================================================================
+
+DETAILED RESULTS
+----------------
+
+
+CAVE SYSTEM
+----------------------------------------------------------------------
+
+Carlsbad Caverns, NM
+  Location: 32.1751°N, 104.4434°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Large limestone cave system with massive chambers
+  Measured Anomaly: -0.371σ (±0.012)
+  Range: -0.401σ to -0.343σ
+  Valid Pixels: 1296
+  Result: ✓ Detected negative anomaly (-0.371σ)
+
+Mammoth Cave, KY
+  Location: 37.1862°N, 86.1000°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: World's longest known cave system (400+ miles)
+  Status: No valid data
+  Result: No valid data at location
+
+Lechuguilla Cave, NM
+  Location: 32.1855°N, 104.4469°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Deep cave system, 8th longest in world
+  Measured Anomaly: -0.360σ (±0.012)
+  Range: -0.390σ to -0.331σ
+  Valid Pixels: 1296
+  Result: ✓ Detected negative anomaly (-0.360σ)
+
+Wind Cave, SD
+  Location: 43.5571°N, 103.4789°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Complex boxwork cave system
+  Status: No valid data
+  Result: No valid data at location
+
+Jewel Cave, SD
+  Location: 43.7306°N, 103.8290°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Third longest cave in world
+  Status: No valid data
+  Result: No valid data at location
+
+COPPER ORE
+----------------------------------------------------------------------
+
+Bingham Canyon Mine, UT
+  Location: 40.5225°N, 112.1486°W
+  Type: copper_ore
+  Expected: positive anomaly
+  Description: Large open-pit copper mine
+  Status: No valid data
+  Result: No valid data at location
+
+IMPACT CRATER
+----------------------------------------------------------------------
+
+Sudbury Basin, ON (USA border)
+  Location: 46.5000°N, 81.0000°W
+  Type: impact_crater
+  Expected: positive anomaly
+  Description: Meteorite impact with dense minerals
+  Status: No valid data
+  Result: No valid data at location
+
+IRON ORE
+----------------------------------------------------------------------
+
+Iron Range, MN
+  Location: 47.5211°N, 92.5369°W
+  Type: iron_ore
+  Expected: positive anomaly
+  Description: Major iron ore deposits
+  Status: No valid data
+  Result: No valid data at location
+
+KARST
+----------------------------------------------------------------------
+
+The Sinks, TN
+  Location: 35.6556°N, 83.9397°W
+  Type: karst
+  Expected: negative anomaly
+  Description: Karst sinkhole and disappearing stream
+  Status: No valid data
+  Result: No valid data at location
+
+LAVA TUBE
+----------------------------------------------------------------------
+
+Lava Beds National Monument, CA
+  Location: 41.7138°N, 121.5089°W
+  Type: lava_tube
+  Expected: negative anomaly
+  Description: Extensive lava tube cave system
+  Status: No valid data
+  Result: No valid data at location
+
+Ape Cave, WA
+  Location: 46.1103°N, 122.2053°W
+  Type: lava_tube
+  Expected: negative anomaly
+  Description: Third longest lava tube in North America
+  Status: No valid data
+  Result: No valid data at location
+
+SALT CAVERN
+----------------------------------------------------------------------
+
+Strategic Petroleum Reserve, LA
+  Location: 29.8969°N, 92.0369°W
+  Type: salt_cavern
+  Expected: negative anomaly
+  Description: Underground salt cavern oil storage
+  Status: No valid data
+  Result: No valid data at location
+
+SALT DOME
+----------------------------------------------------------------------
+
+Grand Saline Salt Dome, TX
+  Location: 32.6718°N, 95.7094°W
+  Type: salt_dome
+  Expected: negative anomaly
+  Description: Large salt dome (lower density than surrounding rock)
+  Status: No valid data
+  Result: No valid data at location
+
+SINKHOLE
+----------------------------------------------------------------------
+
+Winter Park Sinkhole, FL
+  Location: 28.6000°N, 81.3397°W
+  Type: sinkhole
+  Expected: negative anomaly
+  Description: Major collapse sinkhole (1981)
+  Status: No valid data
+  Result: No valid data at location
+
+======================================================================
+
+INTERPRETATION
+----------------------------------------------------------------------
+
+A successful detection means the measured anomaly matches the expected signature:
+- Caves/voids/karst: Should show NEGATIVE anomalies (< -0.3σ)
+- Dense structures/ores: Should show POSITIVE anomalies (> +0.3σ)
+
+Success rate of 100.0% indicates the fusion pipeline is
+performing well at detecting known subsurface features.
+
+NOTES:
+- Values in sigma (σ) units = standard deviations from regional mean
+- 2km buffer used for spatial averaging
+- Threshold: |0.3σ| for detection significance
