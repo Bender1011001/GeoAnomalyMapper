@@ -1,251 +1,135 @@
-# Developer Guide for New Utilities
+# Developer Guide for GeoAnomalyMapper Utilities
 
-**Extending GeoAnomalyMapper's Modular Utilities**
+GeoAnomalyMapper's utility layer provides hardened building blocks that the
+scientific pipeline depends on: deterministic configuration management, robust
+path resolution, resilient data acquisition, and adaptive InSAR templating. This
+guide documents the design goals of each component, recommended extension
+patterns, and code snippets that illustrate best practices.
 
-The scientific code review emphasized modularity to replace monolithic scripts. The new `utils/` directory provides reusable components: `paths.py` for cross-platform resolution, `error_handling.py` for robustness, and `snap_templates.py` for InSAR processing. This guide covers implementation, extension, and best practices for developers contributing to or customizing the project.
+## Development environment
 
-## Introduction
-
-Utilities are designed for:
-- **Reusability**: Import into scripts or other projects.
-- **Testability**: Unit tests in `tests/utils/`.
-- **Configuration Integration**: Use `utils/config.py` for params.
-- **Documentation**: Inline docstrings + this guide.
-
-**Import Pattern**:
-```python
-from utils import paths, error_handling, snap_templates
-from utils.config import ConfigManager
-```
-
-**Setup for Development**:
 ```bash
-pip install -e ".[dev]"  # Includes testing deps
-python setup_environment.py validate
-pytest tests/utils/  # Run utility tests
+pip install -e .[all]
+python -m utils.config       # Inspect the loaded configuration tree
+pytest                       # Execute the full test suite if present
 ```
 
-### v2 Integration Overview
-Stages 1-5 introduced modular config/paths, data agent, fusion enhancements, validation, and environment setup. This guide covers extending these for v2.
+All utilities assume Python 3.10+ and rely on the central configuration file
+(`config/config.json`).
 
-- **Staged Approach**: v2 uses shims for backward compatibility. Enable via `GAM_USE_V2_CONFIG=true`. Future stages build on this (e.g., Stage 6: docs convergence).
-- **Key Changes**: Structured config replaces hardcoded values; shims allow gradual migration.
+## Configuration integration
 
-## 1. paths.py - Cross-Platform Path Resolution
+`utils.config.ConfigManager` is a singleton that loads the JSON configuration,
+applies environment overrides, and materialises directories on demand. Use it to
+fetch scalar settings or resolved paths:
 
-### Purpose
-Replaces hardcoded paths with dynamic, OS-aware resolution using pathlib. Handles substitution from config.json (e.g., `${data_root}`).
-
-### Key Classes/Functions
-- **PathManager**: Central resolver.
-  ```python
-  from utils.paths import PathManager
-
-  pm = PathManager()  # Loads from config
-  raw_dir = pm.get('paths.raw_data')  # Path('./data/raw')
-  insar_dir = pm.resolve('insar_dir')  # Ensures exists
-  ```
-
-- **validate_paths()**: Checks writability, existence.
-  ```python
-  from utils.paths import validate_paths
-  if not validate_paths():
-      raise ValueError("Path issues detected")
-  ```
-
-### Extension
-- Add new keys to config.json (e.g., `"custom_dir": "${data_root}/custom"`).
-- Override: `pm.set_base('/alternative/root')`.
-- Custom Resolver: Subclass PathManager for project-specific logic.
-
-**Best Practices**:
-- Always use `pm.get()` over string literals.
-- Handle non-existent: `pm.ensure_dir('output_dir')`.
-- Testing: Mock config in unit tests.
-
-**Example in Script**:
 ```python
-# In data_agent.py
-pm = PathManager()
-raw_path = pm.get('paths.raw_data')
-if not raw_path.exists():
-    raw_path.mkdir(parents=True)
+from utils.config import ConfigManager
+
+config = ConfigManager()
+cache_path = config.get_path("project.cache_dir")
+robust_retries = config.get("robustness.max_retries", 5)
 ```
 
-### Shim System for Compatibility
-`utils/config_shim.py` and `utils/paths_shim.py` provide v1/v2 bridges:
-- **When v2 disabled** (`GAM_USE_V2_CONFIG=false`): Returns hardcoded defaults (e.g., `get_data_dir() -> Path('data')`).
-- **When enabled**: Delegates to ConfigManager/PathManager.
-- **Gradual Adoption**: Update imports to shims; enable flag to activate v2 without code changes.
+`ConfigManager` is thread-safe for read operations and caches lookups to avoid
+filesystem churn. Call `ConfigManager().reload()` to re-read configuration after
+modifying `config.json` at runtime (for example, in integration tests).
 
-**Example**:
+## Path management (`utils/paths.py`)
+
+`PathManager` exposes common directories as `pathlib.Path` objects resolved
+relative to the repository root. It keeps path handling consistent across
+platforms and honours overrides from `config.json` or environment variables.
+
 ```python
-from utils import config_shim, paths_shim
+from utils.paths import paths
 
-data_dir = config_shim.get_data_dir()  # v1: 'data'; v2: from config.json
-output_path = paths_shim.get_output_dir() / 'report.txt'
+raw_tiles = paths.raw_data
+reports_dir = paths.join("output_dir", "reports")
 ```
 
-This maintains v1 workflows while allowing opt-in to v2 features like validation and substitution.
+* Add new canonical locations by extending the dictionary in `PathManager.__init__`.
+* Use `paths.resolve("relative/path")` when you need an absolute path from the
+  repository root.
+* When writing tests, temporarily modify configuration keys with
+  `ConfigManager().set("paths.raw_data", tmp_path)` to point utilities at a
+  sandboxed directory.
 
-## 2. error_handling.py - Robustness Framework
+## Resilience framework (`utils/error_handling.py`)
 
-### Purpose
-Provides retry, circuit breaker, and error categorization for reliable operations (downloads, API calls).
+The resilience toolkit underpins every network-bound component. It provides
+structured error classes, retry semantics with exponential backoff and jitter,
+circuit breakers, DNS verification, and credential management.
 
-### Key Classes/Functions
-- **RobustDownloader**: Core downloader with resilience.
-  ```python
-  from utils.error_handling import RobustDownloader
+### Key abstractions
 
-  downloader = RobustDownloader(max_retries=5, base_delay=1)
-  try:
-      success = downloader.download_with_retry(url, output_path, auth='copernicus')
-  except PermanentError as e:
-      logger.error(f"Failed permanently: {e}")
-  ```
+- **`retry_with_backoff` decorator** – Wraps any function and retries predictable
+  transient failures. Defaults to five attempts with exponential backoff.
+- **`RobustDownloader`** – High-level helper that combines retries, checksum
+  validation, and resume support for large payloads.
+- **`CircuitBreaker`** – Guards critical sections by halting repeated failures
+  and reopening after a cooldown.
+- **`TokenManager`** – Centralises OAuth-style token caching and refresh.
 
-- **@retry_with_backoff**: Decorator for functions.
-  ```python
-  from utils.error_handling import retry_with_backoff
+### Usage pattern
 
-  @retry_with_backoff(max_retries=3)
-  def fetch_metadata(url):
-      return requests.get(url).json()
-  ```
-
-- **CircuitBreaker**: State management.
-  ```python
-  from utils.error_handling import CircuitBreaker
-
-  cb = CircuitBreaker(threshold=5, timeout=60)
-  if cb.is_open():
-      return None  # Skip
-  with cb:
-      result = risky_operation()
-  ```
-
-- **TokenManager**: Auth handling.
-  ```python
-  from utils.error_handling import TokenManager
-
-  tm = TokenManager(service='copernicus')
-  token = tm.get_token()  # Refreshes if needed
-  headers = {'Authorization': f'Bearer {token}'}
-  ```
-
-- **ensure_dns(hosts)**: Pre-flight check.
-  ```python
-  ensure_dns(['urs.earthdata.nasa.gov'])
-  ```
-
-### Extension
-- Custom Exceptions: Inherit from RetryableError/PermanentError.
-- New Services: Add to `DEFAULT_SERVICES` dict (auth URLs, hosts).
-- Retry Policies: Override `get_delay()` for custom backoff.
-- Integration: Wrap external calls (e.g., gdal) with decorator.
-
-**Best Practices**:
-- Categorize errors explicitly (raise AuthError for 401).
-- Log context: Include service/URL in exceptions.
-- Graceful Degradation: Skip non-critical (e.g., optional InSAR).
-- Testing: Use `pytest-mock` to simulate failures; assert retries.
-- **v2 Integration**: Use with config for retry params (e.g., `max_retries = config.get('robustness.max_retries')`).
-
-**Example Extension** (Custom Downloader):
 ```python
-class CustomDownloader(RobustDownloader):
-    def __init__(self):
-        super().__init__(max_retries=10)  # Override
+from utils.error_handling import RobustDownloader, PermanentError
 
-    def download_gdal(self, source, dest):
-        @retry_with_backoff()
-        def gdal_call():
-            subprocess.run(['gdalwarp', source, dest])
-        gdal_call()
+agent = RobustDownloader(max_retries=6, base_delay=1.5)
+try:
+    agent.download_with_retry(url, output_path, auth="copernicus")
+except PermanentError as exc:
+    logger.error("Acquisition aborted: %s", exc)
 ```
 
-## 3. snap_templates.py - Dynamic InSAR Processing
+Tune behaviour through `config.json` under the `robustness` section (retry
+counts, thresholds, cache locations). Log records emitted by the framework are
+structured and include dataset identifiers, attempt counts, and latency metrics,
+which simplifies monitoring.
 
-### Purpose
-Generates adaptive SNAP Graph XML from Sentinel-1 metadata, replacing static templates for varying acquisitions.
+## SNAP template generation (`utils/snap_templates.py`)
 
-### Key Classes/Functions
-- **GraphTemplateProcessor**: Builds and executes graphs.
-  ```python
-  from utils.snap_templates import GraphTemplateProcessor
+`GraphTemplateProcessor` builds Sentinel-1 processing graphs dynamically. It
+inspects SAFE metadata to configure orbital parameters, baselines, polarisation,
+and processing chains, then executes SNAP GPT with the resulting XML.
 
-  gtp = GraphTemplateProcessor(snap_path='/path/to/gpt')
-  metadata = parse_safe_metadata('path/to/.SAFE')  # Orbit, baseline, etc.
-  graph_xml = gtp.generate_template(metadata, target='interferogram')
-  result = gtp.execute_graph(graph_xml, input_dir='data/raw/insar', output_dir='data/processed/insar')
-  ```
-
-- **parse_safe_metadata(path)**: Extracts params from .SAFE.
-  ```python
-  meta = parse_safe_metadata('S1A_IW_SLC__20230101.SAFE')
-  # Returns: {'orbit': 'ascending', 'baseline': 120, 'polarization': 'VV'}
-  ```
-
-- **default_params()**: Configurable defaults (filter alpha, unwrap method).
-
-### Extension
-- Add Processors: Subclass for custom nodes (e.g., atmospheric correction).
-- Metadata Parsers: Extend for other formats (e.g., ALOS).
-- Params: Override via config (`"snap.template_params"`).
-- Batch: `gtp.process_batch(input_dirs)` for stacks.
-
-**Best Practices**:
-- Validate Metadata: Check baseline <150m.
-- Error Handling: Wrap with RobustDownloader for GPT calls.
-- Outputs: Standardize to GeoTIFF with CRS.
-- Testing: Mock XML generation; use sample .SAFE.
-- **v2 Integration**: Load params from config (e.g., `filter_alpha = config.get('snap.template_params.filter_alpha')`).
-
-**Example in Pipeline**:
 ```python
-# In data_agent.py post-download
-if config.get('insar.auto_process'):
-    gtp = GraphTemplateProcessor()
-    for safe_dir in insar_dirs:
-        meta = parse_safe_metadata(safe_dir)
-        if meta['baseline'] < 150:
-            xml = gtp.generate_template(meta)
-            gtp.execute_graph(xml, safe_dir, processed_dir)
+from utils.snap_templates import GraphTemplateProcessor
+
+processor = GraphTemplateProcessor()
+metadata = processor.parse_safe_metadata("S1A_IW_SLC__20230101T123456.SAFE")
+graph_xml = processor.generate_template(metadata, target="interferogram")
+processor.execute_graph(
+    graph_xml,
+    input_dir="data/raw/sentinel1",
+    output_dir="data/processed/insar",
+)
 ```
 
-## Extending the Utilities System
+Best practices:
 
-### Adding New Utilities
-1. Create `utils/new_utility.py` with docstrings.
-2. Add to `__init__.py`: `from . import new_utility`.
-3. Config Integration: Use ConfigManager for params.
-4. Tests: `tests/test_new_utility.py` with pytest.
-5. Docs: Update this guide + inline examples.
+- Validate baselines and Doppler centroids before launching GPT to avoid wasted
+  processing time.
+- Persist generated XML alongside outputs for auditability; the processor
+  returns the graph path for convenience.
+- Customise default parameters through the `snap.template_params` block in
+  `config.json` (e.g., filtering kernels, unwrapping strategies).
 
-### Integration Patterns
-- **In Scripts**: Import and use (e.g., data_agent.py uses all three).
-- **External Projects**: `pip install -e .` then import.
-- **Hooks**: Config `"extensions": ["custom_module"]` for plugins.
-- **v2 Guidance**: Use shims for config/paths in new code; enable flags for features like dynamic weighting.
+## Extending the utilities
 
-### Testing and CI
-- Run: `pytest tests/utils/ -v`.
-- Coverage: `pytest --cov=utils`.
-- Linting: `black utils/`, `flake8 utils/`.
+1. **Follow the configuration contract** – Any new helper should expose
+   tunables via `config.json` rather than module-level constants.
+2. **Document invariants** – Provide docstrings that explain assumptions about
+   CRS, resolution, or I/O semantics.
+3. **Write deterministic code paths** – Utility functions should avoid global
+   state beyond the shared configuration singletons so they remain testable.
+4. **Surface metrics** – When adding long-running operations, emit structured
+   logs (`INFO` for progress, `WARNING` for retries, `ERROR` for unrecoverable
+   failures) to ensure observability.
+5. **Keep imports lightweight** – Utilities intentionally avoid heavy
+   dependencies so they can be reused by notebooks, CLI tools, or API services.
 
-## Best Practices
-
-- **Modularity**: Keep utils stateless; pass config.
-- **Error Propagation**: Raise custom exceptions; don't swallow.
-- **Performance**: Cache resolutions (e.g., paths); async for I/O.
-- **Documentation**: NumPy-style docstrings; examples in code.
-- **Versioning**: Semantic changes → bump utils version in pyproject.toml.
-- **Security**: No secrets in utils; defer to .env.
-- **Staged Integration**: Follow Stages 1-5 pattern: config first, then paths, robustness, etc. Document shims for compatibility.
-
-For API details: [API_REFERENCE.md](API_REFERENCE.md).
-
-Contribute via PRs; see CONTRIBUTING.md.
-
-*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
+Adhering to these guidelines keeps GeoAnomalyMapper's infrastructure predictable
+and production-ready while allowing advanced users to tailor behaviour to their
+projects.

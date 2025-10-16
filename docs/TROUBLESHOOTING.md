@@ -1,41 +1,27 @@
 # Error Handling and Troubleshooting Guide
 
-**Robust Framework and Common Issue Resolution**
+This guide details how GeoAnomalyMapper's resilience framework mitigates common
+failure modes and provides actionable diagnostics when intervention is required.
+The utilities described here are production-ready and used across the entire
+pipeline.
 
-The scientific code review highlighted fragile error handling in legacy scripts (e.g., crashes on network failures, no recovery). The new framework in `utils/error_handling.py` provides production-grade resilience: retries, circuit breakers, DNS checks, and graceful degradation. This guide explains the system, common errors, and step-by-step troubleshooting for reliable operation.
+## Resilience framework recap
 
-## Overview of Error Handling Framework
+GeoAnomalyMapper centralises robustness logic in `utils.error_handling`:
 
-### Core Components
-- **Custom Exceptions**: Categorizes issues:
-  - `RetryableError`: Network timeouts, 429 rate limits, transient auth (e.g., ConnectionError, Timeout).
-  - `PermanentError`: Invalid config, missing files, 404 not found.
-  - `RateLimitError`: HTTP 429; extra backoff using Retry-After header.
-  - `AuthError`: 401/403; triggers token refresh or skip.
-  - `IntegrityError`: Corrupted downloads (checksum/size mismatch).
+- **Custom exceptions** — `RetryableError`, `PermanentError`, `RateLimitError`,
+  `AuthError`, and `IntegrityError` allow precise handling of external failures.
+- **`retry_with_backoff` decorator** — Implements exponential backoff with jitter
+  for transient issues.
+- **`RobustDownloader`** — Wraps HTTP downloads with retries, checksum
+  validation, range-based resume, and structured logging.
+- **`CircuitBreaker`** — Prevents cascading failures by pausing calls after a
+  configurable number of consecutive errors.
+- **`TokenManager`** — Manages credential refresh for authenticated services
+  (Copernicus, Earthdata, etc.).
 
-- **Retry Logic** (`@retry_with_backoff` decorator):
-  - Exponential backoff: delay = base * (factor ** attempt) + jitter (0-10% random).
-  - Default: 5 retries, 1s base, 2x factor.
-  - Service-specific: Doubles delay for rate limits.
+Configuration lives under the `robustness` block in `config/config.json`:
 
-- **Circuit Breaker**: Prevents cascading failures.
-  - Trips after 5 failures (configurable).
-  - Open state: Skips for 60s recovery.
-  - Half-open: Tests one call before closing.
-
-- **DNS Pre-Checks** (`ensure_dns`): Resolves hosts (e.g., urs.earthdata.nasa.gov) before operations; retries 3x.
-
-- **Token Management** (`TokenManager`): Auto-refreshes 60s before expiry; retries transients.
-
-- **Recovery Mechanisms**:
-  - Resume: HTTP Range headers for partial files.
-  - Integrity: Post-download validation (size, checksum); cleans <1KB errors.
-  - Checkpointing: `data_status.json` tracks progress; idempotent runs.
-
-- **Logging**: Structured (INFO: progress, WARNING: retries, ERROR: permanent); metrics in reports.
-
-**Configuration** (in `config.json`):
 ```json
 {
   "robustness": {
@@ -48,152 +34,137 @@ The scientific code review highlighted fragile error handling in legacy scripts 
 }
 ```
 
-**Usage**: All tools (data_agent.py, fusion) integrate automatically. Logs show "Retried X times" or "Circuit open - skipping".
+## Common scenarios
 
-## Common Error Scenarios and Fixes
+### 1. Network instability
 
-### 1. Network and Connectivity Issues
-**Symptoms**: "Connection broken", "Timeout", "NameResolutionError".
+**Symptoms** — `ConnectionError`, `Timeout`, `NameResolutionError` in logs.
 
-**Causes**: Unstable internet, firewall, DNS.
+**Automatic handling** — Retries with exponential backoff, DNS pre-checks via
+`ensure_dns`, and circuit breaker cooldowns.
 
-**Framework Handling**:
-- Transient → Retry with backoff.
-- DNS fail → Pre-check skips service.
-- Circuit trips on repeats.
+**Diagnostics**
 
-**Troubleshooting**:
-1. **Test DNS**: `python -c "from utils.error_handling import ensure_dns; ensure_dns(['urs.earthdata.nasa.gov'])"`.
-2. **Check Connectivity**: `curl -I https://urs.earthdata.nasa.gov` (200 OK?).
-3. **Config Tune**: Increase `"timeout_read": 60`; set DNS server (e.g., 8.8.8.8).
-4. **Proxy/Firewall**: Add `HTTP_PROXY` to `.env`.
-5. **Rerun**: `python data_agent.py download ...` - auto-resumes.
-
-**Example Log**:
-```
-WARNING: RetryableError: Connection timeout to Copernicus. Attempt 2/5, delay 2s.
-INFO: Success after retry.
-```
-
-### 2. Authentication and Token Errors
-**Symptoms**: "401 Unauthorized", "403 Forbidden", "Invalid credentials".
-
-**Causes**: Wrong .env, expired tokens, quota exceeded.
-
-**Framework Handling**:
-- 401/403 → AuthError; auto-refresh token.
-- Permanent on invalid creds; skips dataset with "auth_required" status.
-
-**Troubleshooting**:
-1. **Verify .env**: Check `CDSE_USERNAME`, etc.; no quotes/spaces.
-2. **Test Auth**: `python data_agent.py status` (shows auth status).
-3. **Refresh**: Delete token cache (`rm ~/.cdse_token`); rerun.
-4. **Quota**: Wait 24h or use alternative source (e.g., EGMS).
-5. **Earthdata**: Ensure .netrc format: `machine urs.earthdata.nasa.gov login USER password PASS`.
-
-**Migration Note**: Old scripts hardcoded creds - now all via .env.
-
-### 3. Download and Integrity Failures
-**Symptoms**: "IntegrityError", partial files, "File too small".
-
-**Causes**: Interrupted downloads, corrupted zips, server errors.
-
-**Framework Handling**:
-- Resume via Range headers.
-- Post-check: Size + checksum; unlink if fail.
-- Cleanup: Removes error pages (<1KB).
-
-**Troubleshooting**:
-1. **Resume**: Rerun command - checks `data_status.json`.
-2. **Force Redownload**: `--force` flag.
-3. **Checksum Verify**: `python data_agent.py validate --dataset nasadem`.
-4. **Disk Space**: Check free space (>50GB recommended).
-5. **Extract Issues**: For NASADEM zips, manual: `unzip data/raw/nasadem.zip -d data/raw/nasadem/`.
-
-**Example**: NASADEM tile fail → Agent retries extract; logs "Missing .hgt - redownloading".
-
-### 4. Processing and Fusion Errors
-**Symptoms**: "No data layer", "Invalid raster", memory errors.
-
-**Causes**: Missing sources, incompatible formats, low RAM.
-
-**Framework Handling**:
-- Graceful skip: Continues with available layers.
-- Validation: Checks CRS/resolution match.
-
-**Troubleshooting**:
-1. **Missing Data**: `python data_agent.py status` - download missing.
-2. **Format Issues**: Ensure GeoTIFF; use GDAL: `gdalinfo file.tif`.
-3. **Memory**: Smaller bbox (`--resolution 0.001`); increase RAM or use `--tile-size 512`.
-4. **Path Mismatches**: `python -m utils.paths validate`.
-5. **SNAP Fail**: Check `setup_environment.py check`; verify GPT path.
-
-### 5. Validation and Scientific Errors
-**Symptoms**: "Low accuracy", "No known features match".
-
-**Causes**: Inflated legacy metrics, poor co-registration.
-
-**Framework Handling**:
-- Accurate reporting: True/false positives via proper alignment.
-- Warns on low confidence.
-
-**Troubleshooting**:
-1. **Update Known Features**: Edit `config/known_features.json`.
-2. **Rerun**: `python validate_against_known_features.py --input output.tif --threshold 0.7`.
-3. **Compare**: Use `--legacy` for old method comparison.
-4. **Data Quality**: Ensure high-res sources; check weights in fusion.
-
-### 6. Configuration and Setup Errors
-**Symptoms**: "Invalid config", "Path not found", tool missing.
-
-**Causes**: Bad JSON, unset vars, uninstalled deps.
-
-**Framework Handling**:
-- Schema validation on load.
-- Path resolution fails → PermanentError with details.
-
-**Troubleshooting**:
-1. **Validate Config**: `python -c "from utils.config import ConfigManager; ConfigManager().validate()"`.
-2. **Setup Check**: `python setup_environment.py report`.
-3. **Paths**: Set `"data_root": "./data"` in config.json.
-4. **Deps**: `pip install -r requirements-dev.txt`; re-validate.
-
-## General Troubleshooting Workflow
-
-1. **Run Status Report**:
+1. Verify DNS resolution:
    ```bash
-   python data_agent.py status --report > status.md
-   python setup_environment.py report > setup.md
+   python -c "from utils.error_handling import ensure_dns; ensure_dns(['urs.earthdata.nasa.gov'])"
    ```
-   - Review for errors/metrics.
+2. Check connectivity:
+   ```bash
+   curl -I https://urs.earthdata.nasa.gov
+   ```
+3. If behind a proxy, set `HTTP_PROXY`/`HTTPS_PROXY` in `.env` and reload the
+   configuration.
 
-2. **Check Logs**:
-   - Console: Verbose with `--verbose`.
-   - Files: `data/outputs/logs/` (configurable).
-   - Search: "ERROR" for permanents, "WARNING" for retries.
+### 2. Authentication failures
 
-3. **Test Incrementally**:
-   - Setup: `setup_environment.py validate`.
-   - Download: `data_agent.py download free --dry-run`.
-   - Process: `multi_resolution_fusion.py --dry-run`.
+**Symptoms** — HTTP 401/403 responses, log entries referencing `AuthError`.
 
-4. **Metrics Review**:
-   - Success rates >90% expected.
-   - Retries <5 per download.
-   - If low: Tune robustness params.
+**Automatic handling** — `TokenManager` refreshes tokens 60 seconds before
+expiry and retries transient errors.
 
-5. **Community Help**:
-   - GitHub Issues: Provide logs + config snippet.
-   - Forums: ESA for InSAR, GDAL for rasters.
+**Diagnostics**
 
-## Best Practices
+1. Confirm credentials in `.env` (no quotes or trailing spaces).
+2. Run the agent status command:
+   ```bash
+   python -m gam.agents.gam_data_agent status --config config/data_sources.yaml
+   ```
+   The output lists authentication state per service.
+3. Remove stale token caches (for example, `rm ~/.cdse_token`).
+4. For NASA Earthdata, ensure `~/.netrc` follows the standard format.
 
-- **Monitoring**: Use `"logging.level": "INFO"`; integrate with tools like ELK.
-- **Testing**: Simulate failures (e.g., unplug net) to verify retries.
-- **Backups**: Checkpointing saves state; gitignore large data/.
-- **Production**: Set circuit timeouts; monitor via status.json API.
-- **Migration**: Wrap old code with `RobustDownloader` for resilience.
+### 3. Download integrity issues
 
-This framework ensures 95%+ uptime; most issues resolve with rerun or config tweak.
+**Symptoms** — `IntegrityError`, truncated archives, or unexpected file sizes.
 
-*Updated: October 2025 - v2.0 (Robust Framework)*
+**Automatic handling** — Resume downloads using HTTP range requests, validate
+checksum/size, remove incomplete files, and record failures in the status log.
+
+**Diagnostics**
+
+1. Re-run the download; the agent resumes from checkpoints:
+   ```bash
+   python -m gam.agents.gam_data_agent sync --config config/data_sources.yaml --dataset xgm2019e_gravity
+   ```
+2. Force a clean redownload if necessary:
+   ```bash
+   python -m gam.agents.gam_data_agent sync --config config/data_sources.yaml --dataset xgm2019e_gravity --force
+   ```
+3. Inspect available disk space and ensure sufficient quota for temporary files.
+
+### 4. Processing or fusion errors
+
+**Symptoms** — Missing layers, CRS mismatch, or NaN-filled outputs.
+
+**Automatic handling** — Pre-flight validation ensures rasters share dimensions
+and CRS; failures raise `PermanentError` with detailed context.
+
+**Diagnostics**
+
+1. Confirm the STAC catalogue is up to date:
+   ```bash
+   python -m gam.agents.stac_index validate --catalog data/stac/catalog.json
+   ```
+2. Check raster metadata:
+   ```bash
+   gdalinfo data/features/insar_velocity.tif | head
+   ```
+3. Review fusion configuration for incorrect paths or resolution values.
+4. Re-run harmonisation if inputs changed:
+   ```bash
+   python -m gam.io.reprojection run --tiling config/tiling_zones.yaml
+   ```
+
+### 5. Validation discrepancies
+
+**Symptoms** — Unexpected accuracy metrics or mismatched known feature hits.
+
+**Diagnostics**
+
+1. Verify the label dataset used for training and validation:
+   ```bash
+   python -m gam.features.extract_points --help
+   ```
+2. Ensure probability rasters are aligned with the validation geometries.
+3. Run the evaluation CLI with verbose logging to inspect precision-recall
+   metrics:
+   ```bash
+   python -m gam.models.evaluate --truth data/labels/validation_points.csv --predictions data/products/predictions.csv
+   ```
+4. Inspect the weight distribution reported by the fusion stage to confirm that
+   higher confidence layers dominate in areas with ground truth support.
+
+### 6. Configuration problems
+
+**Symptoms** — `KeyError` or `ValueError` when loading configuration, missing
+directories at runtime.
+
+**Diagnostics**
+
+1. Print the active configuration:
+   ```bash
+   python -m utils.config
+   ```
+2. Validate directory settings:
+   ```bash
+   python -c "from utils.paths import paths; print(paths.items())"
+   ```
+3. Ensure environment overrides use uppercase keys with double underscores (for
+   example, `GAM__PATHS__RAW_DATA`).
+
+## General workflow for incident response
+
+1. **Capture logs** — Structured logs include timestamps, dataset identifiers,
+   retry counts, and error categories. Preserve them for audits.
+2. **Reproduce with minimal scope** — Re-run the failing command with a narrowed
+   dataset or bounding box to isolate the issue.
+3. **Adjust configuration safely** — Apply overrides via environment variables or
+   a temporary copy of `config.json`; avoid editing tracked defaults during an
+   incident.
+4. **Document fixes** — Record configuration changes, datasets affected, and
+   verification steps in your operations log.
+
+GeoAnomalyMapper's resilience layer is engineered for high availability. By
+following these procedures you can maintain stable operations even when external
+services behave unpredictably.

@@ -1,22 +1,9 @@
 #!/usr/bin/env python3
-"""
-SNAP Graph Template Processor for Dynamic InSAR Processing.
-
-Provides dynamic parameter substitution for SNAP GPT graphs based on Sentinel-1 .SAFE metadata.
-Supports automatic extraction of subswath, polarization, burst indices, and validation for master/slave pairs.
-Backward compatible with manual parameter overrides via config dict.
-
-Example usage:
-    processor = GraphTemplateProcessor('path/to/template.xml', config={'subswath': 'IW2'})
-    params = processor.extract_sentinel1_params('/path/to/master.SAFE')
-    processor.validate_parameters(params, master_path, slave_path)
-    graph = processor.generate_graph(params, 'output.xml')
-    processor.process_interferogram(master_path, slave_path, 'output_dir')
-"""
+"""Dynamic SNAP graph generation for Sentinel-1 interferometry."""
 
 import logging
-import os
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from string import Template
@@ -160,12 +147,16 @@ class GraphTemplateProcessor:
 
         # Other defaults
         params['input_file'] = str(safe_dir)  # Full .SAFE as input
-        params['output_paths'] = self.config.get('output_paths', 'interferogram')  # Base name
-        params['dem_name'] = 'SRTM 1Sec HGT'  # Standard, configurable if needed
+        params['output_paths'] = self.config.get('output_paths', 'interferogram')
+        params['dem_name'] = self.config.get('dem_name', 'SRTM 1Sec HGT')
 
-        # Self-test example (remove in prod if not needed)
-        # Example: params for IW scene should have subswath='IW1', pol='VV'
-        assert params['subswath'] in ['IW1', 'IW2', 'IW3', 'EW1', ...], "Invalid subswath detected"
+        valid_subswaths = {
+            'IW1', 'IW2', 'IW3',
+            'EW1', 'EW2', 'EW3', 'EW4', 'EW5',
+            'SM'
+        }
+        if params['subswath'] not in valid_subswaths:
+            raise ValueError(f"Invalid subswath detected: {params['subswath']}")
         logger.info(f"Extraction complete: { {k: v for k, v in params.items() if k != 'available_bursts'} }")
         return params
 

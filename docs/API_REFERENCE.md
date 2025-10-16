@@ -1,257 +1,243 @@
 # API Reference and Technical Documentation
 
-**Comprehensive Reference for GeoAnomalyMapper Components**
+This reference documents the core Python APIs and CLI entry points that power
+GeoAnomalyMapper. All modules target Python 3.10+ and expect configuration to be
+provided by `config/config.json`.
 
-This document provides technical details on the core APIs, classes, and functions introduced in v2.0 following the scientific code review. It covers the new dynamic fusion capabilities (WeightCalculator), InSAR processing (GraphTemplateProcessor), robustness framework (RobustDownloader), configuration/path systems, and integration points. For user guides, see [README.md](README.md) and specialized docs.
+## Configuration and path management
 
-All APIs are in Python 3.9+ and integrate with the unified config system. Import from `GeoAnomalyMapper` or `utils`.
+### `utils.config.ConfigManager`
 
-## 1. Configuration and Path Resolution System
+Singleton loader for the JSON configuration. Responsibilities:
 
-### ConfigManager (utils/config.py)
-Central loader for `config.json` + `.env` with validation.
+- Load `config/config.json` (or a supplied path) and apply overrides defined via
+  environment variables prefixed with `GAM__`.
+- Provide `get(key, default=None)` and `get_path(key, default=None)` helpers for
+  dotted lookups and filesystem-aware paths.
+- Materialise directories referenced under `project.*` and `paths.*` when the
+  manager initialises, ensuring downstream code can rely on them.
+- Expose `reload()`, `items()`, and `as_dict()` for diagnostics and testing.
 
-**Class: ConfigManager**
-- **__init__(self, config_file='config/config.json', env_file='.env')**: Loads and parses.
-- **get(self, key, default=None)**: Retrieves value (e.g., `config.get('fusion.dynamic_weighting')`).
-- **get_path(self, key)**: Resolves path with substitution (e.g., `${data_root}/raw`).
-- **set(self, key, value)**: Runtime override.
-- **validate(self)**: Schema check; raises ValueError on invalid.
-
-**Technical Details**:
-- Uses `json` + `python-dotenv` for loading.
-- Variable substitution: `${VAR}` from env/config.
-- Schema: Pydantic-like validation for types (int/float/bool/path).
-- Cross-Platform: Integrates with PathManager for OS-aware paths.
-
-**Example**:
 ```python
 from utils.config import ConfigManager
+
 config = ConfigManager()
-data_root = config.get_path('project.data_root')  # Path('./data')
-if config.get('data_sources.insar.enabled'):
-    # Proceed
-    pass
+model_dir = config.get_path("paths.models")
+use_dynamic_weights = config.get("fusion.dynamic_weighting", False)
 ```
 
-### PathManager (utils/paths.py)
-Dynamic path resolution using pathlib.
+### `utils.paths.PathManager`
 
-**Class: PathManager**
-- **__init__(self, config=None)**: Initializes from ConfigManager.
-- **get(self, key)**: Returns Path (e.g., `pm.get('paths.raw_data')`).
-- **resolve(self, key)**: Expands and normalizes (handles ~, env vars).
-- **ensure_dir(self, key)**: Creates if missing.
-- **validate(self)**: Checks existence/writability.
+Thin wrapper around `ConfigManager` that exposes common directories as
+properties (`data_dir`, `output_dir`, `processed_dir`, etc.) and provides
+helpers such as `join(base_key, *subpaths)` and `resolve(relative_path)`.
 
-**Technical Details**:
-- Substitutes `${key}` from config/env.
-- OS-Aware: Uses `pathlib.Path` for / vs \.
-- Caching: Memoizes resolved paths.
-- Errors: Raises PermanentError on invalid (e.g., non-writable).
-
-**Integration**: All scripts use PathManager for data I/O.
-
-### Feature Flags and Environment Variables
-v2 integration uses feature flags for gradual adoption. Key flags include:
-
-- **GAM_USE_V2_CONFIG** (default: false): Enables the full ConfigManager and PathManager. When false, falls back to hardcoded defaults and direct `os.getenv` calls via shims.
-- **GAM_DYNAMIC_WEIGHTING** (default: true when v2 enabled): Activates adaptive weights in fusion (see WeightCalculator).
-- **GAM_DATA_AGENT_ENABLED** (default: true): Allows gam_data_agent.py to manage downloads.
-- **GAM_VALIDATION_ENABLED** (default: true): Runs validation hooks post-processing.
-
-**Usage**:
-Set in `.env` or export before running scripts:
-```bash
-export GAM_USE_V2_CONFIG=true
-export GAM_DYNAMIC_WEIGHTING=false  # Disable for testing
-```
-
-These flags ensure v1 compatibility while opting into v2 features. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for details.
-
-## 2. Dynamic Fusion Capabilities
-
-### WeightCalculator (multi_resolution_fusion.py)
-Computes adaptive weights for data fusion.
-
-**Class: WeightCalculator**
-- **__init__(self, config=None)**: Loads params (uncertainty, confidence).
-- **compute_weights(self, layers, metadata)**: Returns dict of weights per layer.
-  - Params: layers (list of rasters), metadata (dict: resolution, uncertainty).
-  - Returns: {'insar': 0.85, 'gravity': 0.15, ...}.
-- **spectral_weights(self, layers, cutoff=10)**: Band-specific (FFT-based).
-- **update_confidence(self, validation_results)**: Adjusts c_i from known features.
-
-**Technical Details**:
-- Formula: \( w_i = \frac{1}{\sigma_i^2 + \epsilon} \times c_i \).
-- σ_i: From metadata + local std dev.
-- c_i: From validation (default 0.5; updated via ROC).
-- Spectral: FFT decomposition; low-freq favors gravity.
-- Efficiency: Vectorized with NumPy; per-pixel optional (`fast_mode=True`).
-
-**Example**:
 ```python
-from multi_resolution_fusion import WeightCalculator
-wc = WeightCalculator()
-layers = {'insar': insar_raster, 'gravity': gravity_raster}
-meta = {'insar': {'resolution': 10, 'uncertainty': 0.05}, ...}
-weights = wc.compute_weights(layers, meta)
-fused = np.average([insar, gravity], weights=[weights['insar'], weights['gravity']])
+from utils.paths import paths
+
+raw_tiles = paths.raw_data
+reports_dir = paths.join("output_dir", "reports")
 ```
 
-**Configuration**:
-- `"fusion.base_uncertainty"`: ε (0.01-0.1).
-- `"fusion.confidence_threshold"`: Min c_i.
+## Fusion pipeline (`gam.fusion.multi_resolution_fusion`)
 
-### Fusion Pipeline (multi_resolution_fusion.py)
-High-level API for weighted fusion.
+The fusion module combines multiple rasters into a harmonised product using
+resolution-aware weights.
 
-**Function: process_multi_resolution(bbox, output, config=None, dynamic=True)**
-- Inputs: bbox (tuple lon/lat), output (str path).
-- Processes: Downloads (if needed), weights, fuses, saves TIFF.
-- Returns: Path to fused raster.
+### `resolution_weighting(resolutions: Dict[str, float], temperature: float = 1.0)`
 
-**Technical Details**:
-- Resampling: GDAL warp with cubic/average based on direction.
-- Uncertainty Propagation: Outputs sigma map.
-- Validation Hook: Calls WeightCalculator.update_confidence post-fusion.
+Located in `gam.fusion.weight_calculator`. Accepts a mapping from layer name to
+nominal ground sampling distance (metres) and returns normalised weights that
+favour higher resolution layers. The optional temperature parameter controls the
+sharpness of the weighting distribution.
 
-## 3. GraphTemplateProcessor for InSAR (utils/snap_templates.py)
+```python
+from gam.fusion.weight_calculator import resolution_weighting
 
-### Class: GraphTemplateProcessor
-Generates and executes dynamic SNAP graphs.
+weights = resolution_weighting({"insar": 10.0, "gravity": 250.0}).weights
+# {'insar': 0.96, 'gravity': 0.04}
+```
 
-- **__init__(self, snap_path=None, config=None)**: Sets GPT path (auto-detects).
-- **parse_safe_metadata(self, safe_dir)**: Extracts {'orbit', 'baseline', 'polarization', ...}.
-- **generate_template(self, metadata, graph_type='interferogram')**: Builds XML string.
-  - Types: 'interferogram', 'timeseries', 'velocity'.
-  - Adaptive: Baseline <150m → tighter filtering.
-- **execute_graph(self, xml, input_dir, output_dir)**: Runs `gpt graph.xml -Pinput=...`.
-  - Returns: Output paths list.
-  - Handles: Retries via RobustDownloader.
+### `fuse_layers(layers: Dict[str, Dict[str, Any]], output_path: Path, *, dynamic: bool = True, temperature: float = 1.0)`
 
-**Technical Details**:
-- XML Templating: Jinja2 for dynamic params (e.g., {{baseline}} in unwrapping).
-- Optimization: Goldstein filter (alpha=0.5); SNAPHU for unwrapping.
-- Batch: Supports stack processing.
-- Outputs: GeoTIFFs (phase, coherence, velocity).
+Reads each raster, applies either dynamic or uniform weights, and writes a Cloud
+Optimised GeoTIFF via `gam.io.cogs.write_cog`. The `dynamic` flag switches
+between resolution-aware weights and equal weights; the `temperature` argument
+controls how sharply the distribution favours fine-resolution layers. Each
+layer definition must include `path` and `resolution` keys. Dataset handles are
+closed properly to avoid descriptor leaks.
 
-**Example**:
+```python
+from pathlib import Path
+from gam.fusion.multi_resolution_fusion import fuse_layers
+
+layers = {
+    "insar": {"path": Path("data/features/insar.tif"), "resolution": 10.0},
+    "gravity": {"path": Path("data/features/gravity.tif"), "resolution": 250.0},
+}
+fused_path = fuse_layers(layers, Path("data/products/fused.tif"), temperature=0.8)
+```
+
+### Command-line interface
+
+Use the module as a CLI to process all products defined in `config/fusion.yaml`:
+
+```bash
+python -m gam.fusion.multi_resolution_fusion run \
+  --config config/fusion.yaml \
+  --output data/products/fusion \
+  --temperature 0.9
+```
+
+Specify `--static` to disable dynamic weighting for sensitivity checks. Each
+product entry in the YAML file should define a `name` and a `layers` list with
+`path` and `resolution` fields.
+
+## InSAR graph generation (`utils.snap_templates`)
+
+`GraphTemplateProcessor` generates SNAP GPT graphs based on Sentinel-1 SAFE
+metadata and executes them using `gpt`.
+
+### `GraphTemplateProcessor(template_path: str, config: Optional[Dict] = None)`
+
+- Loads the XML template and prepares a substitution map.
+- Optional `config` overrides defaults such as subswath, polarisation, and burst
+  indices.
+
+### `extract_sentinel1_params(safe_path: str) -> Dict`
+
+- Parses `manifest.safe`, measurement TIFFs, and annotation XML to determine
+  acquisition mode, available subswaths, polarisations, burst indices, and
+  approximate AOI.
+- Returns a dictionary containing defaults suitable for interferogram
+  generation.
+
+### `validate_parameters(params: Dict, master_safe: str, slave_safe: str) -> bool`
+
+- Ensures the master/slave pair share mode, subswath, and polarisation.
+- Computes burst overlap and adjusts `first_burst`/`last_burst` accordingly.
+- Checks bounding box overlap and raises descriptive errors on mismatches.
+
+### `generate_graph(template_params: Dict, output_path: str) -> str`
+
+- Substitutes template variables (e.g., `${SUBSWATH}`) and writes a ready-to-run
+  graph XML file.
+
+### `process_interferogram(master_safe: str, slave_safe: str, output_dir: str, manual_params: Optional[Dict] = None) -> Dict`
+
+- High-level helper that extracts parameters, validates the pair, generates the
+  graph, and executes SNAP GPT. Returns a dictionary containing the graph path,
+  output file, and parameters used.
+
 ```python
 from utils.snap_templates import GraphTemplateProcessor
-gtp = GraphTemplateProcessor()
-meta = gtp.parse_safe_metadata('S1A.SAFE')
-xml = gtp.generate_template(meta)
-results = gtp.execute_graph(xml, 'data/raw/insar', 'data/processed/insar')
+
+processor = GraphTemplateProcessor("config/templates/interferogram.xml")
+result = processor.process_interferogram(
+    master_safe="data/raw/sentinel1/master.SAFE",
+    slave_safe="data/raw/sentinel1/slave.SAFE",
+    output_dir="data/processed/insar",
+)
+print(result["output_file"])
 ```
 
-**Configuration**:
-- `"snap.template_params.filter_alpha"`: 0.1-1.0.
-- `"snap.unwrap_method"`: 'snaphu-mcf' or 'mcf'.
+## Resilience utilities (`utils.error_handling`)
 
-## 4. RobustDownloader and Error Handling Framework (utils/error_handling.py)
+The resilience toolkit offers reusable primitives for reliable data acquisition.
 
-### Class: RobustDownloader
-Resilient file/API downloader.
+### Key components
 
-- **__init__(self, max_retries=5, base_delay=1, config=None)**: Sets policy.
-- **download_with_retry(self, url, path, auth_service=None, checksum=None)**: Downloads with resume/validation.
-  - Auth: Integrates TokenManager.
-  - Returns: bool success.
-- **stream_download(self, url, callback=None)**: Chunked for large files (tqdm progress).
+- `retry_with_backoff` – Decorator implementing exponential backoff with jitter.
+- `RobustDownloader` – Wraps HTTP downloads with retries, checksum validation,
+  and resume support.
+- `CircuitBreaker` – Protects external services from repeated failures.
+- `TokenManager` – Manages OAuth-style tokens for authenticated services.
+- Exception hierarchy (`GeoAnomalyError`, `RetryableError`, `PermanentError`,
+  etc.) – Allows fine-grained error handling.
 
-**Technical Details**:
-- Session: requests.Session with adapters (pool=10).
-- Retries: @retry_with_backoff for transients.
-- Integrity: Size/checksum; removes failures.
-- Throttling: Configurable bytes/sec.
-
-### CircuitBreaker
-- **__init__(threshold=5, timeout=60)**.
-- **call(func, *args, **kwargs)**: Context manager; skips if open.
-
-### TokenManager
-- **get_token(self)**: Refreshes if expired.
-- Services: Copernicus, Earthdata (URLs from config).
-
-**Example**:
 ```python
-from utils.error_handling import RobustDownloader, TokenManager
-tm = TokenManager('copernicus')
-downloader = RobustDownloader(auth_service='copernicus')
-downloader.download_with_retry('https://example.com/data.zip', 'data.zip', tm.get_token())
+from utils.error_handling import RobustDownloader, PermanentError
+
+agent = RobustDownloader(max_retries=6, base_delay=1.5)
+try:
+    agent.download_with_retry("https://example.com/data.zip", "data/raw/data.zip")
+except PermanentError as exc:
+    logger.error("Acquisition aborted: %s", exc)
 ```
 
-**Error Hierarchy**:
-- Base: GeoAnomalyError.
-- RetryableError → ConnectionError, Timeout, RateLimitError.
-- PermanentError → ValueError, FileNotFoundError.
+## Command-line entry points
 
-## Integration and Best Practices
+### STAC indexing
 
-- **Config First**: Always load ConfigManager early.
-- **Path Safety**: Use PathManager for all I/O.
-- **Robust Calls**: Wrap external (requests, subprocess) with retry/circuit.
-- **Validation**: Call validate() post-load.
-- **Logging**: Use `logging.getLogger(__name__)`; config sets level.
-- **Testing**: Mock utils in tests (e.g., patch PathManager).
-
-For full source: See utils/ and scripts. Extend via inheritance.
-
-### CLI Utilities
-
-#### gam_data_agent.py
-Unified data acquisition agent for geophysical datasets.
-
-**CLI Interface**:
 ```bash
-python gam_data_agent.py status [--report]
-python gam_data_agent.py download [free|all] [--dataset <key>] [--bbox "lon1,lat1,lon2,lat2"] [--dry-run]
+python -m gam.agents.stac_index init --out data/stac
 ```
 
-- **status**: Shows download status from `data/data_status.json`.
-- **download**: Fetches datasets (e.g., EMAG2, EGM2008, Sentinel-1). Supports bbox for regional data.
-- Datasets: emag2_magnetic, egm2008_gravity, xgm2019e_gravity, srtm_dem, insar_sentinel1.
-- Integrates RobustDownloader for resilience; respects v2 config for paths.
+Initialises a local STAC catalogue for tracking dataset provenance.
 
-**Example**:
+### Data synchronisation
+
 ```bash
-python gam_data_agent.py download free --bbox "-105,32,-104,33"
+python -m gam.agents.gam_data_agent sync --config config/data_sources.yaml
 ```
 
-Tracks progress in `data/data_status.json`; idempotent runs.
+Downloads and updates datasets defined in the configuration, recording progress
+in `data/stac/status.json`.
 
-#### setup_environment.py
-Environment diagnostics and optional setup utility.
+### Raster harmonisation
 
-**CLI Interface**:
 ```bash
-python setup_environment.py check [--deep] [--yes] [--network] [--json <file>]
-python setup_environment.py setup [--v2] [--yes]
-python setup_environment.py requirements
+python -m gam.io.reprojection run --tiling config/tiling_zones.yaml
 ```
 
-- **check**: Runs diagnostics (system, packages, paths, config mode, Stage 1-5 components). `--deep` imports modules (may create dirs); `--network` DNS preflight.
-- **setup**: Creates data/ structure and optional .env copy. `--v2` ensures v2-managed paths.
-- **requirements**: Shows dependency summaries.
+Reprojects and tiles source rasters into the unified grid.
 
-**Example**:
+### Feature generation
+
 ```bash
-python setup_environment.py check --deep --yes --json diag.json
+python -m gam.features.rolling_features run \
+  --tiling config/tiling_zones.yaml \
+  --schema data/feature_schema.json
 ```
 
-Non-invasive by default; explicit confirmation for side effects.
+Computes contextual metrics and emits Cloud Optimised GeoTIFF feature layers.
 
-## Integration and Best Practices
+### Model training and inference
 
-- **Config First**: Always load ConfigManager early.
-- **Path Safety**: Use PathManager for all I/O.
-- **Robust Calls**: Wrap external (requests, subprocess) with retry/circuit.
-- **Validation**: Call validate() post-load.
-- **Logging**: Use `logging.getLogger(__name__)`; config sets level.
-- **Testing**: Mock utils in tests (e.g., patch PathManager).
-- **Shims**: Use `utils/config_shim.py` and `utils/paths_shim.py` for v1/v2 compatibility in legacy code.
+```bash
+python -m gam.models.train run \
+  --dataset data/labels/training_points.csv \
+  --schema data/feature_schema.json \
+  --output artifacts
 
-For full source: See utils/ and scripts. Extend via inheritance.
+python -m gam.models.infer_tiles run \
+  --features data/features \
+  --model artifacts/selected_model.pkl \
+  --schema data/feature_schema.json \
+  --output data/products
+```
 
-*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
+The training command logs metrics to MLflow (configured in `config.json`) and
+emits calibrated models. Inference consumes the persisted schema to guarantee
+feature alignment.
+
+### Post-processing and vectorisation
+
+```bash
+python -m gam.models.postprocess run \
+  --probabilities data/products \
+  --output data/products/vectors \
+  --threshold from:mlflow
+```
+
+Transforms probability rasters into vector features using watershed segmentation
+and topology validation.
+
+### API serving
+
+```bash
+uvicorn gam.api.main:app --host 0.0.0.0 --port 8080
+```
+
+Hosts the FastAPI service providing `/predict/points` and `/predict/bbox`
+endpoints that operate directly against the STAC catalogue and trained models.
