@@ -1,0 +1,9 @@
+rasters:
+  gravity:
+    url: https://www.ncei.noaa.gov/pub/geodetics/geomag/EMAG2_10/EMAG2_V3_SeaLevel_DataTiff.tif
+    checksum: null
+    target: data/raw/gravity/gravity.tif
+  magnetics:
+    url: https://pubs.usgs.gov/of/2009/1258/OF2009-1258_Grids/Conus_Magnetic_anomaly_1km.tif
+    checksum: null
+    target: data/raw/magnetics/magnetics.tif

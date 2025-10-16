@@ -1,0 +1,6 @@
+api:
+  catalog: data/stac/catalog.json
+  model: artifacts/selected_model.pkl
+  schema: data/feature_schema.json
+  host: 0.0.0.0
+  port: 8080

@@ -1,0 +1,9 @@
+products:
+  - name: gravity_magnetics_fused
+    layers:
+      - name: gravity
+        path: data/interim/32613/gravity_UTM13N.tif
+        resolution: 1000
+      - name: magnetics
+        path: data/interim/32613/magnetics_UTM13N.tif
+        resolution: 1000

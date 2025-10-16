@@ -1,0 +1,5 @@
+training:
+  dataset: data/labels/training_points.csv
+  schema: data/feature_schema.json
+  folds: 5
+  output: artifacts

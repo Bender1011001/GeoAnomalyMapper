@@ -21,6 +21,17 @@ dependencies = [
     "python-dotenv>=0.19.0",
     "requests>=2.25.0",
     "urllib3>=1.26.0",
+    "pyproj>=3.4.0",
+    "shapely>=2.0.0",
+    "pystac>=1.7.3",
+    "pandas>=1.4.0",
+    "scikit-learn>=1.0.0",
+    "lightgbm>=3.3.0",
+    "mlflow>=2.0.0",
+    "shap>=0.41.0",
+    "scikit-image>=0.19.0",
+    "fiona>=1.8.20",
+    "joblib>=1.1.0",
 ]
 
 [project.optional-dependencies]
