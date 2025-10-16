@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "GeoAnomalyMapper",
+    "version": "3.0.0",
+    "data_root": "data",
+    "outputs_dir": "data/outputs",
+    "processed_dir": "data/processed",
+    "cache_dir": "data/cache"
+  },
+  "paths": {
+    "raw_data": "data/raw",
+    "interim": "data/interim",
+    "features": "data/features",
+    "models": "data/models",
+    "logs": "data/outputs/logs"
+  },
+  "pipelines": {
+    "tiling_config": "config/tiling_zones.yaml",
+    "data_sources_config": "config/data_sources.yaml",
+    "fusion_config": "config/fusion.yaml",
+    "training_config": "config/training.yaml",
+    "serving_config": "config/serving.yaml"
+  },
+  "fusion": {
+    "dynamic_weighting": true,
+    "temperature": 1.0,
+    "target_resolution_m": 250,
+    "uncertainty_threshold": 0.25
+  },
+  "robustness": {
+    "max_retries": 5,
+    "base_delay": 1.0,
+    "circuit_threshold": 5,
+    "recovery_timeout": 60,
+    "validate_integrity": true
+  },
+  "serving": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "reload": false
+  },
+  "logging": {
+    "level": "INFO",
+    "structured": true
+  }
+}
