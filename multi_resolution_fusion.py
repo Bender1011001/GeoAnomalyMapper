@@ -23,6 +23,7 @@ Usage:
 import logging
 import argparse
 import sys
+import warnings
 from pathlib import Path
 from typing import Tuple, Optional, Dict, List
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ from enum import Enum
 
 import numpy as np
 import rasterio
+from rasterio.errors import RasterioError
 from rasterio.transform import from_bounds
 from rasterio.warp import reproject, Resampling, calculate_default_transform
 from rasterio.enums import Resampling as RioResampling
@@ -39,6 +41,7 @@ import matplotlib.pyplot as plt
 
 # Configuration shim import for optional v2 features
 from utils.config_shim import get_config
+from utils.raster_io import write_raster_with_metadata
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -73,6 +76,7 @@ class DataLayer:
     uncertainty: Optional[np.ndarray] = None
     weight: float = 1.0
     unit: str = ""
+    native_resolution: Optional[float] = None  # degrees
     
     @property
     def shape(self):
@@ -208,7 +212,8 @@ def load_and_resample_adaptive(
         name=src_path.stem,
         data=dst_array,
         resolution=target_res,
-        bounds=target_bounds
+        bounds=target_bounds,
+        native_resolution=source_res
     )
 
 
@@ -509,6 +514,159 @@ def fuse_weighted(
     )
 
 
+class ResolutionWarning(UserWarning):
+    """Warning raised when requested output resolution exceeds data support."""
+
+
+def determine_coarsest_native_resolution(data_paths: Dict[str, Path],
+                                         selected_sources: Optional[List[str]] = None) -> Optional[float]:
+    """Determine the coarsest native resolution among available rasters."""
+
+    resolutions: List[float] = []
+    for key, raster_path in data_paths.items():
+        if selected_sources and key not in selected_sources:
+            continue
+        if not raster_path or not raster_path.exists():
+            continue
+        try:
+            with rasterio.open(raster_path) as src:
+                res_x, res_y = src.res
+                native = max(abs(res_x), abs(res_y))
+                resolutions.append(native)
+        except RasterioError as exc:
+            logger.warning(f"Unable to determine resolution for {raster_path}: {exc}")
+    if not resolutions:
+        return None
+    return max(resolutions)
+
+
+def enforce_resolution_governance(requested_resolution: float,
+                                  coarsest_native: Optional[float],
+                                  force: bool) -> float:
+    """Apply resolution governance rules and return the effective output resolution."""
+
+    if coarsest_native is None:
+        return requested_resolution
+
+    safe_floor = coarsest_native / 2.0
+    if requested_resolution < safe_floor and not force:
+        warnings.warn(
+            (
+                "Requested resolution %.6f° exceeds the supported fidelity "
+                "given input data (coarsest native %.6f°). Output resolution "
+                "capped to %.6f°. Use --force-resolution to override."
+            )
+            % (requested_resolution, coarsest_native, safe_floor),
+            ResolutionWarning
+        )
+        logger.warning(
+            "Output resolution capped from %.6f° to %.6f° to preserve data integrity",
+            requested_resolution,
+            safe_floor
+        )
+        return safe_floor
+
+    if requested_resolution < safe_floor and force:
+        logger.warning(
+            "Force resolution enabled. Proceeding with %.6f° despite coarsest native %.6f°",
+            requested_resolution,
+            coarsest_native
+        )
+
+    return requested_resolution
+
+
+def run_bootstrap_fusion(
+    layers: List[DataLayer],
+    n_iterations: int,
+    use_uncertainty: bool = True,
+    dynamic: bool = False,
+    target_res: Optional[float] = None,
+    tile_size: int = 512,
+    random_state: Optional[int] = None
+) -> Tuple[DataLayer, Optional[DataLayer]]:
+    """Run bootstrap ensemble of the weighted fusion to estimate uncertainty."""
+
+    if not layers:
+        raise ValueError("No layers provided for bootstrap fusion")
+
+    base_height, base_width = layers[0].shape
+    if any(layer.shape != (base_height, base_width) for layer in layers):
+        raise ValueError("All layers must share the same grid for bootstrap fusion")
+
+    rng = np.random.default_rng(random_state)
+    iterations = max(1, int(n_iterations))
+
+    mean_array = np.full((base_height, base_width), np.nan, dtype=np.float32)
+    std_array = np.full_like(mean_array, np.nan)
+
+    for y0 in range(0, base_height, tile_size):
+        y1 = min(y0 + tile_size, base_height)
+        for x0 in range(0, base_width, tile_size):
+            x1 = min(x0 + tile_size, base_width)
+
+            tile_results: List[np.ndarray] = []
+            for _ in range(iterations):
+                sample_indices = rng.integers(0, len(layers), size=len(layers))
+                sampled_layers: List[DataLayer] = []
+                for idx in sample_indices:
+                    layer = layers[idx]
+                    tile_uncertainty = None
+                    if layer.uncertainty is not None:
+                        tile_uncertainty = layer.uncertainty[y0:y1, x0:x1]
+                    sampled_layers.append(
+                        DataLayer(
+                            name=layer.name,
+                            data=layer.data[y0:y1, x0:x1],
+                            resolution=layer.resolution,
+                            bounds=layer.bounds,
+                            uncertainty=tile_uncertainty,
+                            weight=layer.weight,
+                            unit=layer.unit,
+                            native_resolution=layer.native_resolution
+                        )
+                    )
+
+                fused_tile = fuse_weighted(
+                    sampled_layers,
+                    use_uncertainty=use_uncertainty,
+                    dynamic=dynamic,
+                    target_res=target_res
+                ).data
+                tile_results.append(fused_tile)
+
+            ensemble = np.stack(tile_results, axis=0)
+            mean_array[y0:y1, x0:x1] = np.nanmean(ensemble, axis=0).astype(np.float32)
+            if iterations > 1:
+                std_array[y0:y1, x0:x1] = np.nanstd(ensemble, axis=0).astype(np.float32)
+            else:
+                std_array[y0:y1, x0:x1] = np.zeros((y1 - y0, x1 - x0), dtype=np.float32)
+
+    mean_layer = DataLayer(
+        name="bootstrap_mean",
+        data=mean_array,
+        resolution=layers[0].resolution,
+        bounds=layers[0].bounds,
+        uncertainty=std_array,
+        weight=1.0,
+        unit='σ units',
+        native_resolution=layers[0].native_resolution
+    )
+
+    std_layer = DataLayer(
+        name="bootstrap_stddev",
+        data=std_array,
+        resolution=layers[0].resolution,
+        bounds=layers[0].bounds,
+        uncertainty=None,
+        weight=1.0,
+        unit='σ units',
+        native_resolution=layers[0].native_resolution
+    )
+
+    return mean_layer, std_layer
+
+
 # ============================================================================
 # MAIN PROCESSING
 # ============================================================================
@@ -517,7 +675,10 @@ def process_multi_resolution(
     bounds: Tuple[float, float, float, float],
     target_resolution: float = 0.001,  # ~100m
     output_name: str = "multi_res_fusion",
-    data_sources: Optional[List[str]] = None
+    data_sources: Optional[List[str]] = None,
+    bootstrap_iterations: int = 32,
+    tile_size: int = 512,
+    force_resolution: bool = False
 ):
     """
     Process region using multi-resolution fusion.
@@ -532,11 +693,11 @@ def process_multi_resolution(
     logger.info("MULTI-RESOLUTION DATA FUSION PIPELINE")
     logger.info("=" * 70)
     logger.info(f"Region: {bounds}")
-    logger.info(f"Target resolution: {target_resolution}° ({target_resolution * 111:.1f} km)")
+    logger.info(f"Requested resolution: {target_resolution}° ({target_resolution * 111:.1f} km)")
     logger.info("")
-    
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     # Define data paths (update these based on your data)
     data_paths = {
         'gravity': DATA_DIR / "outputs" / "final" / "fused_anomaly.tif",
@@ -546,14 +707,34 @@ def process_multi_resolution(
         'dem': DATA_DIR / "raw" / "dem" / "srtm30.tif",
     }
     
+    selected_sources = set(data_sources) if data_sources else None
+
+    coarsest_native = determine_coarsest_native_resolution(data_paths, data_sources)
+    if coarsest_native:
+        logger.info(
+            "Coarsest native resolution among inputs: %.6f° (~%.0f m)",
+            coarsest_native,
+            coarsest_native * 111000
+        )
+
+    effective_resolution = enforce_resolution_governance(
+        target_resolution,
+        coarsest_native,
+        force_resolution
+    )
+    if effective_resolution != target_resolution:
+        logger.info("Effective resolution after governance: %.6f°", effective_resolution)
+    target_resolution = effective_resolution
+
     # Load available layers
     layers = []
-    
+    data_lineage: List[str] = []
+
     logger.info("Loading data layers...")
     logger.info("-" * 70)
-    
+
     # High-resolution InSAR (if available)
-    if data_paths.get('insar') and data_paths['insar'].exists():
+    if (selected_sources is None or 'insar' in selected_sources) and data_paths.get('insar') and data_paths['insar'].exists():
         layer = load_and_resample_adaptive(
             data_paths['insar'],
             bounds,
@@ -567,10 +748,11 @@ def process_multi_resolution(
                 layer, DataSource.INSAR_SENTINEL1
             )
             layers.append(layer)
+            data_lineage.append(str(data_paths['insar']))
             logger.info(f"✓ InSAR (Sentinel-1): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
-    
+
     # High-resolution gravity (XGM2019e)
-    if data_paths.get('gravity_hires') and data_paths['gravity_hires'].exists():
+    if (selected_sources is None or 'gravity_hires' in selected_sources) and data_paths.get('gravity_hires') and data_paths['gravity_hires'].exists():
         layer = load_and_resample_adaptive(
             data_paths['gravity_hires'],
             bounds,
@@ -584,10 +766,11 @@ def process_multi_resolution(
                 layer, DataSource.GRAVITY_XGM2019E
             )
             layers.append(layer)
+            data_lineage.append(str(data_paths['gravity_hires']))
             logger.info(f"✓ Gravity (XGM2019e): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
-    
+
     # Standard gravity (EGM2008) - fallback
-    elif data_paths.get('gravity') and data_paths['gravity'].exists():
+    elif (selected_sources is None or 'gravity' in selected_sources) and data_paths.get('gravity') and data_paths['gravity'].exists():
         layer = load_and_resample_adaptive(
             data_paths['gravity'],
             bounds,
@@ -601,10 +784,11 @@ def process_multi_resolution(
                 layer, DataSource.GRAVITY_EGM2008
             )
             layers.append(layer)
+            data_lineage.append(str(data_paths['gravity']))
             logger.info(f"✓ Gravity (EGM2008): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
-    
+
     # Magnetic
-    if data_paths.get('magnetic') and data_paths['magnetic'].exists():
+    if (selected_sources is None or 'magnetic' in selected_sources) and data_paths.get('magnetic') and data_paths['magnetic'].exists():
         layer = load_and_resample_adaptive(
             data_paths['magnetic'],
             bounds,
@@ -618,8 +802,9 @@ def process_multi_resolution(
                 layer, DataSource.MAGNETIC_EMAG2
             )
             layers.append(layer)
+            data_lineage.append(str(data_paths['magnetic']))
             logger.info(f"✓ Magnetic (EMAG2): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
-    
+
     logger.info("-" * 70)
     logger.info(f"Total layers loaded: {len(layers)}")
     logger.info("")
@@ -634,49 +819,83 @@ def process_multi_resolution(
         logger.info("GAM_DYNAMIC_WEIGHTING enabled – using dynamic weighting fusion")
     else:
         logger.info("GAM_DYNAMIC_WEIGHTING disabled – using standard weighted fusion")
-    logger.info("Performing fusion...")
-    if dynamic_flag:
-        # Dynamic weighting mode
-        fused_layer = fuse_weighted(
-            layers,
-            use_uncertainty=True,
-            dynamic=True,
-            target_res=target_resolution
-        )
-    else:
-        # Standard mode (backward compatible)
-        fused_layer = fuse_weighted(layers, use_uncertainty=True)
-    
+    logger.info(
+        "Running bootstrap fusion ensemble (%d iterations, tile size %d)…",
+        bootstrap_iterations,
+        tile_size
+    )
+
+    fused_layer, std_layer = run_bootstrap_fusion(
+        layers,
+        n_iterations=bootstrap_iterations,
+        use_uncertainty=True,
+        dynamic=dynamic_flag,
+        target_res=target_resolution,
+        tile_size=tile_size
+    )
+
+    if std_layer is None:
+        raise RuntimeError("Bootstrap fusion did not return an uncertainty layer")
+
     # Save output
-    output_tif = OUTPUT_DIR / f"{output_name}.tif"
-    logger.info(f"Saving fused result: {output_tif}")
-    
+    output_mean_tif = OUTPUT_DIR / f"{output_name}_mean.tif"
+    output_std_tif = OUTPUT_DIR / f"{output_name}_stddev.tif"
+    logger.info(f"Saving fused anomaly: {output_mean_tif}")
+    logger.info(f"Saving uncertainty map: {output_std_tif}")
+
     height, width = fused_layer.shape
     transform = from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], width, height)
-    
-    with rasterio.open(
-        output_tif,
-        'w',
-        driver='GTiff',
-        height=height,
-        width=width,
-        count=1,
-        dtype=np.float32,
-        crs='EPSG:4326',
-        transform=transform,
-        nodata=np.nan,
-        compress='DEFLATE',
-        predictor=2,
-        tiled=True,
-        blockxsize=512,
-        blockysize=512
-    ) as dst:
-        dst.write(fused_layer.data, 1)
-        dst.set_band_description(1, "Multi-resolution fused anomaly (σ units)")
-    
+    block_x = min(tile_size, width)
+    block_y = min(tile_size, height)
+    base_profile = {
+        'driver': 'GTiff',
+        'height': height,
+        'width': width,
+        'count': 1,
+        'dtype': 'float32',
+        'crs': 'EPSG:4326',
+        'transform': transform,
+        'nodata': np.nan,
+        'compress': 'DEFLATE',
+        'predictor': 2,
+        'tiled': True,
+        'blockxsize': block_x,
+        'blockysize': block_y
+    }
+
+    mean_metadata = {
+        'units': 'σ units',
+        'crs': 'EPSG:4326',
+        'effective_resolution_meters': fused_layer.resolution_meters,
+        'data_lineage': data_lineage,
+        'raster_profile': base_profile.copy(),
+        'statistic': 'bootstrap_mean',
+        'bootstrap_iterations': bootstrap_iterations
+    }
+    write_raster_with_metadata(
+        fused_layer.data.astype(np.float32),
+        output_mean_tif,
+        mean_metadata
+    )
+
+    std_metadata = {
+        'units': 'σ units',
+        'crs': 'EPSG:4326',
+        'effective_resolution_meters': fused_layer.resolution_meters,
+        'data_lineage': data_lineage,
+        'raster_profile': base_profile.copy(),
+        'statistic': 'bootstrap_stddev',
+        'bootstrap_iterations': bootstrap_iterations
+    }
+    write_raster_with_metadata(
+        std_layer.data.astype(np.float32),
+        output_std_tif,
+        std_metadata
+    )
+
     # Generate statistics report
     valid_data = fused_layer.data[~np.isnan(fused_layer.data)]
-    
+
     report = f"""
 MULTI-RESOLUTION FUSION REPORT
 {'=' * 70}
@@ -689,6 +908,7 @@ Data Layers:
 {chr(10).join(f'  - {layer.name}: {layer.resolution_meters:.0f}m, weight={layer.weight}' for layer in layers)}
 
 Statistics:
+  - Bootstrap iterations: {bootstrap_iterations}
   - Valid pixels: {len(valid_data):,}
   - Mean: {np.mean(valid_data):.3f}
   - Std Dev: {np.std(valid_data):.3f}
@@ -698,7 +918,8 @@ Statistics:
   - 95th percentile: {np.percentile(valid_data, 95):.3f}
 
 Output:
-  - Fused GeoTIFF: {output_tif}
+  - Fused GeoTIFF (mean): {output_mean_tif}
+  - Uncertainty GeoTIFF (std dev): {output_std_tif}
 
 Notes:
   - Values are normalized z-scores (σ units)
@@ -763,6 +984,18 @@ def main():
         help='Target resolution in degrees (default: 0.001° ~ 100m)'
     )
     parser.add_argument(
+        '--bootstrap-iterations',
+        type=int,
+        default=32,
+        help='Number of bootstrap iterations for uncertainty estimation (default: 32)'
+    )
+    parser.add_argument(
+        '--tile-size',
+        type=int,
+        default=512,
+        help='Tile size (pixels) for bootstrap processing (default: 512)'
+    )
+    parser.add_argument(
         '--output',
         type=str,
         default='multi_res_fusion',
@@ -774,7 +1007,12 @@ def main():
         nargs='+',
         help='Data sources to include (default: all available)'
     )
-    
+    parser.add_argument(
+        '--force-resolution',
+        action='store_true',
+        help='Override resolution governance and force requested output resolution'
+    )
+
     args = parser.parse_args()
     
     # Parse bounds - support both new and old format
@@ -795,7 +1033,10 @@ def main():
         bounds,
         target_resolution=args.resolution,
         output_name=args.output,
-        data_sources=args.sources
+        data_sources=args.sources,
+        bootstrap_iterations=args.bootstrap_iterations,
+        tile_size=args.tile_size,
+        force_resolution=args.force_resolution
     )
 
 

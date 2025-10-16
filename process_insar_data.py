@@ -10,12 +10,25 @@ Processes downloaded Sentinel-1 SLC products to extract:
 Integrates with multi-resolution fusion pipeline for enhanced detection.
 """
 
+import argparse
 import logging
 import sys
 from pathlib import Path
 import subprocess
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 import json
+
+import numpy as np
+import rasterio
+from rasterio.warp import reproject
+from rasterio.enums import Resampling
+
+from utils.insar_tools import (
+    apply_gacos_correction,
+    apply_coherence_mask,
+    project_los_to_vertical
+)
+from utils.raster_io import write_raster_with_metadata
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,21 +39,42 @@ logger = logging.getLogger(__name__)
 
 class InSARProcessor:
     """Process Sentinel-1 InSAR data for anomaly detection."""
-    
-    def __init__(self, data_dir: Path):
+
+    def __init__(
+        self,
+        data_dir: Path,
+        interferogram_path: Optional[Path] = None,
+        coherence_path: Optional[Path] = None,
+        incidence_angle_path: Optional[Path] = None,
+        gacos_grid: Optional[Path] = None,
+        gacos_executable: str = 'gacos',
+        coherence_threshold: float = 0.3,
+        output_prefix: str = 'sentinel1_stack',
+        skip_gacos: bool = False
+    ):
         self.data_dir = data_dir
         self.insar_dir = data_dir / 'raw' / 'insar' / 'sentinel1'
         self.output_dir = data_dir / 'processed' / 'insar'
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Check for manifest
+
         self.manifest_file = self.insar_dir / '_manifest.jsonl'
-        if not self.manifest_file.exists():
-            raise FileNotFoundError(f"Manifest not found: {self.manifest_file}")
+
+        self.interferogram_path = interferogram_path
+        self.coherence_path = coherence_path
+        self.incidence_angle_path = incidence_angle_path
+        self.gacos_grid = gacos_grid
+        self.gacos_executable = gacos_executable
+        self.coherence_threshold = coherence_threshold
+        self.output_prefix = output_prefix
+        self.skip_gacos = skip_gacos
     
     def load_manifest(self) -> List[Dict]:
         """Load downloaded scenes from manifest."""
         scenes = []
+        if not self.manifest_file.exists():
+            logger.warning("Manifest not found at %s", self.manifest_file)
+            return scenes
+
         with open(self.manifest_file, 'r') as f:
             for line in f:
                 if line.strip():
@@ -193,7 +227,7 @@ class InSARProcessor:
     
     def generate_snap_graph(self):
         """Generate SNAP GPT graph XML for batch processing."""
-        
+
         graph_path = self.output_dir / 'snap_interferogram_graph.xml'
         
         graph_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -380,12 +414,152 @@ class InSARProcessor:
         
         logger.info(f"✓ SNAP graph created: {graph_path}")
         logger.info("  Usage: gpt snap_interferogram_graph.xml -Pmaster=scene1.zip -Pslave=scene2.zip -Poutput=result.tif")
-        
+
         return graph_path
-    
+
+    def _read_raster(self, path: Path) -> Tuple[np.ndarray, dict]:
+        """Read a raster and return array and profile."""
+
+        with rasterio.open(path) as src:
+            data = src.read(1)
+            profile = src.profile
+        return data, profile
+
+    def _resample_to_match(self, source_path: Path, target_profile: dict) -> np.ndarray:
+        """Resample a raster to match the target profile."""
+
+        with rasterio.open(source_path) as src:
+            destination = np.full(
+                (target_profile['height'], target_profile['width']),
+                np.nan,
+                dtype=np.float32
+            )
+            reproject(
+                source=rasterio.band(src, 1),
+                destination=destination,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=target_profile['transform'],
+                dst_crs=target_profile['crs'],
+                resampling=Resampling.bilinear,
+                src_nodata=src.nodata,
+                dst_nodata=np.nan
+            )
+        return destination
+
+    def run_automated_pipeline(self) -> Optional[Dict[str, Path]]:
+        """Execute automated InSAR processing chain when inputs are provided."""
+
+        if not self.interferogram_path:
+            logger.info("No interferogram provided; skipping automated InSAR pipeline.")
+            return None
+
+        if not Path(self.interferogram_path).exists():
+            raise FileNotFoundError(f"Interferogram not found: {self.interferogram_path}")
+
+        working_path = Path(self.interferogram_path)
+        lineage = [str(working_path)]
+
+        if self.gacos_grid and not self.skip_gacos:
+            corrected_path = self.output_dir / f"{self.output_prefix}_gacos_corrected.tif"
+            try:
+                logger.info("Applying GACOS correction using %s", self.gacos_executable)
+                working_path = apply_gacos_correction(
+                    working_path,
+                    Path(self.gacos_grid),
+                    corrected_path,
+                    self.gacos_executable
+                )
+                lineage.append(str(working_path))
+            except FileNotFoundError:
+                logger.warning(
+                    "GACOS executable '%s' not found. Skipping atmospheric correction.",
+                    self.gacos_executable
+                )
+            except subprocess.CalledProcessError as exc:
+                logger.warning(
+                    "GACOS correction failed (%s). Proceeding without correction.",
+                    exc
+                )
+
+        los_data, base_profile = self._read_raster(working_path)
+        los_data = los_data.astype(np.float32)
+
+        coherence_data = None
+        if self.coherence_path and Path(self.coherence_path).exists():
+            logger.info("Loading coherence map: %s", self.coherence_path)
+            coherence_data = self._resample_to_match(Path(self.coherence_path), base_profile)
+        else:
+            if self.coherence_path:
+                logger.warning("Coherence map not found: %s", self.coherence_path)
+
+        if coherence_data is not None:
+            logger.info("Applying coherence mask with threshold %.2f", self.coherence_threshold)
+            los_masked = apply_coherence_mask(los_data, coherence_data, self.coherence_threshold)
+        else:
+            los_masked = los_data
+
+        incidence_data = None
+        if self.incidence_angle_path and Path(self.incidence_angle_path).exists():
+            logger.info("Loading incidence angle map: %s", self.incidence_angle_path)
+            incidence_data = self._resample_to_match(Path(self.incidence_angle_path), base_profile)
+        else:
+            if self.incidence_angle_path:
+                logger.warning("Incidence angle map not found: %s", self.incidence_angle_path)
+
+        if incidence_data is not None:
+            logger.info("Projecting LOS displacement to vertical component")
+            vertical = project_los_to_vertical(los_masked, incidence_data)
+        else:
+            vertical = los_masked
+
+        base_profile = base_profile.copy()
+        base_profile.update({
+            'dtype': 'float32',
+            'count': 1,
+            'nodata': np.nan,
+            'compress': 'DEFLATE',
+            'predictor': 2,
+            'tiled': True,
+            'blockxsize': min(512, base_profile['width']),
+            'blockysize': min(512, base_profile['height'])
+        })
+
+        los_output = self.output_dir / f"{self.output_prefix}_los_masked.tif"
+        vertical_output = self.output_dir / f"{self.output_prefix}_vertical_displacement.tif"
+
+        metadata_common = {
+            'units': 'mm',
+            'crs': str(base_profile['crs']),
+            'effective_resolution_meters': abs(base_profile['transform'][0]) * 111000,
+            'data_lineage': lineage,
+            'raster_profile': base_profile.copy()
+        }
+
+        write_raster_with_metadata(
+            los_masked,
+            los_output,
+            {**metadata_common, 'statistic': 'los_masked'}
+        )
+
+        write_raster_with_metadata(
+            vertical,
+            vertical_output,
+            {**metadata_common, 'statistic': 'vertical_displacement'}
+        )
+
+        logger.info("Automated InSAR processing complete.")
+        logger.info("Masked LOS displacement: %s", los_output)
+        logger.info("Vertical displacement: %s", vertical_output)
+
+        return {
+            'los_masked': los_output,
+            'vertical_displacement': vertical_output
+        }
+
     def process(self):
         """Main processing workflow."""
-        
+
         logger.info("=" * 70)
         logger.info("INSAR DATA PROCESSING")
         logger.info("=" * 70)
@@ -409,7 +583,13 @@ class InSARProcessor:
         if software.get('snap'):
             logger.info("\nGenerating SNAP processing graph...")
             self.generate_snap_graph()
-        
+
+        pipeline_outputs = self.run_automated_pipeline()
+        if pipeline_outputs:
+            logger.info("\nAutomated pipeline outputs:")
+            for name, path in pipeline_outputs.items():
+                logger.info("  %s: %s", name, path)
+
         logger.info("\n" + "=" * 70)
         logger.info("SETUP COMPLETE")
         logger.info("=" * 70)
@@ -426,10 +606,41 @@ class InSARProcessor:
 
 def main():
     """CLI interface."""
-    base_dir = Path(__file__).parent.parent / 'data'
-    
+    parser = argparse.ArgumentParser(
+        description="Automate Sentinel-1 InSAR processing for GeoAnomalyMapper"
+    )
+    default_data_dir = Path(__file__).parent.parent / 'data'
+    parser.add_argument(
+        '--data-dir',
+        type=Path,
+        default=default_data_dir,
+        help=f'Base data directory (default: {default_data_dir})'
+    )
+    parser.add_argument('--interferogram', type=Path, help='Path to LOS displacement GeoTIFF')
+    parser.add_argument('--coherence', type=Path, help='Path to coherence GeoTIFF')
+    parser.add_argument('--incidence-angle', type=Path, help='Path to incidence angle GeoTIFF')
+    parser.add_argument('--gacos-grid', type=Path, help='Path to GACOS correction grid')
+    parser.add_argument('--gacos-exec', type=str, default='gacos', help='GACOS executable name (default: gacos)')
+    parser.add_argument('--coherence-threshold', type=float, default=0.3,
+                        help='Coherence threshold for masking (default: 0.3)')
+    parser.add_argument('--output-prefix', type=str, default='sentinel1_stack',
+                        help='Prefix for processed output files (default: sentinel1_stack)')
+    parser.add_argument('--skip-gacos', action='store_true', help='Skip GACOS correction even if provided')
+
+    args = parser.parse_args()
+
     try:
-        processor = InSARProcessor(base_dir)
+        processor = InSARProcessor(
+            data_dir=args.data_dir,
+            interferogram_path=args.interferogram,
+            coherence_path=args.coherence,
+            incidence_angle_path=args.incidence_angle,
+            gacos_grid=args.gacos_grid,
+            gacos_executable=args.gacos_exec,
+            coherence_threshold=args.coherence_threshold,
+            output_prefix=args.output_prefix,
+            skip_gacos=args.skip_gacos
+        )
         processor.process()
     except FileNotFoundError as e:
         logger.error(f"Error: {e}")

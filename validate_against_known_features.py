@@ -20,6 +20,13 @@ import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional
 import json
 from utils.config_shim import get_config
+from sklearn.metrics import (
+    precision_recall_curve,
+    average_precision_score,
+    roc_curve,
+    auc
+)
+from sklearn.calibration import CalibrationDisplay
 
 logging.basicConfig(
     level=logging.INFO,
@@ -174,7 +181,7 @@ KNOWN_FEATURES = [
 ]
 
 
-def sample_anomaly_at_location(raster_path: Path, lon: float, lat: float, 
+def sample_anomaly_at_location(raster_path: Path, lon: float, lat: float,
                                 buffer_km: float = 2.0) -> Dict:
     """Sample anomaly value at a specific location with spatial averaging."""
     
@@ -229,7 +236,39 @@ def sample_anomaly_at_location(raster_path: Path, lon: float, lat: float,
         }
 
 
-def validate_features(raster_path: Path, features: List[Dict], 
+def sample_background_points(
+    raster_path: Path,
+    n_samples: int,
+    buffer_km: float,
+    rng: np.random.Generator
+) -> List[Dict[str, Dict]]:
+    """Sample random background locations within the raster bounds."""
+
+    samples: List[Dict[str, Dict]] = []
+    if n_samples <= 0:
+        return samples
+
+    with rasterio.open(raster_path) as src:
+        bounds = src.bounds
+
+    max_attempts = n_samples * 10
+    attempts = 0
+    while len(samples) < n_samples and attempts < max_attempts:
+        lon = float(rng.uniform(bounds.left, bounds.right))
+        lat = float(rng.uniform(bounds.bottom, bounds.top))
+        stats = sample_anomaly_at_location(raster_path, lon, lat, buffer_km)
+        if (
+            stats.get('in_bounds')
+            and stats.get('valid_pixels', 0) >= MIN_VALID_PIXELS
+            and not np.isnan(stats.get('mean', np.nan))
+        ):
+            samples.append({'lon': lon, 'lat': lat, 'stats': stats})
+        attempts += 1
+
+    return samples
+
+
+def validate_features(raster_path: Path, features: List[Dict],
                       buffer_km: float = 2.0) -> Dict:
     """Validate anomaly detection against known features."""
     
@@ -237,6 +276,7 @@ def validate_features(raster_path: Path, features: List[Dict],
     logger.info(f"Sampling with {buffer_km} km buffer")
     
     results = []
+    score_records: List[Dict[str, object]] = []
     correct_detections = 0
     incorrect_detections = 0
     out_of_bounds = 0
@@ -280,16 +320,27 @@ def validate_features(raster_path: Path, features: List[Dict],
                 meets_expectation = mean_value <= -threshold
                 requirement = f"≤ -{threshold:.2f}σ"
                 expectation_desc = 'negative'
+                oriented_score = max(-mean_value, 0.0)
             elif expected_sign == 'positive':
                 meets_expectation = mean_value >= threshold
                 requirement = f"≥ {threshold:.2f}σ"
                 expectation_desc = 'positive'
+                oriented_score = max(mean_value, 0.0)
             else:
                 meets_expectation = abs(mean_value) >= threshold
                 requirement = f"|σ| ≥ {threshold:.2f}"
                 expectation_desc = 'positive or negative'
+                oriented_score = abs(mean_value)
 
             detected_correctly = bool(meets_expectation)
+
+            score_records.append({
+                'score': float(oriented_score),
+                'label': 1,
+                'feature_name': feature.get('name', 'unknown'),
+                'mean_sigma': mean_value,
+                'expected_sign': expected_sign
+            })
 
             if detected_correctly:
                 explanation = (
@@ -321,6 +372,22 @@ def validate_features(raster_path: Path, features: List[Dict],
     else:
         success_rate = 0.0
 
+    rng = np.random.default_rng(42)
+    background_samples = sample_background_points(raster_path, testable, buffer_km, rng)
+    for sample in background_samples:
+        stats = sample['stats']
+        mean_value = float(stats['mean'])
+        score_records.append({
+            'score': abs(mean_value),
+            'label': 0,
+            'feature_name': f"background_{len(score_records)}",
+            'mean_sigma': mean_value,
+            'expected_sign': 'background'
+        })
+
+    scores = [float(r['score']) for r in score_records]
+    labels = [int(r['label']) for r in score_records]
+
     return {
         'results': results,
         'summary': {
@@ -332,11 +399,20 @@ def validate_features(raster_path: Path, features: List[Dict],
             'no_data': no_data,
             'insufficient_data': insufficient_data,
             'success_rate': success_rate
-        }
+        },
+        'scores': scores,
+        'labels': labels,
+        'score_records': score_records,
+        'background_samples': background_samples
     }
 
 
-def generate_validation_report(validation: Dict, output_path: Path, enhanced_metrics: Optional[Dict] = None):
+def generate_validation_report(
+    validation: Dict,
+    output_path: Path,
+    enhanced_metrics: Optional[Dict] = None,
+    performance_metrics: Optional[Dict[str, object]] = None
+):
     """Generate detailed validation report.
 
     The default report structure and text are preserved to maintain docs/Pages compatibility.
@@ -438,7 +514,29 @@ NOTES:
             report += f"  - ≥ 1.0σ: {bins.get('>=1.0', 0)}\n"
             report += f"  - ≥ 0.5σ and < 1.0σ: {bins.get('>=0.5', 0)}\n"
             report += f"  - < 0.5σ: {bins.get('<0.5', 0)}\n"
-    
+
+    if performance_metrics:
+        report += f"\n{'=' * 70}\n"
+        report += "PROBABILISTIC PERFORMANCE\n"
+        report += "-" * 70 + "\n"
+        ap = performance_metrics.get('average_precision')
+        auc_val = performance_metrics.get('roc_auc')
+        threshold = performance_metrics.get('operational_threshold_recall_80')
+        if ap is not None:
+            report += f"Average Precision (AP): {ap:.3f}\n"
+        if auc_val is not None:
+            report += f"ROC AUC: {auc_val:.3f}\n"
+        if threshold is not None:
+            report += (
+                f"Operational threshold for ≥80% recall (max precision): {threshold:.4f}\n"
+            )
+        if performance_metrics.get('precision_recall_curve'):
+            report += f"Precision-Recall Curve: {performance_metrics['precision_recall_curve']}\n"
+        if performance_metrics.get('roc_curve'):
+            report += f"ROC Curve: {performance_metrics['roc_curve']}\n"
+        if performance_metrics.get('calibration_curve'):
+            report += f"Reliability Diagram: {performance_metrics['calibration_curve']}\n"
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(report)
     logger.info(f"Validation report saved: {output_path}")
@@ -669,23 +767,109 @@ def main():
     
     # Run validation
     validation = validate_features(raster_path, KNOWN_FEATURES, args.buffer)
-    
+
+    scores = np.asarray(validation.get('scores', []), dtype=float)
+    labels = np.asarray(validation.get('labels', []), dtype=int)
+    performance_metrics: Optional[Dict[str, object]] = None
+
+    if scores.size > 0 and labels.size > 0 and len(np.unique(labels)) > 1:
+        performance_metrics = {}
+        precision, recall, thresholds = precision_recall_curve(labels, scores)
+        ap = average_precision_score(labels, scores)
+        performance_metrics['average_precision'] = float(ap)
+
+        pr_curve_path = output_dir / f"{raster_path.stem}_precision_recall.png"
+        plt.figure(figsize=(8, 6))
+        plt.step(recall, precision, where='post', label=f'AP = {ap:.3f}')
+        plt.fill_between(recall, precision, step='post', alpha=0.2)
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curve')
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.4)
+        plt.tight_layout()
+        plt.savefig(pr_curve_path, dpi=200)
+        plt.close()
+        performance_metrics['precision_recall_curve'] = str(pr_curve_path)
+
+        fpr, tpr, _ = roc_curve(labels, scores)
+        roc_auc = auc(fpr, tpr)
+        performance_metrics['roc_auc'] = float(roc_auc)
+        roc_curve_path = output_dir / f"{raster_path.stem}_roc_curve.png"
+        plt.figure(figsize=(8, 6))
+        plt.plot(fpr, tpr, label=f'AUC = {roc_auc:.3f}')
+        plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Chance')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic')
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.4)
+        plt.tight_layout()
+        plt.savefig(roc_curve_path, dpi=200)
+        plt.close()
+        performance_metrics['roc_curve'] = str(roc_curve_path)
+
+        recall_thresholds = recall[:-1]
+        precision_thresholds = precision[:-1]
+        optimal_threshold = None
+        if thresholds.size > 0 and recall_thresholds.size > 0:
+            target_recall = 0.8
+            candidate_idx = np.where(recall_thresholds >= target_recall)[0]
+            if candidate_idx.size > 0:
+                best_idx = candidate_idx[np.argmax(precision_thresholds[candidate_idx])]
+                optimal_threshold = float(thresholds[best_idx])
+            else:
+                best_idx = int(np.argmax(precision_thresholds))
+                if thresholds.size > 0:
+                    optimal_threshold = float(thresholds[min(best_idx, thresholds.size - 1)])
+        performance_metrics['operational_threshold_recall_80'] = optimal_threshold
+
+        probabilities = 1.0 / (1.0 + np.exp(-scores))
+        calibration_path = output_dir / f"{raster_path.stem}_reliability.png"
+        fig, ax = plt.subplots(figsize=(8, 6))
+        CalibrationDisplay.from_predictions(labels, probabilities, n_bins=10, ax=ax)
+        ax.set_title('Reliability Diagram')
+        ax.grid(True, linestyle='--', alpha=0.4)
+        plt.tight_layout()
+        fig.savefig(calibration_path, dpi=200)
+        plt.close(fig)
+        performance_metrics['calibration_curve'] = str(calibration_path)
+
+        logger.info("Average Precision (AP): %.3f", ap)
+        logger.info("ROC AUC: %.3f", roc_auc)
+        if optimal_threshold is not None:
+            logger.info(
+                "Operational threshold achieving ≥80%% recall with max precision: %.4f",
+                optimal_threshold
+            )
+    else:
+        logger.warning(
+            "Insufficient diversity in labels to compute probabilistic metrics."
+        )
+
     # Enhanced metrics (opt-in)
     metrics = compute_enhanced_metrics(validation) if enhanced_flag else None
-    
+
     # Generate report (text always; structure unchanged; enhanced section appended only when enabled)
     report_path = output_dir / f"{raster_path.stem}_validation_report.txt"
-    generate_validation_report(validation, report_path, metrics)
+    generate_validation_report(validation, report_path, metrics, performance_metrics)
     
     # Optional JSON report (opt-in)
     if json_flag:
         json_path = output_dir / f"{raster_path.stem}_validation_report.json"
         with open(json_path, 'w', encoding='utf-8') as jf:
             json.dump(
-                {'summary': to_python(validation['summary']),
-                 'results': to_python(validation['results']),
-                 'enhanced_metrics': to_python(metrics) if metrics else None},
-                jf, indent=2
+                {
+                    'summary': to_python(validation['summary']),
+                    'results': to_python(validation['results']),
+                    'scores': validation.get('scores'),
+                    'labels': validation.get('labels'),
+                    'background_samples': to_python(validation.get('background_samples', [])),
+                    'enhanced_metrics': to_python(metrics) if metrics else None,
+                    'performance_metrics': to_python(performance_metrics) if performance_metrics else None
+                },
+                jf,
+                indent=2
             )
         logger.info(f"Validation JSON saved: {json_path}")
     
@@ -705,11 +889,21 @@ def main():
     print(f"No Data: {summary['no_data']}")
     print(f"Insufficient Data: {summary['insufficient_data']}")
     print(f"Success Rate: {summary['success_rate']:.1%}")
+    if performance_metrics:
+        print(f"Average Precision (AP): {performance_metrics.get('average_precision', float('nan')):.3f}")
+        print(f"ROC AUC: {performance_metrics.get('roc_auc', float('nan')):.3f}")
+        threshold = performance_metrics.get('operational_threshold_recall_80')
+        if threshold is not None:
+            print(f"Operational threshold for ≥80% recall: {threshold:.4f}")
     print(f"\nReports:")
     print(f"  Text: {report_path}")
     print(f"  Map:  {map_path}")
     if json_flag:
         print(f"  JSON: {json_path}")
+    if performance_metrics:
+        print(f"  PR Curve: {performance_metrics.get('precision_recall_curve')}")
+        print(f"  ROC Curve: {performance_metrics.get('roc_curve')}")
+        print(f"  Reliability: {performance_metrics.get('calibration_curve')}")
     print("=" * 70 + "\n")
 
 
