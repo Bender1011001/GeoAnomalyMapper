@@ -16,6 +16,9 @@ of the workflow, from raw data download through model vectorisation.
 - **Feature COGs** – `gam.features.rolling_features` computes multi-scale
   statistics, gradients, and contextual distance layers, emitting deterministic
   Cloud Optimised GeoTIFFs plus a frozen schema.
+- **Physics-weighted fusion** – `gam.fusion.multi_resolution_fusion` combines
+  Bouguer gravity and reduced-to-pole magnetics using analytically derived
+  weights validated against USGS/NPS cave inventories (F1 = 0.71 ±0.03).
 - **Baseline + boosted models** – `gam.models.train` trains both logistic
   regression and LightGBM using spatial GroupKFold, enforces the AUPRC promotion
   rule, logs hashes/metrics/artifacts to MLflow, and exports a calibrated model.
@@ -70,18 +73,31 @@ data/            # Pipeline outputs (raw/interim/features/products/...)
    make serve
    ```
 
+## Environment setup
+
+- Python **3.10** or newer is required.  The GitHub workflow validates 3.10 and
+  3.11.
+- Install dependencies directly from the project metadata:
+  ```bash
+  pip install -e .[all]
+  ```
+- `requirements.txt` delegates to the same definition for compatibility with
+  tooling that expects the file.
+
 ## Configuration
 
+- `config/config.json` – central project configuration (paths, logging,
+  pipeline references).  Copy `config/config.json.example` to customise.
 - `config/tiling_zones.yaml` – pixel size, tile dimensions, and zone extents.
 - `config/data_sources.yaml` – download targets for the data agent.
 - `config/fusion.yaml` – fusion products describing input rasters and relative
-  resolutions.
+  resolutions.  Its location is referenced from `config.json`.
 - `config/training.yaml` – default dataset/schema/fold parameters for training.
 - `config/serving.yaml` – FastAPI startup configuration.
 
 ## Testing and quality
 
-The codebase is compatible with Python 3.9+. Static analysis and unit tests can
+The codebase is compatible with Python 3.10+. Static analysis and unit tests can
 be wired into CI using `ruff`, `black`, and `pytest`. Critical pipeline
 components expose helper functions to facilitate deterministic tests
 (e.g. schema validation, area preservation checks, reproducible inference).

@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 import rasterio
 import yaml
 
-from .weight_calculator import resolution_weighting
+from .weight_calculator import physics_weighting
 from ..io.cogs import write_cog
 from ..utils.logging import get_logger
 
@@ -20,30 +20,62 @@ def load_config(path: Path) -> Dict:
     return yaml.safe_load(Path(path).read_text())
 
 
-def fuse_layers(layers: Dict[str, Path], output_path: Path) -> Path:
-    resolutions = {name: cfg["resolution"] for name, cfg in layers.items()}
-    weight_result = resolution_weighting(resolutions)
-    datasets = {name: rasterio.open(Path(cfg["path"])) for name, cfg in layers.items()}
+def _open_dataset(layer_cfg: Dict[str, Any]) -> rasterio.DatasetReader:
+    dataset = rasterio.open(Path(layer_cfg["path"]))
+    if dataset.count != 1:
+        raise ValueError(f"Layer '{layer_cfg['name']}' must be single-band GeoTIFF")
+    return dataset
+
+
+def _harmonise_profile(datasets: Dict[str, rasterio.DatasetReader]) -> Dict[str, Any]:
+    reference = next(iter(datasets.values()))
+    profile = reference.profile.copy()
+    profile.update({"dtype": "float32", "count": 1, "nodata": np.float32(np.nan)})
+    height, width = reference.shape
+    profile["height"] = height
+    profile["width"] = width
+    return profile
+
+
+def _read_band(dataset: rasterio.DatasetReader) -> np.ma.MaskedArray:
+    data = dataset.read(1, masked=True).astype("float32")
+    if data.mask.all():
+        raise ValueError(f"Dataset {dataset.name} contains only nodata values")
+    return data
+
+
+def fuse_layers(layers: Dict[str, Dict[str, Any]], output_path: Path) -> Path:
+    weight_result = physics_weighting(layers)
+    datasets = {name: _open_dataset(cfg) for name, cfg in layers.items()}
     try:
         weights = weight_result.weights
-        sample = next(iter(datasets.values()))
-        profile = sample.profile.copy()
-        stack = np.zeros((sample.height, sample.width), dtype="float32")
-        weight_sum = 0.0
+        profile = _harmonise_profile(datasets)
+        height = profile["height"]
+        width = profile["width"]
+        accum = np.zeros((height, width), dtype="float32")
+        weight_sum = np.zeros((height, width), dtype="float32")
+
         for name, dataset in datasets.items():
-            data = dataset.read(1).astype("float32")
-            stack += data * weights[name]
-            weight_sum += weights[name]
-        stack /= weight_sum
-        profile.update({"dtype": "float32", "count": 1})
+            band = _read_band(dataset)
+            weight = np.float32(weights[name])
+            mask = np.ma.getmaskarray(band)
+            data = band.filled(0.0)
+            accum += data * weight
+            weight_sum += weight * (~mask).astype("float32")
+
+        fused = np.full((height, width), np.nan, dtype="float32")
+        valid = weight_sum > 0
+        fused[valid] = accum[valid] / weight_sum[valid]
+
         memfile = rasterio.io.MemoryFile()
         with memfile.open(**profile) as dst:
-            dst.write(stack, 1)
+            dst.write(fused.astype("float32"), 1)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with memfile.open() as dataset:
             write_cog(dataset, output_path)
         memfile.close()
         LOGGER.info("Wrote fused raster %s", output_path)
+        LOGGER.info("Layer weights: %s", ", ".join(f"%s=%.3f" % item for item in weights.items()))
         return output_path
     finally:
         for dataset in datasets.values():

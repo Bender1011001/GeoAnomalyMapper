@@ -2,7 +2,7 @@
 
 **Robust Framework and Common Issue Resolution**
 
-The scientific code review highlighted fragile error handling in legacy scripts (e.g., crashes on network failures, no recovery). The new framework in `utils/error_handling.py` provides production-grade resilience: retries, circuit breakers, DNS checks, and graceful degradation. This guide explains the system, common errors, and step-by-step troubleshooting for reliable operation.
+GeoAnomalyMapper's production pipeline relies on the resilience framework in `utils/error_handling.py`: retries, circuit breakers, DNS checks, and graceful degradation. This guide explains the system, common errors, and step-by-step troubleshooting for reliable operation.
 
 ## Overview of Error Handling Framework
 
@@ -91,7 +91,7 @@ INFO: Success after retry.
 4. **Quota**: Wait 24h or use alternative source (e.g., EGMS).
 5. **Earthdata**: Ensure .netrc format: `machine urs.earthdata.nasa.gov login USER password PASS`.
 
-**Migration Note**: Old scripts hardcoded creds - now all via .env.
+**Credential Management**: Store all secrets in `.env`; never embed credentials in scripts.
 
 ### 3. Download and Integrity Failures
 **Symptoms**: "IntegrityError", partial files, "File too small".
@@ -131,7 +131,7 @@ INFO: Success after retry.
 ### 5. Validation and Scientific Errors
 **Symptoms**: "Low accuracy", "No known features match".
 
-**Causes**: Inflated legacy metrics, poor co-registration.
+**Causes**: Misaligned validation datasets, poor co-registration.
 
 **Framework Handling**:
 - Accurate reporting: True/false positives via proper alignment.
@@ -140,7 +140,7 @@ INFO: Success after retry.
 **Troubleshooting**:
 1. **Update Known Features**: Edit `config/known_features.json`.
 2. **Rerun**: `python validate_against_known_features.py --input output.tif --threshold 0.7`.
-3. **Compare**: Use `--legacy` for old method comparison.
+3. **Compare**: Use the validation report to contrast fused results with reference features and confirm spatial alignment.
 4. **Data Quality**: Ensure high-res sources; check weights in fusion.
 
 ### 6. Configuration and Setup Errors
@@ -192,8 +192,8 @@ INFO: Success after retry.
 - **Testing**: Simulate failures (e.g., unplug net) to verify retries.
 - **Backups**: Checkpointing saves state; gitignore large data/.
 - **Production**: Set circuit timeouts; monitor via status.json API.
-- **Migration**: Wrap old code with `RobustDownloader` for resilience.
+- **Integration**: Use `RobustDownloader` whenever interacting with external services.
 
 This framework ensures 95%+ uptime; most issues resolve with rerun or config tweak.
 
-*Updated: October 2025 - v2.0 (Robust Framework)*
+*Updated: October 2025*

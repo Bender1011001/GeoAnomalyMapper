@@ -1,9 +1,21 @@
 products:
   - name: gravity_magnetics_fused
+    description: Physics-weighted fusion of Bouguer gravity and reduced-to-pole magnetics.
     layers:
       - name: gravity
+        model: gravity_slab
         path: data/interim/32613/gravity_UTM13N.tif
-        resolution: 1000
+        resolution: 1000  # metres
+        density_contrast_kg_m3: 420
+        target_thickness_m: 180
+        target_depth_m: 600
+        noise_floor: 0.08  # mGal
       - name: magnetics
+        model: magnetic_dipole
         path: data/interim/32613/magnetics_UTM13N.tif
-        resolution: 1000
+        resolution: 1000  # metres
+        magnetization_a_m: 9.5
+        anomaly_volume_m3: 2.2e5
+        target_depth_m: 600
+        inclination_deg: 63
+        noise_floor: 1.2  # nT

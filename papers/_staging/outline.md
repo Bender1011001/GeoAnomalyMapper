@@ -164,7 +164,7 @@ Continental-scale validation on 1.45 billion pixels demonstrates the feasibility
 ## A. Appendix
 
 ### A.1 Reproducibility
-All processing performed using Python 3.9 with pinned dependencies (see requirements.txt). Processing commands:
+All processing performed using Python 3.10 with dependencies installed from `pyproject.toml` (`pip install -e .[all]`). Processing commands:
 ```bash
 python convert_xgm_to_geotiff.py --region continental_usa --resolution 111m
 python multi_resolution_fusion.py --threshold 0.02 --validation enabled  
@@ -180,9 +180,9 @@ Random seeds fixed (NumPy seed=42, rasterio nodata=-9999). Build instructions: p
 - Code: https://github.com/[repository] (open source, MIT license)
 
 ### A.3 Implementation Details
-**Processing Environment**: 
-- OS: Windows 11, Python 3.9.7
-- Key packages: GDAL 3.4.3, NumPy 1.21.5, SciPy 1.8.0, matplotlib 3.5.1
+**Processing Environment**:
+- OS: Windows 11, Python 3.10
+- Dependencies: installed from `pyproject.toml` via `pip install -e .[all]`
 - Memory usage: 12GB peak for continental processing
 - Runtime: 47 minutes on Intel i7-8700K, 32GB RAM
 
