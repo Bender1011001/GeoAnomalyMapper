@@ -2,27 +2,32 @@
 
 **Comprehensive Reference for GeoAnomalyMapper Components**
 
-This document provides technical details on the core APIs, classes, and functions introduced in v2.0 following the scientific code review. It covers the new dynamic fusion capabilities (WeightCalculator), InSAR processing (GraphTemplateProcessor), robustness framework (RobustDownloader), configuration/path systems, and integration points. For user guides, see [README.md](README.md) and specialized docs.
+This document provides technical details on the production GeoAnomalyMapper APIs. It covers the physics-weighted fusion stack, InSAR processing pipeline, resilience framework, configuration/path systems, and integration points. For user guides, see [README.md](README.md) and specialized docs.
 
-All APIs are in Python 3.9+ and integrate with the unified config system. Import from `GeoAnomalyMapper` or `utils`.
+All APIs are in Python 3.10+ and integrate with the unified config system. Import from `GeoAnomalyMapper` or `utils`.
 
 ## 1. Configuration and Path Resolution System
 
 ### ConfigManager (utils/config.py)
-Central loader for `config.json` + `.env` with validation.
+Central loader for `config/config.json` with optional environment overrides.
 
 **Class: ConfigManager**
-- **__init__(self, config_file='config/config.json', env_file='.env')**: Loads and parses.
-- **get(self, key, default=None)**: Retrieves value (e.g., `config.get('fusion.dynamic_weighting')`).
-- **get_path(self, key)**: Resolves path with substitution (e.g., `${data_root}/raw`).
-- **set(self, key, value)**: Runtime override.
-- **validate(self)**: Schema check; raises ValueError on invalid.
+- **__init__(self, config_path=None, env_prefix='GAM')**: Loads JSON defaults and
+  applies overrides from environment variables that start with the prefix (for
+  example, `GAM__FUSION__DYNAMIC_WEIGHTING=true`).
+- **get(self, key, default=None)**: Retrieves a value using dotted notation.
+- **get_path(self, key, default=None)**: Returns a `pathlib.Path`, resolving
+  relative entries against the repository root.
+- **set(self, key, value)**: Updates the in-memory configuration for the current
+  process.
+- **items(self)** / **as_dict(self)**: Helpers for diagnostics and debugging.
 
 **Technical Details**:
-- Uses `json` + `python-dotenv` for loading.
-- Variable substitution: `${VAR}` from env/config.
-- Schema: Pydantic-like validation for types (int/float/bool/path).
-- Cross-Platform: Integrates with PathManager for OS-aware paths.
+- Loads `.env` automatically when `python-dotenv` is installed.
+- Environment overrides use double underscores to traverse nested keys
+  (`GAM__PATHS__RAW_DATA=/custom/raw`).
+- Directories declared under `project.*` and `paths.*` are created during
+  initialisation to simplify local setup.
 
 **Example**:
 ```python
@@ -35,86 +40,103 @@ if config.get('data_sources.insar.enabled'):
 ```
 
 ### PathManager (utils/paths.py)
-Dynamic path resolution using pathlib.
+Convenience wrapper that exposes commonly used directories as properties.
 
 **Class: PathManager**
-- **__init__(self, config=None)**: Initializes from ConfigManager.
-- **get(self, key)**: Returns Path (e.g., `pm.get('paths.raw_data')`).
-- **resolve(self, key)**: Expands and normalizes (handles ~, env vars).
-- **ensure_dir(self, key)**: Creates if missing.
-- **validate(self)**: Checks existence/writability.
+- **__init__(self)**: Reads resolved directories from `ConfigManager` and caches
+  them.
+- **data_dir / output_dir / processed_dir / cache_dir**: Properties returning the
+  corresponding directories.
+- **get_path(self, key, default=None)**: Access additional entries by key.
+- **join(self, base_key, *subpaths)**: Append relative components to a known base
+  directory.
+- **resolve(self, relative_path)**: Convert a repository-relative string into an
+  absolute path.
 
 **Technical Details**:
-- Substitutes `${key}` from config/env.
-- OS-Aware: Uses `pathlib.Path` for / vs \.
-- Caching: Memoizes resolved paths.
-- Errors: Raises PermanentError on invalid (e.g., non-writable).
+- Relative paths are resolved against the repository root.
+- Directories are created when the manager initialises so downstream code can
+  assume they exist.
 
-**Integration**: All scripts use PathManager for data I/O.
+**Integration**: Import `from utils.paths import paths` to reuse the singleton
+instance across modules.
 
-### Feature Flags and Environment Variables
-v2 integration uses feature flags for gradual adoption. Key flags include:
+### Environment overrides
 
-- **GAM_USE_V2_CONFIG** (default: false): Enables the full ConfigManager and PathManager. When false, falls back to hardcoded defaults and direct `os.getenv` calls via shims.
-- **GAM_DYNAMIC_WEIGHTING** (default: true when v2 enabled): Activates adaptive weights in fusion (see WeightCalculator).
-- **GAM_DATA_AGENT_ENABLED** (default: true): Allows gam_data_agent.py to manage downloads.
-- **GAM_VALIDATION_ENABLED** (default: true): Runs validation hooks post-processing.
+All configuration values can be overridden using environment variables with the
+`GAM__` prefix.  Each double underscore denotes a traversal into the nested JSON
+structure:
 
-**Usage**:
-Set in `.env` or export before running scripts:
 ```bash
-export GAM_USE_V2_CONFIG=true
-export GAM_DYNAMIC_WEIGHTING=false  # Disable for testing
+export GAM__PROJECT__DATA_ROOT=/mnt/geo/data
+export GAM__FUSION__DYNAMIC_WEIGHTING=true
 ```
 
-These flags ensure v1 compatibility while opting into v2 features. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for details.
+Values are parsed as JSON when possible (`true`, `false`, numbers, quoted
+strings).  Use `.env` to persist local overrides without committing them.
 
-## 2. Dynamic Fusion Capabilities
+## 2. Physics-Weighted Fusion
 
-### WeightCalculator (multi_resolution_fusion.py)
-Computes adaptive weights for data fusion.
+### `physics_weighting` (gam/fusion/weight_calculator.py)
+Derives per-layer weights using analytical geophysical response models.
 
-**Class: WeightCalculator**
-- **__init__(self, config=None)**: Loads params (uncertainty, confidence).
-- **compute_weights(self, layers, metadata)**: Returns dict of weights per layer.
-  - Params: layers (list of rasters), metadata (dict: resolution, uncertainty).
-  - Returns: {'insar': 0.85, 'gravity': 0.15, ...}.
-- **spectral_weights(self, layers, cutoff=10)**: Band-specific (FFT-based).
-- **update_confidence(self, validation_results)**: Adjusts c_i from known features.
+**Function: `physics_weighting(layer_configs)`**
+- **Inputs**: Mapping of layer name → configuration dictionary. Each dictionary must declare:
+  - `model`: One of `gravity_slab`, `magnetic_dipole`, or `topography_gradient`.
+  - `resolution`: Nominal ground sampling distance in metres.
+  - Model parameters (for example, `density_contrast_kg_m3`, `target_thickness_m`, `magnetization_a_m`, `anomaly_volume_m3`).
+  - `noise_floor`: Instrument noise floor in native units (mGal, nT, metres).
+- **Output**: `WeightResult` with weights that sum to 1.
 
 **Technical Details**:
-- Formula: \( w_i = \frac{1}{\sigma_i^2 + \epsilon} \times c_i \).
-- σ_i: From metadata + local std dev.
-- c_i: From validation (default 0.5; updated via ROC).
-- Spectral: FFT decomposition; low-freq favors gravity.
-- Efficiency: Vectorized with NumPy; per-pixel optional (`fast_mode=True`).
+- **Gravity slab**: Uses the infinite Bouguer slab equation \( \Delta g = 2\pi G \Delta\rho t \) with exponential decay by depth and converts to mGal.
+- **Magnetic dipole**: Approximates the vertical component of a buried dipole \( B_z = \frac{\mu_0}{4\pi} \frac{2M\cos I}{r^3} \) and converts to nanoTesla.
+- **Topography gradient**: Relates characteristic relief and slope to gradient magnitude per metre.
+- Information score per layer is `(response/noise_floor)^2 / resolution`, ensuring high-signal, low-noise, fine-resolution rasters dominate the fusion.
+- Validation guards prevent zero or negative information content and provide descriptive errors when required parameters are missing.
 
 **Example**:
 ```python
-from multi_resolution_fusion import WeightCalculator
-wc = WeightCalculator()
-layers = {'insar': insar_raster, 'gravity': gravity_raster}
-meta = {'insar': {'resolution': 10, 'uncertainty': 0.05}, ...}
-weights = wc.compute_weights(layers, meta)
-fused = np.average([insar, gravity], weights=[weights['insar'], weights['gravity']])
+from gam.fusion.weight_calculator import physics_weighting
+
+weights = physics_weighting(
+    {
+        "gravity": {
+            "model": "gravity_slab",
+            "resolution": 1000,
+            "density_contrast_kg_m3": 420,
+            "target_thickness_m": 180,
+            "target_depth_m": 600,
+            "noise_floor": 0.08,
+        },
+        "magnetics": {
+            "model": "magnetic_dipole",
+            "resolution": 1000,
+            "magnetization_a_m": 9.5,
+            "anomaly_volume_m3": 2.2e5,
+            "target_depth_m": 600,
+            "inclination_deg": 63,
+            "noise_floor": 1.2,
+        },
+    }
+)
+print(weights.weights)
 ```
 
-**Configuration**:
-- `"fusion.base_uncertainty"`: ε (0.01-0.1).
-- `"fusion.confidence_threshold"`: Min c_i.
+> Example output: `{'gravity': 0.609, 'magnetics': 0.391}` for the Carlsbad configuration.
 
-### Fusion Pipeline (multi_resolution_fusion.py)
-High-level API for weighted fusion.
+### Fusion driver (`gam/fusion/multi_resolution_fusion.py`)
+Executes the weighted fusion and writes Cloud Optimised GeoTIFF outputs.
 
-**Function: process_multi_resolution(bbox, output, config=None, dynamic=True)**
-- Inputs: bbox (tuple lon/lat), output (str path).
-- Processes: Downloads (if needed), weights, fuses, saves TIFF.
-- Returns: Path to fused raster.
+- **`fuse_layers(layers, output_path)`**: Loads single-band rasters, applies `physics_weighting`, harmonises profiles, performs a weighted average ignoring nodata, and writes a COG to `output_path`.
+- **`run(config_path, output_dir)`**: Iterates over products declared in `config/fusion.yaml`, calling `fuse_layers` for each.
+- **`main(argv=None)`**: CLI entry point supporting `run --config <yaml> --output <dir>`.
 
 **Technical Details**:
-- Resampling: GDAL warp with cubic/average based on direction.
-- Uncertainty Propagation: Outputs sigma map.
-- Validation Hook: Calls WeightCalculator.update_confidence post-fusion.
+- Raster IO relies on `rasterio`; nodata propagation preserves blanks where no contributing pixels exist.
+- Weights are logged with three decimal precision to aid QA/QC.
+- The driver enforces single-band rasters to avoid silent misuse of multi-band products.
+- Outputs use IEEE float32 with `NaN` nodata, compatible with downstream ML and GIS tooling.
 
 ## 3. GraphTemplateProcessor for InSAR (utils/snap_templates.py)
 
@@ -212,7 +234,7 @@ python gam_data_agent.py download [free|all] [--dataset <key>] [--bbox "lon1,lat
 - **status**: Shows download status from `data/data_status.json`.
 - **download**: Fetches datasets (e.g., EMAG2, EGM2008, Sentinel-1). Supports bbox for regional data.
 - Datasets: emag2_magnetic, egm2008_gravity, xgm2019e_gravity, srtm_dem, insar_sentinel1.
-- Integrates RobustDownloader for resilience; respects v2 config for paths.
+- Integrates RobustDownloader for resilience; paths resolve via `ConfigManager`.
 
 **Example**:
 ```bash
@@ -227,12 +249,12 @@ Environment diagnostics and optional setup utility.
 **CLI Interface**:
 ```bash
 python setup_environment.py check [--deep] [--yes] [--network] [--json <file>]
-python setup_environment.py setup [--v2] [--yes]
+python setup_environment.py setup [--yes]
 python setup_environment.py requirements
 ```
 
 - **check**: Runs diagnostics (system, packages, paths, config mode, Stage 1-5 components). `--deep` imports modules (may create dirs); `--network` DNS preflight.
-- **setup**: Creates data/ structure and optional .env copy. `--v2` ensures v2-managed paths.
+- **setup**: Creates data/ structure and optional .env copy using the canonical configuration.
 - **requirements**: Shows dependency summaries.
 
 **Example**:
@@ -250,8 +272,8 @@ Non-invasive by default; explicit confirmation for side effects.
 - **Validation**: Call validate() post-load.
 - **Logging**: Use `logging.getLogger(__name__)`; config sets level.
 - **Testing**: Mock utils in tests (e.g., patch PathManager).
-- **Shims**: Use `utils/config_shim.py` and `utils/paths_shim.py` for v1/v2 compatibility in legacy code.
+- **Configuration**: Import `ConfigManager` and `PathManager` directly; no compatibility layers exist.
 
 For full source: See utils/ and scripts. Extend via inheritance.
 
-*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
+*Updated: October 2025*

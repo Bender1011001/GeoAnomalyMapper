@@ -1,329 +1,134 @@
-# Configuration System Guide
+# Configuration Guide
 
-**Unified and Flexible Configuration for GeoAnomalyMapper**
+GeoAnomalyMapper now ships with a single, version-controlled configuration
+surface located at `config/config.json`.  The file captures the directories used
+by the processing pipeline, points to the YAML recipe files that describe each
+stage, and exposes tunable runtime settings (logging, serving, fusion knobs).
+Environment variables can override any key without editing the JSON on disk,
+allowing reproducible defaults with per-machine customisation.
 
-The scientific code review identified hardcoded paths and scattered settings as major issues. The new configuration system centralizes all parameters in `config/config.json` with support for environment variables (`.env`) and runtime overrides. This enables cross-platform compatibility, customization without code changes, and production deployment.
+## Getting started
 
-## Overview
+1. Copy the tracked defaults if you need a writable copy:
+   ```bash
+   cp config/config.json.example config/config.json
+   ```
+2. (Optional) Duplicate `.env.example` into `.env` to store credentials or
+   overrides you do not want to commit.
+3. Install project dependencies and run the pipeline as normal.
 
-### Key Principles
-- **Centralized**: Single `config.json` for paths, data sources, fusion params, robustness settings.
-- **Layered Overrides**: JSON defaults → `.env` vars → CLI flags → runtime.
-- **Validation**: Automatic schema checking on load; reports errors.
-- **Security**: Credentials in `.env` (gitignored); no secrets in JSON.
-- **Cross-Platform**: Pathlib integration via `utils/paths.py` resolves OS-specific paths.
+The repository includes `config/config.json` so fresh clones work immediately.
+Updating `config.json` lets you point the pipeline to alternative data roots or
+change fusion behaviour without touching source code.
 
-### File Locations
-- **Core Config**: `config/config.json` - Project settings.
-- **Environment**: `.env` - Secrets and overrides (e.g., credentials, API keys).
-- **Validation Data**: `config/known_features.json` - For scientific benchmarking.
-- **Example Templates**: `config/config.json.example`, `.env.example` (git-committed).
+## File structure
 
-**Setup**:
-```bash
-cd GeoAnomalyMapper
-cp config/config.json.example config/config.json
-cp .env.example .env
-# Edit .env for credentials
-# Edit config.json for custom paths/settings
-```
-
-## Structure of config.json
-
-The JSON uses a modular schema with validation. Example:
+The top-level keys are intentionally small and map directly onto the code base.
+The default file looks like this:
 
 ```json
 {
   "project": {
     "name": "GeoAnomalyMapper",
-    "version": "2.0.0",
-    "data_root": "./data",
-    "processed_dir": "processed",
-    "outputs_dir": "outputs"
+    "version": "3.0.0",
+    "data_root": "data",
+    "outputs_dir": "data/outputs",
+    "processed_dir": "data/processed",
+    "cache_dir": "data/cache"
   },
   "paths": {
-    "raw_data": "${data_root}/raw",
-    "insar_dir": "${raw_data}/insar",
-    "gravity_dir": "${raw_data}/gravity",
-    "enable_symlinks": false
+    "raw_data": "data/raw",
+    "interim": "data/interim",
+    "features": "data/features",
+    "models": "data/models",
+    "logs": "data/outputs/logs"
   },
-  "data_sources": {
-    "gravity": {
-      "enabled": true,
-      "preferred_model": "xgm2019e",
-      "resolution": 0.025,
-      "height_km": 0
-    },
-    "magnetic": {
-      "enabled": true,
-      "source": "emag2v3"
-    },
-    "insar": {
-      "enabled": true,
-      "sources": ["copernicus", "egms"],
-      "max_baseline": 150,
-      "auto_process": true
-    },
-    "elevation": {
-      "enabled": true,
-      "source": "nasadem"
-    },
-    "lithology": {
-      "enabled": true,
-      "path": "${raw_data}/LiMW_GIS 2015.gdb"
-    }
+  "pipelines": {
+    "tiling_config": "config/tiling_zones.yaml",
+    "data_sources_config": "config/data_sources.yaml",
+    "fusion_config": "config/fusion.yaml",
+    "training_config": "config/training.yaml",
+    "serving_config": "config/serving.yaml"
   },
   "fusion": {
-    "dynamic_weighting": true,
-    "target_resolution": 0.001,
-    "spectral_cutoff": 10,
-    "uncertainty_threshold": 0.1
+    "dynamic_weighting": false,
+    "target_resolution_m": 250,
+    "uncertainty_threshold": 0.25
   },
-  "robustness": {
-    "max_retries": 5,
-    "base_delay": 1.0,
-    "backoff_factor": 2.0,
-    "jitter": true,
-    "circuit_threshold": 5,
-    "recovery_timeout": 60,
-    "timeout_connect": 10,
-    "timeout_read": 30,
-    "bandwidth_throttle": null,
-    "services": {
-      "copernicus": {
-        "auth_url": "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
-        "hosts": ["identity.dataspace.copernicus.eu", "catalogue.dataspace.copernicus.eu"]
-      },
-      "earthdata": {
-        "auth_url": "https://urs.earthdata.nasa.gov/oauth/token",
-        "hosts": ["urs.earthdata.nasa.gov", "e4ftl01.cr.usgs.gov"]
-      }
-    }
-  },
-  "validation": {
-    "enabled": true,
-    "known_features_path": "config/known_features.json",
-    "thresholds": {
-      "true_positive": 0.7,
-      "false_positive": 0.3
-    }
+  "serving": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "reload": false
   },
   "logging": {
     "level": "INFO",
-    "format": "structured",
-    "file": "${outputs_dir}/logs/app.log"
+    "structured": true
   }
 }
 ```
 
-### Variable Substitution
-- `${data_root}`: Expands to project paths (via `utils/paths.py`).
-- Environment vars: `${ENV_VAR}` pulls from `.env` or system.
-- Cross-Platform: Automatically uses `/` on Unix, `\` on Windows.
+* `project.*` – canonical directories created on start-up.
+* `paths.*` – additional folders used by preprocessors and exporters.
+* `pipelines.*` – pointers to existing YAML recipes (tiling, fusion, training,
+  serving).  These files remain YAML because they describe large structured
+  tables, but their locations are centralised here.
+* `fusion`, `serving`, `logging` – runtime options consumed directly by code.
 
-## Environment Variables (.env)
+The `ConfigManager` automatically creates any directories referenced by
+`project.*` and `paths.*` to simplify local setup.
 
-For secrets and overrides (never commit!):
+## Environment overrides
 
-```
-# Credentials
-CDSE_USERNAME=your_email@example.com
-CDSE_PASSWORD=your_password
-EARTHDATA_USERNAME=your_username
-EARTHDATA_PASSWORD=your_password
-
-# Overrides
-DATA_ROOT=/custom/data/path
-MAX_RETRIES=10
-DYNAMIC_WEIGHTING=false
-
-# SNAP Path (if not auto-detected)
-SNAP_PATH=/Applications/snap/bin/gpt
-```
-
-**Loading Order**:
-1. Load `config.json`.
-2. Override with `.env` (e.g., `MAX_RETRIES` sets `"robustness.max_retries"`).
-3. CLI flags (e.g., `--data-root /path`).
-4. Runtime (e.g., in scripts).
-
-## Usage in Code
-
-All modules load config via a central manager:
-
-```python
-from utils.config import ConfigManager
-
-# Initialize (loads JSON + .env)
-config = ConfigManager()
-
-# Access
-data_root = config.get('project.data_root')  # './data'
-insar_enabled = config.get('data_sources.insar.enabled', default=True)
-
-# Paths (resolved)
-raw_dir = config.get_path('paths.raw_data')  # Path('./data/raw')
-
-# Validation
-if not config.validate():
-    raise ValueError("Invalid config")
-
-# Overrides
-config.set('fusion.target_resolution', 0.0005)  # Runtime change
-```
-
-**In data_agent.py**:
-- Uses config for sources, bbox defaults, robustness params.
-- Validates services before download.
-
-**In multi_resolution_fusion.py**:
-- Loads fusion/weights; applies dynamic if enabled.
-
-### Feature Flag System
-v2 introduces opt-in feature flags for gradual adoption without breaking v1 workflows. Flags are set via environment variables (in `.env` or exported) and control shim behavior.
-
-**Key Flags**:
-- **GAM_USE_V2_CONFIG** (default: false): Enables full ConfigManager/PathManager. When false, shims fall back to hardcoded defaults and `os.getenv`.
-- **GAM_DYNAMIC_WEIGHTING** (default: true when v2 enabled): Activates adaptive weights in fusion.
-- **GAM_DATA_AGENT_ENABLED** (default: true): Enables gam_data_agent.py for automated downloads.
-- **GAM_VALIDATION_ENABLED** (default: true): Runs post-processing validation.
-
-**Enabling v2 Features**:
-1. Set `GAM_USE_V2_CONFIG=true` in `.env` or export.
-2. Update scripts to import from shims: `from utils import config_shim, paths_shim`.
-3. Gradually enable other flags as needed (e.g., `GAM_DYNAMIC_WEIGHTING=true` for fusion enhancements).
-
-**Example (.env)**:
-```
-GAM_USE_V2_CONFIG=true
-GAM_DYNAMIC_WEIGHTING=true
-GAM_DATA_AGENT_ENABLED=true
-```
-
-This system ensures v1 (default: shims use fallbacks) and v2 (opt-in: full structured config) behaviors coexist. See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for shim details.
-
-## Validation and Schema
-
-Config includes built-in schema validation (using pydantic or jsonschema):
+Any key can be overridden using the `GAM__` prefix with double-underscore
+separators.  For example:
 
 ```bash
-# Validate config
-python -c "from utils.config import ConfigManager; ConfigManager().validate()"
+# Use an alternate data directory without editing config.json
+echo "GAM__PROJECT__DATA_ROOT=/mnt/geo/data" >> .env
 
-# Report issues
-python setup_environment.py config-report
+# Enable dynamic fusion weighting on the fly
+export GAM__FUSION__DYNAMIC_WEIGHTING=true
 ```
 
-**Common Errors**:
-- Missing required keys (e.g., no `data_root`).
-- Invalid types (e.g., string for numeric `max_retries`).
-- Unresolved paths (e.g., invalid `${VAR}`).
+Values are parsed as JSON when possible, so `true`, `false`, `42`, or `"string"`
+are handled automatically.  If parsing fails, the literal string is used.
 
-**Fixes**:
-- Use example as template.
-- Check logs for specific errors.
-- Test with minimal config for troubleshooting.
+## Access from code
 
-## Customization Examples
+Use `ConfigManager` and `PathManager` for consistent access.  Both classes live
+in `utils` and are singletons.
 
-### 1. Custom Data Paths (Cross-Platform)
-```json
-{
-  "project": {
-    "data_root": "/shared/geodata"  // Unix
-  }
-}
-```
-- On Windows: Auto-converts to `C:\shared\geodata`.
-- Symlinks: Set `"enable_symlinks": true` for large datasets.
-
-### 2. Disable InSAR for Testing
-```json
-{
-  "data_sources": {
-    "insar": { "enabled": false }
-  }
-}
-```
-- Or via .env: `INSAR_ENABLED=false`.
-
-### 3. Tune Robustness for Slow Networks
-```json
-{
-  "robustness": {
-    "max_retries": 10,
-    "base_delay": 2.0,
-    "bandwidth_throttle": 1024000  // 1MB/s
-  }
-}
-```
-
-### 4. Advanced Fusion
-```json
-{
-  "fusion": {
-    "dynamic_weighting": true,
-    "custom_weights": {
-      "insar": 0.9,
-      "gravity": 0.7
-    },
-    "spectral_bands": [0, 10, 50]  // Low/mid/high freq
-  }
-}
-```
-
-### 5. Production Logging
-```json
-{
-  "logging": {
-    "level": "DEBUG",
-    "handlers": ["file", "console"],
-    "file": "/var/log/geoanomaly.log"
-  }
-}
-```
-
-## Migration from Legacy
-
-- **Hardcoded Paths**: Replace with config keys (e.g., `data/raw/` → `config.get_path('paths.raw_data')`).
-- **Scattered Settings**: Consolidate into JSON sections.
-- **Credentials**: Move from scripts to `.env`.
-- **Validation**: Add `ConfigManager.validate()` to entrypoints.
-
-**Gradual Adoption with Shims**:
-Use `utils/config_shim.py` and `utils/paths_shim.py` for compatibility. Existing code imports from shims without changes; set `GAM_USE_V2_CONFIG=true` to opt into v2.
-
-**Script Update Example**:
 ```python
-# Old: hardcoded
-RAW_DIR = './data/raw'
-
-# New (via shim for compatibility):
-from utils import config_shim
-RAW_DIR = config_shim.get_data_dir()  # Falls back to './data' if v2 disabled
-
-# Full v2:
 from utils.config import ConfigManager
+from utils.paths import paths
+
 config = ConfigManager()
-RAW_DIR = config.get_path('paths.raw_data')
+data_root = config.get_path("project.data_root")
+fusion_enabled = config.get("fusion.dynamic_weighting", False)
+
+raw_dir = paths.raw_data
+outputs = paths.join("output_dir", "reports")
 ```
 
-**Enabling New Capabilities**:
-- **Dynamic Weighting**: Set `GAM_DYNAMIC_WEIGHTING=true`; update fusion calls to use WeightCalculator.
-- **Data Agent**: Run `python gam_data_agent.py download free` after enabling `GAM_DATA_AGENT_ENABLED=true`.
-- No breaking changes: v1 workflows run unchanged (shims default to false).
+`ConfigManager.get("section.key")` returns raw values.  Use `get_path` for
+filesystem-aware values – it resolves relative paths against the repository root
+and expands `~` automatically.  `PathManager` exposes the most common paths as
+properties (`data_dir`, `output_dir`, `processed_dir`, etc.).
 
-For detailed v1 vs v2 comparison: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md).
+## Validation and troubleshooting
 
-## Best Practices
+* Confirm the loader sees your changes: `python -c "from utils.config import ConfigManager; print(ConfigManager().get('project.data_root'))"`.
+* Run `python -m utils.config` to print a short summary of the loaded keys.
+* If a directory is missing, ensure your path points to a directory rather than
+  a file.  The manager creates directories referenced under `project.*` and
+  `paths.*` when it initialises.
+* Remove stale overrides by deleting the relevant entries from `.env` or by
+  unsetting the environment variables.
 
-- **Version Control**: Commit `config.json.example`; ignore `.env` and `config.json` if sensitive.
-- **Environments**: Use separate configs (dev/prod) via `--config-file`.
-- **Documentation**: Inline comments in JSON for complex params.
-- **Testing**: `python -m unittest` includes config validation tests.
-- **Security**: Rotate credentials quarterly; use vault for production.
-- **Feature Flags**: Start with `GAM_USE_V2_CONFIG=true`; enable others incrementally.
+## Configuration discipline
 
-For troubleshooting: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
-
-*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
+Configuration is treated as production code.  Changes to `config.json` are
+validated in CI, configuration diffs are reviewed alongside code, and the
+registry of environment overrides lives in `docs/API_REFERENCE.md`.  This
+ensures every execution environment – from interactive notebooks to scheduled
+pipelines – observes the identical, version-controlled configuration tree.

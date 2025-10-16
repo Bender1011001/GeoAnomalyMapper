@@ -94,16 +94,12 @@ bibtex main
 
 **Python environment** (for reproducing results):
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Use the project metadata as the single source of truth
+pyenv install 3.10.14  # or rely on system Python >=3.10
+pyenv local 3.10.14    # optional
 
-# Key packages
-python==3.9.7
-numpy==1.21.5
-gdal==3.4.3
-scipy==1.8.0
-matplotlib==3.5.1
-rasterio==1.2.10
+# Install dependencies declared in pyproject.toml
+pip install -e .[all]
 ```
 
 ## Output

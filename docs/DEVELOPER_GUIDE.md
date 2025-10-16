@@ -1,8 +1,6 @@
-# Developer Guide for New Utilities
+# Developer Guide for GeoAnomalyMapper Utilities
 
-**Extending GeoAnomalyMapper's Modular Utilities**
-
-The scientific code review emphasized modularity to replace monolithic scripts. The new `utils/` directory provides reusable components: `paths.py` for cross-platform resolution, `error_handling.py` for robustness, and `snap_templates.py` for InSAR processing. This guide covers implementation, extension, and best practices for developers contributing to or customizing the project.
+GeoAnomalyMapper's `utils/` package consolidates reusable infrastructure that underpins the production pipeline: `paths.py` delivers canonical filesystem access, `error_handling.py` guarantees resilient I/O, and `snap_templates.py` automates parameterised InSAR processing. This guide documents the extension points and engineering standards that keep the utilities trustworthy for research and operational deployments.
 
 ## Introduction
 
@@ -20,16 +18,16 @@ from utils.config import ConfigManager
 
 **Setup for Development**:
 ```bash
-pip install -e ".[dev]"  # Includes testing deps
-python setup_environment.py validate
-pytest tests/utils/  # Run utility tests
+pip install -e .[all]
+python -m utils.config  # Print loaded configuration summary
+pytest tests/utils/  # Run utility tests (if present)
 ```
 
-### v2 Integration Overview
-Stages 1-5 introduced modular config/paths, data agent, fusion enhancements, validation, and environment setup. This guide covers extending these for v2.
+### Configuration integration overview
 
-- **Staged Approach**: v2 uses shims for backward compatibility. Enable via `GAM_USE_V2_CONFIG=true`. Future stages build on this (e.g., Stage 6: docs convergence).
-- **Key Changes**: Structured config replaces hardcoded values; shims allow gradual migration.
+All utilities read from the unified JSON configuration via
+`utils.config.ConfigManager`.  Imports are direct and there are no compatibility
+layers or feature flags.
 
 ## 1. paths.py - Cross-Platform Path Resolution
 
@@ -41,52 +39,37 @@ Replaces hardcoded paths with dynamic, OS-aware resolution using pathlib. Handle
   ```python
   from utils.paths import PathManager
 
-  pm = PathManager()  # Loads from config
-  raw_dir = pm.get('paths.raw_data')  # Path('./data/raw')
-  insar_dir = pm.resolve('insar_dir')  # Ensures exists
-  ```
-
-- **validate_paths()**: Checks writability, existence.
-  ```python
-  from utils.paths import validate_paths
-  if not validate_paths():
-      raise ValueError("Path issues detected")
+  pm = PathManager()  # Loads from config/config.json
+  raw_dir = pm.raw_data
+  output_dir = pm.output_dir
   ```
 
 ### Extension
-- Add new keys to config.json (e.g., `"custom_dir": "${data_root}/custom"`).
-- Override: `pm.set_base('/alternative/root')`.
-- Custom Resolver: Subclass PathManager for project-specific logic.
+- Add new keys to `config.json` (e.g., `"paths": {"custom": "data/custom"}`) and
+  access them via `config.get_path("paths.custom")`.
+- Subclass `PathManager` or wrap it if additional derived paths are required for
+  bespoke tooling.
 
 **Best Practices**:
-- Always use `pm.get()` over string literals.
-- Handle non-existent: `pm.ensure_dir('output_dir')`.
-- Testing: Mock config in unit tests.
+- Prefer `PathManager` over string literals when resolving project directories.
+- Use `ConfigManager().get_path(...)` for ad-hoc lookups not exposed through the
+  manager.
+- Testing: Inject a temporary config file or monkeypatch `ConfigManager` when
+  verifying code that depends on paths.
 
 **Example in Script**:
 ```python
 # In data_agent.py
 pm = PathManager()
-raw_path = pm.get('paths.raw_data')
+raw_path = pm.get_path('raw_data')
 if not raw_path.exists():
     raw_path.mkdir(parents=True)
 ```
 
-### Shim System for Compatibility
-`utils/config_shim.py` and `utils/paths_shim.py` provide v1/v2 bridges:
-- **When v2 disabled** (`GAM_USE_V2_CONFIG=false`): Returns hardcoded defaults (e.g., `get_data_dir() -> Path('data')`).
-- **When enabled**: Delegates to ConfigManager/PathManager.
-- **Gradual Adoption**: Update imports to shims; enable flag to activate v2 without code changes.
-
-**Example**:
-```python
-from utils import config_shim, paths_shim
-
-data_dir = config_shim.get_data_dir()  # v1: 'data'; v2: from config.json
-output_path = paths_shim.get_output_dir() / 'report.txt'
-```
-
-This maintains v1 workflows while allowing opt-in to v2 features like validation and substitution.
+### Configuration hygiene
+Utilities must import `ConfigManager` directly and avoid duplicating path logic.
+This ensures configuration drift is impossible and every environment consumes
+the same canonical configuration tree.
 
 ## 2. error_handling.py - Robustness Framework
 
@@ -150,7 +133,7 @@ Provides retry, circuit breaker, and error categorization for reliable operation
 - Log context: Include service/URL in exceptions.
 - Graceful Degradation: Skip non-critical (e.g., optional InSAR).
 - Testing: Use `pytest-mock` to simulate failures; assert retries.
-- **v2 Integration**: Use with config for retry params (e.g., `max_retries = config.get('robustness.max_retries')`).
+- **Configuration-driven tuning**: Use `ConfigManager` to source retry parameters (e.g., `max_retries = config.get('robustness.max_retries')`).
 
 **Example Extension** (Custom Downloader):
 ```python
@@ -200,7 +183,7 @@ Generates adaptive SNAP Graph XML from Sentinel-1 metadata, replacing static tem
 - Error Handling: Wrap with RobustDownloader for GPT calls.
 - Outputs: Standardize to GeoTIFF with CRS.
 - Testing: Mock XML generation; use sample .SAFE.
-- **v2 Integration**: Load params from config (e.g., `filter_alpha = config.get('snap.template_params.filter_alpha')`).
+- **Config-driven templates**: Load parameters from configuration (e.g., `filter_alpha = config.get('snap.template_params.filter_alpha')`).
 
 **Example in Pipeline**:
 ```python
@@ -227,7 +210,7 @@ if config.get('insar.auto_process'):
 - **In Scripts**: Import and use (e.g., data_agent.py uses all three).
 - **External Projects**: `pip install -e .` then import.
 - **Hooks**: Config `"extensions": ["custom_module"]` for plugins.
-- **v2 Guidance**: Use shims for config/paths in new code; enable flags for features like dynamic weighting.
+- **Direct imports only**: Reference `ConfigManager` and `PathManager` directly; no compatibility shims exist in the codebase.
 
 ### Testing and CI
 - Run: `pytest tests/utils/ -v`.
@@ -248,4 +231,4 @@ For API details: [API_REFERENCE.md](API_REFERENCE.md).
 
 Contribute via PRs; see CONTRIBUTING.md.
 
-*Updated: October 2025 - v2.0 (Stage 1-5 Integration)*
+*Updated: October 2025*
