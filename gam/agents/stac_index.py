@@ -119,10 +119,10 @@ class StacIndex:
                 roles=[asset_role],
                 extra_fields={"checksum:multihash": checksum},
             )
-            item.add_asset(asset_role, asset)
+        item.add_asset(asset_role, asset)
         if derived_from:
             for href in derived_from:
-            item.add_link(Link(rel="derived_from", target=href))
+                item.add_link(Link(rel="derived_from", target=href))
         collection.add_item(item, strategy=pystac.RelinkStrategy.REF_RESOLVE)
         collection.normalize_hrefs(str(self.catalog_root))
         collection.save()

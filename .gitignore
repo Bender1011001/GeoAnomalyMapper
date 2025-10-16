@@ -128,17 +128,30 @@ nasadem_download.log
 processing.log
 
 # Large data files and directories
-data/raw/
-data/outputs/cog/
-data/outputs/multi_resolution/*.tif
-data/outputs/final/*.tif
-data/outputs/final/*.kmz
-data/outputs/final/*.kml
-data/outputs/final/*.vrt
-data/outputs/final/*.csv
-data/outputs/final/*.png
-data/outputs/void_detection/*.tif
-data/outputs/void_detection/*.png
+data/raw/**
+!data/raw/
+!data/raw/.gitkeep
+data/interim/**
+!data/interim/
+!data/interim/.gitkeep
+data/features/**
+!data/features/
+!data/features/.gitkeep
+data/fused/**
+!data/fused/
+!data/fused/.gitkeep
+data/products/**
+!data/products/
+!data/products/.gitkeep
+data/labels/**
+!data/labels/
+!data/labels/.gitkeep
+data/stac/**
+!data/stac/
+!data/stac/.gitkeep
+artifacts/**
+!artifacts/
+!artifacts/.gitkeep
 
 # Embedded repositories and submodules (if not intended as submodule)
 GeoAnomalyMapper/
@@ -156,6 +169,7 @@ GeoAnomalyMapper/
 *.tmp
 *.temp
 pmtiles.exe
+!.gitkeep
 
 # Roo and other tools
 .roo/
