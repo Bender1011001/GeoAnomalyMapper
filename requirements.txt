@@ -87,7 +87,7 @@ anyio==4.11.0
 fastapi==0.117.1
 h11==0.16.0
 sniffio==1.3.1
-starlette==0.48.0
+starlette==0.49.1
 uvicorn==0.37.0
 
 # Dashboard dependencies (merged, duplicates resolved to latest)
