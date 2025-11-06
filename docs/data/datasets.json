@@ -1,9 +1,0 @@
-[
-  {
-    "id": "sample-voids",
-    "name": "Sample Void Detections",
-    "description": "Example dataset showing how processed void outputs appear on the map.",
-    "file": "data/sample_voids.geojson",
-    "color": "#ff6b6b"
-  }
-]

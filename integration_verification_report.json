@@ -1,0 +1,209 @@
+{
+  "project_root": "C:\\Users\\admin\\Downloads\\SAR-project",
+  "py_executable": "C:\\Users\\admin\\Downloads\\SAR-project\\.venv\\Scripts\\python.exe",
+  "v1": {
+    "mode": "v1",
+    "imports": {
+      "ok": true,
+      "details": {
+        "utils.config_shim": "OK",
+        "utils.paths_shim": "OK",
+        "multi_resolution_fusion": "OK",
+        "detect_voids": "OK",
+        "validate_against_known_features": "OK",
+        "setup_environment": "OK",
+        "process_data": "OK",
+        "process_insar_data": "OK",
+        "create_visualization": "OK",
+        "create_enhanced_visualization": "OK"
+      }
+    },
+    "cli_help": {
+      "gam_data_agent.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: gam_data_agent.py [-h] {status,download} ...\n\nGeoAnomalyMapper Unified Data Agent\n\npositional arguments:\n  {status,download}\n    status           Show dataset status\n    download         Download datasets\n\noptions:"
+      },
+      "multi_resolution_fusion.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: multi_resolution_fusion.py [-h] [--lon-min LON_MIN] [--lat-min LAT_MIN]\n                                  [--lon-max LON_MAX] [--lat-max LAT_MAX]\n                                  [--region REGION] [--resolution RESOLUTION]\n                                  [--output OUTPUT]\n                                  [--sources SOURCES [SOURCES ...]]\n\nMulti-resolution geophysical data fusion pipeline\n\noptions:\n  -h, --help            show this help message and exit"
+      },
+      "detect_voids.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: detect_voids.py [-h] [--region REGION] [--resolution RESOLUTION]\n                       [--output OUTPUT] [--output-dir OUTPUT_DIR]\n\nDetect underground voids using multi-layer geophysical analysis\n\noptions:\n  -h, --help            show this help message and exit\n  --region REGION       Region bounds: \"lon_min,lat_min,lon_max,lat_max\"\n                        (default: Carlsbad Caverns area)\n  --resolution RESOLUTION"
+      },
+      "validate_against_known_features.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: validate_against_known_features.py [-h] [--buffer BUFFER]\n                                          [--output-dir OUTPUT_DIR]\n                                          [--enhanced] [--json-report]\n                                          raster\n\nValidate fusion results against known underground features\n\npositional arguments:\n  raster                Path to fused anomaly GeoTIFF\n"
+      },
+      "setup_environment.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: setup_environment.py [-h] {check,setup,requirements} ...\n\nGeoAnomalyMapper Environment Setup & Diagnostics Utility\n\npositional arguments:\n  {check,setup,requirements}\n    check               Run environment diagnostics (safe by default)\n    setup               Guided setup (explicit confirmation required)\n    requirements        Show scenario-based requirements and suggestions\n"
+      },
+      "process_data.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: process_data.py [-h] --region REGION [--resolution RESOLUTION]\n\nProcess all geophysical data for void detection\n\noptions:\n  -h, --help            show this help message and exit\n  --region REGION       Region bounds: \"lon_min,lat_min,lon_max,lat_max\"\n  --resolution RESOLUTION\n                        Output resolution in degrees (default: 0.001 = ~100m)\n"
+      },
+      "process_insar_data.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: process_insar_data.py [-h] [--data-dir DATA_DIR]\n\nProcess Sentinel-1 InSAR data for anomaly detection\n\noptions:\n  -h, --help           show this help message and exit\n  --data-dir DATA_DIR  Base data directory (default: ./data)"
+      },
+      "create_visualization.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: create_visualization.py [-h] [--output-dir OUTPUT_DIR] input_tif\n\nCreate visualizations for multi-resolution fusion outputs\n\npositional arguments:\n  input_tif             Input GeoTIFF file to visualize\n\noptions:\n  -h, --help            show this help message and exit\n  --output-dir OUTPUT_DIR"
+      },
+      "create_enhanced_visualization.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: create_enhanced_visualization.py [-h] [--region REGION]\n\nCreate enhanced visualizations of subsurface data\n\noptions:\n  -h, --help       show this help message and exit\n  --region REGION  Region bounds: \"lon_min,lat_min,lon_max,lat_max\""
+      }
+    },
+    "env_check_safe": {
+      "rc": 1,
+      "ok": true,
+      "exit_code_meaning": "0=ok,1=warnings,2=errors",
+      "snippet": "  osgeo.gdal   X  -\n  rio_cogeo    X  -\n  isce2        X  -\n  mintpy       X  -\n  psutil       X  -\n\n=== CLI Tools (PATH) ===\n  gdalinfo       OK\n  gdal_translate OK\n  gdalbuildvrt   OK\n\n=== Data Directories ===\nBase: C:\\Users\\admin\\Downloads\\SAR-project\\data  exists=OK\n  raw/gravity                      OK\n  raw/magnetic                     OK\n  raw/dem                          X\n  raw/insar/sentinel1              OK\n  processed/gravity                OK\n  processed/magnetic               OK\n  processed/dem                    X\n  processed/insar                  OK\n  outputs/final                    OK\n  outputs/multi_resolution         OK\n  outputs/void_detection           OK\n  outputs/visualizations           OK\n  outputs/reports                  OK\n  cache                            OK\n\n=== Config/Paths Mode ===\nGAM_USE_V2_CONFIG: false (v2_enabled=X)\nNote: Deep shims not imported; pass --deep --yes to verify v2/v1 behavior. Note: deep import may create directories.\n\n=== Stage 1\u20134 Components ===\nDeep checks were not performed (safe mode). Use --deep --yes to verify imports.\n\n=== Summary ===\nIssues: none\nWarnings (1):\n  - Deep shims not imported; pass --deep --yes to verify v2/v1 behavior. Note: deep import may create directories.\n"
+    },
+    "shims": {
+      "config_v2_enabled": false,
+      "data_dir": "data",
+      "output_dir": "data\\outputs",
+      "processed_dir": "data\\processed",
+      "cache_dir": "data\\cache"
+    },
+    "data_agent_status": {
+      "rc": 0,
+      "ok": true,
+      "report_exists": true,
+      "report_path": "C:\\Users\\admin\\Downloads\\SAR-project\\data\\outputs\\data_status_report.md",
+      "snippet": "2025-10-15 16:36:18,949 - __main__ - INFO - Loaded existing status from data\\data_status.json\nGeoAnomalyMapper Data Status Report\n========================================\n[OK] emag2_magnetic: data\\raw\\emag2\\EMAG2_V3_SeaLevel_DataTiff.tif (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T15:18:19.546971\n\n[OK] egm2008_gravity: data\\raw\\gravity\\egm2008_geoid.tiff (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T15:18:19.546971\n\n[OK] xgm2019e_gravity: data\\raw\\gravity\\XGM2019e_2159.gfc (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T15:18:19.546971\n\n[OK] srtm_dem: data\\raw\\elevation\\srtm\\srtm_carlsbad_30m.tif (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T15:18:19.546971\n\n2025-10-15 16:36:18,950 - __main__ - INFO - Report saved to data\\outputs\\data_status_report.md"
+    },
+    "docs": {
+      "ok": true,
+      "missing": []
+    },
+    "ok": true
+  },
+  "v2": {
+    "mode": "v2",
+    "imports": {
+      "ok": true,
+      "details": {
+        "utils.config_shim": "OK",
+        "utils.paths_shim": "OK",
+        "multi_resolution_fusion": "OK",
+        "detect_voids": "OK",
+        "validate_against_known_features": "OK",
+        "setup_environment": "OK",
+        "gam_data_agent": "OK"
+      }
+    },
+    "cli_help": {
+      "gam_data_agent.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: gam_data_agent.py [-h] {status,download} ...\n\nGeoAnomalyMapper Unified Data Agent\n\npositional arguments:\n  {status,download}\n    status           Show dataset status\n    download         Download datasets\n\noptions:"
+      },
+      "multi_resolution_fusion.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: multi_resolution_fusion.py [-h] [--lon-min LON_MIN] [--lat-min LAT_MIN]\n                                  [--lon-max LON_MAX] [--lat-max LAT_MAX]\n                                  [--region REGION] [--resolution RESOLUTION]\n                                  [--output OUTPUT]\n                                  [--sources SOURCES [SOURCES ...]]\n\nMulti-resolution geophysical data fusion pipeline\n\noptions:\n  -h, --help            show this help message and exit"
+      },
+      "detect_voids.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: detect_voids.py [-h] [--region REGION] [--resolution RESOLUTION]\n                       [--output OUTPUT] [--output-dir OUTPUT_DIR]\n\nDetect underground voids using multi-layer geophysical analysis\n\noptions:\n  -h, --help            show this help message and exit\n  --region REGION       Region bounds: \"lon_min,lat_min,lon_max,lat_max\"\n                        (default: Carlsbad Caverns area)\n  --resolution RESOLUTION"
+      },
+      "validate_against_known_features.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: validate_against_known_features.py [-h] [--buffer BUFFER]\n                                          [--output-dir OUTPUT_DIR]\n                                          [--enhanced] [--json-report]\n                                          raster\n\nValidate fusion results against known underground features\n\npositional arguments:\n  raster                Path to fused anomaly GeoTIFF\n"
+      },
+      "setup_environment.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: setup_environment.py [-h] {check,setup,requirements} ...\n\nGeoAnomalyMapper Environment Setup & Diagnostics Utility\n\npositional arguments:\n  {check,setup,requirements}\n    check               Run environment diagnostics (safe by default)\n    setup               Guided setup (explicit confirmation required)\n    requirements        Show scenario-based requirements and suggestions\n"
+      },
+      "process_data.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: process_data.py [-h] --region REGION [--resolution RESOLUTION]\n\nProcess all geophysical data for void detection\n\noptions:\n  -h, --help            show this help message and exit\n  --region REGION       Region bounds: \"lon_min,lat_min,lon_max,lat_max\"\n  --resolution RESOLUTION\n                        Output resolution in degrees (default: 0.001 = ~100m)\n"
+      },
+      "process_insar_data.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: process_insar_data.py [-h] [--data-dir DATA_DIR]\n\nProcess Sentinel-1 InSAR data for anomaly detection\n\noptions:\n  -h, --help           show this help message and exit\n  --data-dir DATA_DIR  Base data directory (default: ./data)"
+      },
+      "create_visualization.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: create_visualization.py [-h] [--output-dir OUTPUT_DIR] input_tif\n\nCreate visualizations for multi-resolution fusion outputs\n\npositional arguments:\n  input_tif             Input GeoTIFF file to visualize\n\noptions:\n  -h, --help            show this help message and exit\n  --output-dir OUTPUT_DIR"
+      },
+      "create_enhanced_visualization.py": {
+        "rc": 0,
+        "ok": true,
+        "snippet": "usage: create_enhanced_visualization.py [-h] [--region REGION]\n\nCreate enhanced visualizations of subsurface data\n\noptions:\n  -h, --help       show this help message and exit\n  --region REGION  Region bounds: \"lon_min,lat_min,lon_max,lat_max\""
+      }
+    },
+    "env_check_deep": {
+      "rc": 0,
+      "ok": true,
+      "exit_code_meaning": "0=ok,1=warnings,2=errors",
+      "snippet": "  gdalbuildvrt   OK\n\n=== Data Directories ===\nBase: C:\\Users\\admin\\Downloads\\SAR-project\\data  exists=OK\n  raw/gravity                      OK\n  raw/magnetic                     OK\n  raw/dem                          X\n  raw/insar/sentinel1              OK\n  processed/gravity                OK\n  processed/magnetic               OK\n  processed/dem                    X\n  processed/insar                  OK\n  outputs/final                    OK\n  outputs/multi_resolution         OK\n  outputs/void_detection           OK\n  outputs/visualizations           OK\n  outputs/reports                  OK\n  cache                            OK\n\n=== Config/Paths Mode ===\nGAM_USE_V2_CONFIG: true (v2_enabled=OK)\nShims imported (deep mode):\n  config_v2_enabled: True\n  DATA_DIR: data\n  OUTPUT_DIR: data/outputs\n  paths_v2_enabled: True\n  data_dir_path: data\n  output_dir_path: data\\outputs\n\n=== Stage 1\u20134 Components ===\n  import gam_data_agent               OK\n  import multi_resolution_fusion      OK\n  import detect_voids                 OK\n  import validate_against_known_features OK\n  RobustDownloader available: OK\n\n=== Summary ===\nIssues: none\nWarnings: none\n"
+    },
+    "shims": {
+      "config_v2_enabled": true,
+      "data_dir": "data",
+      "output_dir": "data\\outputs",
+      "processed_dir": "data\\processed",
+      "cache_dir": "data\\cache"
+    },
+    "dynamic_weighting": {
+      "rc": 0,
+      "raw": "{\"ok_shape\": true, \"ok_values\": true, \"std_mean\": 0.0, \"dyn_mean\": 0.0}\n",
+      "ok_shape": true,
+      "ok_values": true,
+      "std_mean": 0.0,
+      "dyn_mean": 0.0
+    },
+    "data_agent_dry_run": {
+      "rc": 0,
+      "ok": true,
+      "status_exists": true,
+      "status_path": "C:\\Users\\admin\\Downloads\\SAR-project\\data\\data_status.json",
+      "snippet": "2025-10-15 16:36:27,032 - __main__ - INFO - Loaded existing status from data\\data_status.json\n2025-10-15 16:36:27,032 - __main__ - INFO - emag2_magnetic is global; ignoring bbox\n2025-10-15 16:36:27,032 - __main__ - INFO - [DRY-RUN] Would download emag2_magnetic from https://www.ncei.noaa.gov/pub/geodetics/geomag/EMAG2_10/EMAG2_V3_SeaLevel_DataTiff.tif to data\\raw\\emag2\\EMAG2_V3_SeaLevel_DataTiff.tif\n2025-10-15 16:36:27,032 - __main__ - INFO - egm2008_gravity is global; ignoring bbox\n2025-10-15 16:36:27,032 - __main__ - INFO - [DRY-RUN] Would download egm2008_gravity from https://earth-info.nga.mil/portals/165/products-services/geospatial-products-and-services/gravity/geoid-models/egm2008/egm2008_geoid.zip to data\\raw\\gravity\\egm2008_geoid.tiff\n2025-10-15 16:36:27,032 - __main__ - INFO - xgm2019e_gravity is global; ignoring bbox\n2025-10-15 16:36:27,032 - __main__ - INFO - [DRY-RUN] Would download xgm2019e_gravity from https://icgem.gfz-potsdam.de/home to data\\raw\\gravity\\XGM2019e_2159.gfc\n2025-10-15 16:36:27,032 - __main__ - INFO - [DRY-RUN] Would download srtm_dem from https://e4ftl01.cr.usgs.gov/MEASURES/SRTM_20m_Digital_Elevation/SRTM_20m_001_20200313T000000_20200313T000000.hgt.zip to data\\raw\\elevation\\srtm\\srtm_carlsbad_30m.tif\n2025-10-15 16:36:27,032 - __main__ - INFO - [DRY-RUN] Would filter by bbox: (-105.0, 32.0, -104.0, 33.0)\n2025-10-15 16:36:27,033 - __main__ - INFO - Updated status saved to data\\data_status.json\n2025-10-15 16:36:27,033 - __main__ - INFO - Download complete: 4/4 successful"
+    },
+    "data_agent_status": {
+      "rc": 0,
+      "ok": true,
+      "report_exists": true,
+      "report_path": "C:\\Users\\admin\\Downloads\\SAR-project\\data\\outputs\\data_status_report.md",
+      "snippet": "2025-10-15 16:36:27,268 - __main__ - INFO - Loaded existing status from data\\data_status.json\nGeoAnomalyMapper Data Status Report\n========================================\n[OK] emag2_magnetic: data\\raw\\emag2\\EMAG2_V3_SeaLevel_DataTiff.tif (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T16:36:27.032774\n\n[OK] egm2008_gravity: data\\raw\\gravity\\egm2008_geoid.tiff (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T16:36:27.032774\n\n[OK] xgm2019e_gravity: data\\raw\\gravity\\XGM2019e_2159.gfc (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T16:36:27.032774\n\n[OK] srtm_dem: data\\raw\\elevation\\srtm\\srtm_carlsbad_30m.tif (N/A)\n   Status: downloaded\n   Downloaded: 2025-10-15T16:36:27.032774\n\n2025-10-15 16:36:27,269 - __main__ - INFO - Report saved to data\\outputs\\data_status_report.md"
+    },
+    "process_all": {
+      "rc": 0,
+      "ok": true,
+      "log_exists": true,
+      "log_path": "C:\\Users\\admin\\Downloads\\SAR-project\\data\\processed\\processing_log.json",
+      "snippet": "2025-10-15 16:36:27,642 - INFO - PROCESSING ELEVATION DATA\n2025-10-15 16:36:27,642 - INFO - ======================================================================\n2025-10-15 16:36:27,642 - WARNING - No DEM files found\n2025-10-15 16:36:27,642 - WARNING - Download Copernicus DEM 30m tiles for your region\n2025-10-15 16:36:27,642 - INFO - \n======================================================================\n2025-10-15 16:36:27,643 - INFO - PROCESSING INSAR DATA\n2025-10-15 16:36:27,643 - INFO - ======================================================================\n2025-10-15 16:36:27,643 - WARNING - No InSAR data found (optional)\n2025-10-15 16:36:27,643 - WARNING - InSAR provides subsidence data for improved void detection\n2025-10-15 16:36:27,643 - INFO - \n======================================================================\n2025-10-15 16:36:27,643 - INFO - PROCESSING LITHOLOGY DATA\n2025-10-15 16:36:27,643 - INFO - ======================================================================\n2025-10-15 16:36:27,643 - WARNING - No lithology data found (optional)\n2025-10-15 16:36:27,643 - WARNING - Lithology helps identify karst-prone rock types\n2025-10-15 16:36:27,643 - INFO - \n======================================================================\n2025-10-15 16:36:27,643 - INFO - PROCESSING SUMMARY\n2025-10-15 16:36:27,643 - INFO - ======================================================================\n2025-10-15 16:36:27,643 - INFO - GRAVITY         \\u26a0 SKIPPED/MISSING\n2025-10-15 16:36:27,643 - INFO - MAGNETIC        \\u26a0 SKIPPED/MISSING\n2025-10-15 16:36:27,643 - INFO - DEM             \\u26a0 SKIPPED/MISSING\n2025-10-15 16:36:27,643 - INFO - INSAR           \\u26a0 SKIPPED/MISSING\n2025-10-15 16:36:27,643 - INFO - LITHOLOGY       \\u26a0 SKIPPED/MISSING\n2025-10-15 16:36:27,643 - WARNING - \n\\u2717 Insufficient data for void detection\n2025-10-15 16:36:27,643 - WARNING - Need at least gravity OR magnetic data\n2025-10-15 16:36:27,643 - WARNING - Complete manual processing steps above\n2025-10-15 16:36:27,644 - INFO - Processing log saved: C:\\Users\\admin\\Downloads\\data\\processed\\processing_log.json"
+    },
+    "ok": true
+  },
+  "docs": {
+    "ok": true,
+    "missing": []
+  },
+  "summary": {
+    "v1_ok": true,
+    "v2_ok": true,
+    "docs_ok": true,
+    "overall_ok": true
+  }
+}

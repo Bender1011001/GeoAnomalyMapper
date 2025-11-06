@@ -16,6 +16,7 @@ from pathlib import Path
 import subprocess
 from typing import List, Dict
 import json
+import argparse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -426,7 +427,18 @@ class InSARProcessor:
 
 def main():
     """CLI interface."""
-    base_dir = Path(__file__).parent.parent / 'data'
+    parser = argparse.ArgumentParser(
+        description="Process Sentinel-1 InSAR data for anomaly detection"
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=str(Path(__file__).parent.parent / 'data'),
+        help="Base data directory (default: ./data)",
+    )
+    args, _ = parser.parse_known_args()
+
+    base_dir = Path(args.data_dir)
     
     try:
         processor = InSARProcessor(base_dir)

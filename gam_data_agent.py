@@ -188,7 +188,8 @@ def status_command(args):
     print("GeoAnomalyMapper Data Status Report")
     print("=" * 40)
     for key, info in status.items():
-        avail = "✅" if info.get('available', False) else "❌"
+        # ASCII-safe indicators for Windows consoles (avoid Unicode emojis)
+        avail = "[OK]" if info.get('available', False) else "[X]"
         path = info.get('path', 'N/A')
         size = f"{info.get('size_mb', 0):.1f} MB" if info.get('size_mb') else 'N/A'
         print(f"{avail} {key}: {path} ({size})")

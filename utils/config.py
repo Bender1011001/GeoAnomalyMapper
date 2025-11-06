@@ -54,20 +54,31 @@ class ConfigManager:
         # Check feature flag
         self._use_v2_config = os.getenv('GAM_USE_V2_CONFIG', 'false').lower() == 'true'
         
-        # Hardcoded defaults based on project structure (for backward compatibility)
-        self._defaults = {
-            'DATA_DIR': 'data',
-            'OUTPUT_DIR': 'data/outputs',
-            'PROCESSED_DIR': 'data/processed',
-            'CACHE_DIR': 'data/cache',
-            'GAM_USE_V2_CONFIG': str(self._use_v2_config),
-        }
+        # Defaults differ for v1 (legacy) vs v2 (structured)
+        if self._use_v2_config:
+            # v2: OUTPUT_DIR/PROCESSED_DIR/CACHE_DIR are relative to DATA_DIR
+            self._defaults = {
+                'DATA_DIR': 'data',
+                'OUTPUT_DIR': 'outputs',
+                'PROCESSED_DIR': 'processed',
+                'CACHE_DIR': 'cache',
+                'GAM_USE_V2_CONFIG': 'true',
+            }
+        else:
+            # v1: preserve fully-qualified defaults for backward compatibility
+            self._defaults = {
+                'DATA_DIR': 'data',
+                'OUTPUT_DIR': 'data/outputs',
+                'PROCESSED_DIR': 'data/processed',
+                'CACHE_DIR': 'data/cache',
+                'GAM_USE_V2_CONFIG': 'false',
+            }
         
         if not self._use_v2_config:
-            # Fallback to hardcoded defaults when v2 config disabled
+            # Fallback to hardcoded defaults when v2 config disabled (strict legacy behavior)
             self._config = {**self._defaults}
         else:
-            # Load from env vars, fallback to defaults
+            # v2: Load from env vars, fallback to v2 defaults
             self._config = {}
             for key, default_value in self._defaults.items():
                 env_value = os.getenv(key)

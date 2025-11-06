@@ -64,7 +64,21 @@ from typing import Dict, List, Optional, Tuple
 # ---------------------------
 
 def _bool_icon(ok: bool) -> str:
-    return "✓" if ok else "✗"
+    """
+    Return a status icon with Windows-safe fallback.
+    On consoles that do not support UTF-8 glyphs, fall back to ASCII.
+    """
+    import sys
+    icon_ok = "✓"
+    icon_bad = "✗"
+    enc = getattr(sys.stdout, "encoding", None) or ""
+    try:
+        # Attempt to encode the chosen icon to the current stdout encoding
+        (icon_ok if ok else icon_bad).encode(enc or "utf-8")
+        return icon_ok if ok else icon_bad
+    except Exception:
+        # Fallback for cp1252 and other non-UTF consoles
+        return "OK" if ok else "X"
 
 
 def _safe_import_version(pkg: str, import_name: Optional[str] = None) -> Tuple[bool, Optional[str]]:

@@ -5,7 +5,7 @@
     "size_mb": 0,
     "resolution": "~2 km",
     "coverage": "Global",
-    "download_timestamp": "2025-10-15T15:18:19.546971",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
     "status": "downloaded"
   },
   "egm2008_gravity": {
@@ -14,7 +14,7 @@
     "size_mb": 0,
     "resolution": "~20 km",
     "coverage": "Global",
-    "download_timestamp": "2025-10-15T15:18:19.546971",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
     "status": "downloaded"
   },
   "xgm2019e_gravity": {
@@ -23,7 +23,7 @@
     "size_mb": 0,
     "resolution": "~2 km",
     "coverage": "Global (requires conversion)",
-    "download_timestamp": "2025-10-15T15:18:19.546971",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
     "status": "downloaded"
   },
   "srtm_dem": {
@@ -32,7 +32,7 @@
     "size_mb": 0,
     "resolution": "30 m",
     "coverage": "Global land",
-    "download_timestamp": "2025-10-15T15:18:19.546971",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
     "status": "downloaded"
   }
 }
