@@ -26,6 +26,8 @@ import rasterio
 from rasterio.plot import show
 import json
 
+from project_paths import OUTPUTS_DIR, PROCESSED_DIR
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -33,10 +35,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ============================================================================
 
-BASE_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = BASE_DIR.parent
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
-OUTPUT_DIR = PROJECT_ROOT / "data" / "outputs" / "visualizations"
+OUTPUT_DIR = OUTPUTS_DIR / "visualizations"
 
 # ============================================================================
 # CUSTOM COLORMAPS
@@ -629,7 +628,7 @@ def main():
     
     gravity_file = PROCESSED_DIR / "gravity" / "gravity_processed.tif"
     magnetic_file = PROCESSED_DIR / "magnetic" / "magnetic_processed.tif"
-    probability_file = PROJECT_ROOT / "data" / "outputs" / "void_detection" / "void_probability.tif"
+    probability_file = OUTPUTS_DIR / "void_detection" / "void_probability.tif"
     
     gravity_data, extent, _ = load_raster_data(gravity_file)
     magnetic_data, _, _ = load_raster_data(magnetic_file)
