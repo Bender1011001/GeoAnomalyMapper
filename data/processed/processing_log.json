@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-11-11T00:16:18",
+  "region": [
+    -105.0,
+    32.0,
+    -104.0,
+    33.0
+  ],
+  "results": {
+    "gravity": true,
+    "magnetic": true,
+    "dem": false,
+    "insar": true,
+    "lithology": false
+  },
+  "insar_details": {
+    "processing_date": "2025-11-11T00:16:18",
+    "scenes_processed": 5,
+    "pairs_processed": 10,
+    "pairs_successful": 10,
+    "swath": "IW2",
+    "output_directory": "data/processed/insar",
+    "products": [
+      "coherence.tif",
+      "displacement.tif"
+    ]
+  }
+}

@@ -1,0 +1,650 @@
+[
+  {
+    "type": "insar_subsidence",
+    "lat": 40.11321196286033,
+    "lon": -124.14242238348606,
+    "value": -6.902290344238281,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.9 mm subsidence",
+    "explanation": "The ground here is sinking at 6.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.825194334969574,
+    "lon": -125.4190674408349,
+    "value": -6.668953895568848,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.7 mm subsidence",
+    "explanation": "The ground here is sinking at 6.7 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.51527628485501,
+    "lon": -125.75997265975106,
+    "value": -6.885723114013672,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.9 mm subsidence",
+    "explanation": "The ground here is sinking at 6.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 38.40425427474983,
+    "lon": -126.15286342524682,
+    "value": -5.939276218414307,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.9 mm subsidence",
+    "explanation": "The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.691197652578225,
+    "lon": -124.06644350771589,
+    "value": -5.410008907318115,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.4 mm subsidence",
+    "explanation": "The ground here is sinking at 5.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.461277621801784,
+    "lon": -125.54803158523427,
+    "value": -6.093416690826416,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -6.1 mm subsidence",
+    "explanation": "The ground here is sinking at 6.1 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.98626462370817,
+    "lon": -124.22140042540506,
+    "value": -5.878628730773926,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.9 mm subsidence",
+    "explanation": "The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 38.39125459660739,
+    "lon": -125.6060154641115,
+    "value": -4.506511211395264,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.5 mm subsidence",
+    "explanation": "The ground here is sinking at 4.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 39.4462284766288,
+    "lon": -124.71526311791119,
+    "value": -4.28838586807251,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.3 mm subsidence",
+    "explanation": "The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.4882769533284,
+    "lon": -125.2081260883677,
+    "value": -4.3971734046936035,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.4 mm subsidence",
+    "explanation": "The ground here is sinking at 4.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.78726955060461,
+    "lon": -124.38735428563992,
+    "value": -4.252536773681641,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.3 mm subsidence",
+    "explanation": "The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 36.08131178821928,
+    "lon": -125.50904242529957,
+    "value": -4.181895732879639,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.2 mm subsidence",
+    "explanation": "The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 39.313231769479174,
+    "lon": -125.03817333993442,
+    "value": 2.3017613887786865,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 2.3 mm uplift",
+    "explanation": "The ground here is rising at 2.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 36.32930564816744,
+    "lon": -125.94892012712688,
+    "value": 2.4205589294433594,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 2.4 mm uplift",
+    "explanation": "The ground here is rising at 2.4 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.21428373709535,
+    "lon": -126.1758570323878,
+    "value": 0.5908766984939575,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 0.6 mm uplift",
+    "explanation": "The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 39.10923682016698,
+    "lon": -124.79424115983018,
+    "value": 1.095400094985962,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 1.1 mm uplift",
+    "explanation": "The ground here is rising at 1.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.78726955060461,
+    "lon": -125.67799545168324,
+    "value": 0.6744111776351929,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 0.7 mm uplift",
+    "explanation": "The ground here is rising at 0.7 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.1272611327916,
+    "lon": -124.10943155584901,
+    "value": 0.504597544670105,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.5 mm uplift",
+    "explanation": "The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.71324662444331,
+    "lon": -124.15641849218058,
+    "value": 0.2514670789241791,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.3 mm uplift",
+    "explanation": "The ground here is rising at 0.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 36.85929252628246,
+    "lon": -124.3983512281856,
+    "value": 0.5658351182937622,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.6 mm uplift",
+    "explanation": "The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 39.43223412158469,
+    "lon": -117.85792309654869,
+    "value": -6.596442699432373,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.6 mm subsidence",
+    "explanation": "The ground here is sinking at 6.6 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.21521581355498,
+    "lon": -124.73686234093987,
+    "value": -6.519476890563965,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.5 mm subsidence",
+    "explanation": "The ground here is sinking at 6.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.8302014336849,
+    "lon": -122.2378844122099,
+    "value": -6.984855651855469,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -7.0 mm subsidence",
+    "explanation": "The ground here is sinking at 7.0 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.56920753636147,
+    "lon": -122.51288198339866,
+    "value": -6.110245227813721,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -6.1 mm subsidence",
+    "explanation": "The ground here is sinking at 6.1 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 38.60425348180002,
+    "lon": -114.50395271921361,
+    "value": -5.266542434692383,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.3 mm subsidence",
+    "explanation": "The ground here is sinking at 5.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 36.55930129779078,
+    "lon": -126.0268509476072,
+    "value": -4.9141740798950195,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -4.9 mm subsidence",
+    "explanation": "The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.333283200198196,
+    "lon": -119.71390670428093,
+    "value": -5.559576511383057,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.6 mm subsidence",
+    "explanation": "The ground here is sinking at 5.6 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 40.85520084913733,
+    "lon": -120.36690093695827,
+    "value": -4.203335285186768,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.2 mm subsidence",
+    "explanation": "The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 39.03224347434572,
+    "lon": -118.88991398188257,
+    "value": -4.831622123718262,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.8 mm subsidence",
+    "explanation": "The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 36.25430842927107,
+    "lon": -123.92586950372498,
+    "value": -4.312324047088623,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.3 mm subsidence",
+    "explanation": "The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 36.14331102466225,
+    "lon": -119.32391014877685,
+    "value": -4.209157943725586,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.2 mm subsidence",
+    "explanation": "The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.685274969768486,
+    "lon": -120.62989861413153,
+    "value": -4.8171539306640625,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.8 mm subsidence",
+    "explanation": "The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.223285772207475,
+    "lon": -117.68892458916359,
+    "value": 1.6046062707901,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 1.6 mm uplift",
+    "explanation": "The ground here is rising at 1.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.9232460229731,
+    "lon": -124.54886400136354,
+    "value": 2.073503017425537,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 2.1 mm uplift",
+    "explanation": "The ground here is rising at 2.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 39.89922320223619,
+    "lon": -114.58095203914647,
+    "value": 1.0314037799835205,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 1.0 mm uplift",
+    "explanation": "The ground here is rising at 1.0 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.91624618664642,
+    "lon": -119.29891036957787,
+    "value": 0.7743639945983887,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 0.8 mm uplift",
+    "explanation": "The ground here is rising at 0.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 39.83322474544176,
+    "lon": -120.16990267687031,
+    "value": 1.094692587852478,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 1.1 mm uplift",
+    "explanation": "The ground here is rising at 1.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.867247332359646,
+    "lon": -121.7258889342148,
+    "value": 0.38755086064338684,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.4 mm uplift",
+    "explanation": "The ground here is rising at 0.4 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.406281493319305,
+    "lon": -124.36486562645905,
+    "value": 0.3289962708950043,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.3 mm uplift",
+    "explanation": "The ground here is rising at 0.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.65727562446176,
+    "lon": -122.09988563103153,
+    "value": 0.10396676510572433,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.1 mm uplift",
+    "explanation": "The ground here is rising at 0.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 38.858193387715275,
+    "lon": -114.38568266801573,
+    "value": -6.480048179626465,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.5 mm subsidence",
+    "explanation": "The ground here is sinking at 6.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 35.91519395899116,
+    "lon": -112.6246955424216,
+    "value": -6.4037556648254395,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -6.4 mm subsidence",
+    "explanation": "The ground here is sinking at 6.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 38.30019349603058,
+    "lon": -114.18468413749648,
+    "value": -9.16633129119873,
+    "severity": "extreme",
+    "description": "Extreme ground subsidence detected: -9.2 mm subsidence",
+    "explanation": "The ground here is sinking at 9.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 35.5921940216898,
+    "lon": -114.11868462001254,
+    "value": -5.892580509185791,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.9 mm subsidence",
+    "explanation": "The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 41.142192944360154,
+    "lon": -112.6956950233513,
+    "value": -4.914482593536377,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -4.9 mm subsidence",
+    "explanation": "The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 31.90519473738609,
+    "lon": -114.23168379388656,
+    "value": -4.982570171356201,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -5.0 mm subsidence",
+    "explanation": "The ground here is sinking at 5.0 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 30.018195103678174,
+    "lon": -113.37569005197368,
+    "value": -4.948418617248535,
+    "severity": "high",
+    "description": "Significant ground subsidence detected: -4.9 mm subsidence",
+    "explanation": "The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 35.58419402324271,
+    "lon": -114.90467887368487,
+    "value": -4.22416877746582,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.2 mm subsidence",
+    "explanation": "The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 37.96119356183504,
+    "lon": -112.85869383168284,
+    "value": -4.326473712921143,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.3 mm subsidence",
+    "explanation": "The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 34.884194159122124,
+    "lon": -115.1186773091631,
+    "value": -4.406889915466309,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.4 mm subsidence",
+    "explanation": "The ground here is sinking at 4.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 34.68319419813893,
+    "lon": -111.7937016177375,
+    "value": -4.247945308685303,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.2 mm subsidence",
+    "explanation": "The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_subsidence",
+    "lat": 30.373195034767896,
+    "lon": -114.0326852487456,
+    "value": -4.82885217666626,
+    "severity": "medium",
+    "description": "Moderate ground subsidence detected: -4.8 mm subsidence",
+    "explanation": "The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 33.23219447979754,
+    "lon": -115.29567601514275,
+    "value": 2.7037606239318848,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 2.7 mm uplift",
+    "explanation": "The ground here is rising at 2.7 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 37.627193626668934,
+    "lon": -114.38968263877234,
+    "value": 1.781929612159729,
+    "severity": "extreme",
+    "description": "Extreme ground uplift detected: 1.8 mm uplift",
+    "explanation": "The ground here is rising at 1.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 34.10219431091884,
+    "lon": -114.70868030661137,
+    "value": 0.76657634973526,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 0.8 mm uplift",
+    "explanation": "The ground here is rising at 0.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 31.840194750003466,
+    "lon": -112.23969835709865,
+    "value": 1.036920189857483,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 1.0 mm uplift",
+    "explanation": "The ground here is rising at 1.0 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 38.533193450802145,
+    "lon": -112.06169965842984,
+    "value": 1.5363389253616333,
+    "severity": "high",
+    "description": "Significant ground uplift detected: 1.5 mm uplift",
+    "explanation": "The ground here is rising at 1.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 40.209193125468005,
+    "lon": -114.39268261683979,
+    "value": 0.5350226163864136,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.5 mm uplift",
+    "explanation": "The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 33.131194499403,
+    "lon": -115.13767717025696,
+    "value": 0.5243236422538757,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.5 mm uplift",
+    "explanation": "The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "insar_uplift",
+    "lat": 30.160195076114064,
+    "lon": -113.88168635268386,
+    "value": 0.5767083764076233,
+    "severity": "medium",
+    "description": "Moderate ground uplift detected: 0.6 mm uplift",
+    "explanation": "The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.0775,
+    "lon": -104.0575,
+    "value": -61.3729248046875,
+    "severity": "extreme",
+    "description": "Extreme low gravity anomaly: -61.4 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.0455,
+    "lon": -104.0005,
+    "value": -67.72191619873047,
+    "severity": "extreme",
+    "description": "Extreme low gravity anomaly: -67.7 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.0225,
+    "lon": -104.2835,
+    "value": -49.79895782470703,
+    "severity": "high",
+    "description": "Significant low gravity anomaly: -49.8 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.0865,
+    "lon": -104.1665,
+    "value": -53.57802963256836,
+    "severity": "high",
+    "description": "Significant low gravity anomaly: -53.6 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.2995,
+    "lon": -104.0225,
+    "value": -46.027347564697266,
+    "severity": "medium",
+    "description": "Moderate low gravity anomaly: -46.0 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_low",
+    "lat": 32.1405,
+    "lon": -104.2175,
+    "value": -46.74519348144531,
+    "severity": "medium",
+    "description": "Moderate low gravity anomaly: -46.7 mGal",
+    "explanation": "Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9865,
+    "lon": -104.0115,
+    "value": 8.611432075500488,
+    "severity": "extreme",
+    "description": "Extreme high gravity anomaly: 8.6 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9975,
+    "lon": -104.0655,
+    "value": 9.352620124816895,
+    "severity": "extreme",
+    "description": "Extreme high gravity anomaly: 9.4 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9725,
+    "lon": -104.4465,
+    "value": 7.1495361328125,
+    "severity": "high",
+    "description": "Significant high gravity anomaly: 7.1 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9745,
+    "lon": -104.6795,
+    "value": 7.030035018920898,
+    "severity": "high",
+    "description": "Significant high gravity anomaly: 7.0 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9185,
+    "lon": -104.7745,
+    "value": 5.624137878417969,
+    "severity": "medium",
+    "description": "Moderate high gravity anomaly: 5.6 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  },
+  {
+    "type": "gravity_high",
+    "lat": 32.9565,
+    "lon": -104.1445,
+    "value": 6.2569899559021,
+    "severity": "medium",
+    "description": "Moderate high gravity anomaly: 6.3 mGal",
+    "explanation": "Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures."
+  }
+]

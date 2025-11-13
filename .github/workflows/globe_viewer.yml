@@ -1,0 +1,47 @@
+name: GlobeViewer Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }} - GlobeViewer
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('GeoAnomalyMapper/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip wheel
+          if [ -f GeoAnomalyMapper/requirements.txt ]; then pip install -r GeoAnomalyMapper/requirements.txt; fi
+          if [ -f GeoAnomalyMapper/requirements-dashboard.txt ]; then pip install -r GeoAnomalyMapper/requirements-dashboard.txt; fi
+          python -m pip install --upgrade pytest
+
+      - name: Run GlobeViewer test
+        env:
+          MPLBACKEND: Agg
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/GeoAnomalyMapper
+        run: |
+          pytest -q GeoAnomalyMapper/tests/test_globe_viewer.py

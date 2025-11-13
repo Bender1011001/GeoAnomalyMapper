@@ -1,0 +1,70 @@
+{
+  "processing_date": "2025-11-11T00:16:18.468105",
+  "scenes_processed": 5,
+  "pairs_processed": 10,
+  "pairs_successful": 10,
+  "output_directory": "data\\processed\\insar",
+  "swath": "IW2",
+  "results": [
+    {
+      "master": "S1A_IW_SLC__1SDV_20251006T130356_20251006T130423_061305_07A5EF_3B84",
+      "slave": "S1A_IW_SLC__1SDV_20251008T142348_20251008T142415_061335_07A723_19F9",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251006T130356_20251006T130423_061305_07A5EF_3B84",
+      "slave": "S1A_IW_SLC__1SDV_20251008T142503_20251008T142520_061335_07A723_4BC6",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251006T130356_20251006T130423_061305_07A5EF_3B84",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013143_20251008T013210_004464_008D6F_FD00",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251006T130356_20251006T130423_061305_07A5EF_3B84",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013439_20251008T013506_004464_008D6F_B190",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251008T142348_20251008T142415_061335_07A723_19F9",
+      "slave": "S1A_IW_SLC__1SDV_20251008T142503_20251008T142520_061335_07A723_4BC6",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251008T142348_20251008T142415_061335_07A723_19F9",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013143_20251008T013210_004464_008D6F_FD00",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251008T142348_20251008T142415_061335_07A723_19F9",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013439_20251008T013506_004464_008D6F_B190",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251008T142503_20251008T142520_061335_07A723_4BC6",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013143_20251008T013210_004464_008D6F_FD00",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1A_IW_SLC__1SDV_20251008T142503_20251008T142520_061335_07A723_4BC6",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013439_20251008T013506_004464_008D6F_B190",
+      "swath": "IW2",
+      "success": true
+    },
+    {
+      "master": "S1C_IW_SLC__1SDV_20251008T013143_20251008T013210_004464_008D6F_FD00",
+      "slave": "S1C_IW_SLC__1SDV_20251008T013439_20251008T013506_004464_008D6F_B190",
+      "swath": "IW2",
+      "success": true
+    }
+  ]
+}

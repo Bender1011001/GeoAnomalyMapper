@@ -1,0 +1,30 @@
+{
+  "master_scene": "S1A_IW_SLC__1SDV_20251008T142503_20251008T142520_061335_07A723_4BC6",
+  "slave_scene": "S1C_IW_SLC__1SDV_20251008T013439_20251008T013506_004464_008D6F_B190",
+  "swath": "IW2",
+  "temporal_baseline_days": 1,
+  "lat_bounds": [
+    35.58282413021865,
+    41.19369293436331
+  ],
+  "lon_bounds": [
+    -126.203349388752,
+    -113.9604575194278
+  ],
+  "grid_shape": [
+    5611,
+    12243
+  ],
+  "coherence_stats": {
+    "min": 0.28774040937423706,
+    "max": 1.0,
+    "mean": 0.7720893025398254
+  },
+  "displacement_stats": {
+    "min": -13.45683479309082,
+    "max": 6.069905757904053,
+    "mean": -2.0007598400115967,
+    "units": "millimeters"
+  },
+  "processing_timestamp": "2025-11-11T00:16:09.555491"
+}

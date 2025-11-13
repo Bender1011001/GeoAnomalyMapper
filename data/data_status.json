@@ -1,0 +1,38 @@
+{
+  "emag2_magnetic": {
+    "available": true,
+    "path": "data\\raw\\emag2\\EMAG2_V3_SeaLevel_DataTiff.tif",
+    "size_mb": 0,
+    "resolution": "~2 km",
+    "coverage": "Global",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
+    "status": "downloaded"
+  },
+  "egm2008_gravity": {
+    "available": true,
+    "path": "data\\raw\\gravity\\egm2008_geoid.tiff",
+    "size_mb": 0,
+    "resolution": "~20 km",
+    "coverage": "Global",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
+    "status": "downloaded"
+  },
+  "xgm2019e_gravity": {
+    "available": true,
+    "path": "data\\raw\\gravity\\XGM2019e_2159.gfc",
+    "size_mb": 0,
+    "resolution": "~2 km",
+    "coverage": "Global (requires conversion)",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
+    "status": "downloaded"
+  },
+  "srtm_dem": {
+    "available": true,
+    "path": "data\\raw\\elevation\\srtm\\srtm_carlsbad_30m.tif",
+    "size_mb": 0,
+    "resolution": "30 m",
+    "coverage": "Global land",
+    "download_timestamp": "2025-10-15T16:36:27.032774",
+    "status": "downloaded"
+  }
+}

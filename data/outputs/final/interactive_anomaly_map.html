@@ -1,0 +1,3676 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_fd8f4b8807bef3e2a2d5558c6ff7b697 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+        <div style="position: fixed; 
+                    top: 10px; left: 50px; width: 500px; height: 90px; 
+                    background-color: white; border: 2px solid grey; 
+                    z-index: 9999; font-size: 16px; padding: 10px;
+                    box-shadow: 2px 2px 6px rgba(0,0,0,0.3);">
+            <h3 style="margin: 0;">🗺️ Geophysical Anomaly Map</h3>
+            <p style="margin: 5px 0; font-size: 12px;">
+                Click any marker to learn what we found and what it means.<br>
+                Use the layer control (top right) to filter anomaly types.
+            </p>
+        </div>
+        
+    
+        <div style="position: fixed; 
+                    top: 110px; right: 10px; width: 250px; 
+                    background-color: white; border: 2px solid grey; 
+                    z-index: 9999; font-size: 12px; padding: 10px;
+                    box-shadow: 2px 2px 6px rgba(0,0,0,0.3);">
+            <h4 style="margin: 0 0 10px 0;">📊 Detection Summary</h4>
+            <p style="margin: 3px 0;"><strong>Total Anomalies:</strong> 72</p>
+            <p style="margin: 3px 0; color: red;">🔻 Subsidence: 36</p>
+            <p style="margin: 3px 0; color: green;">🔺 Uplift: 24</p>
+            <p style="margin: 3px 0; color: blue;">⚖️ Gravity: 12</p>
+            <p style="margin: 3px 0; color: purple;">🧲 Magnetic: 0</p>
+        </div>
+        
+    
+            <div class="folium-map" id="map_fd8f4b8807bef3e2a2d5558c6ff7b697" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_fd8f4b8807bef3e2a2d5558c6ff7b697 = L.map(
+                "map_fd8f4b8807bef3e2a2d5558c6ff7b697",
+                {
+                    center: [36.5613207484428, -117.27143161510679],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 6,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+            L.control.scale().addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+
+            
+
+        
+    
+            var tile_layer_302c081775f88c1186a937a1227d7a06 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_302c081775f88c1186a937a1227d7a06.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var tile_layer_aa773d84ceaa8fe8e6fa87a03efae030 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_aa773d84ceaa8fe8e6fa87a03efae030.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var tile_layer_bf3f029c6aa245856597ffb401f892c8 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_bf3f029c6aa245856597ffb401f892c8.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var feature_group_628fdfd647e07093296bd6a6d56ba439 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_e35cbb6b0d31564aa632b57e0e652358 = L.marker(
+                [40.11321196286033, -124.14242238348606],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_acff6b47869b1bb3d2a5c6655b15aff0 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_5e21507ecab7ba5a43f947329f67c26d = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_8c5450a0b3e6d62e1a338f28803e9cfb = $(`<div id="html_8c5450a0b3e6d62e1a338f28803e9cfb" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.1132°N, 124.1424°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_5e21507ecab7ba5a43f947329f67c26d.setContent(html_8c5450a0b3e6d62e1a338f28803e9cfb);
+            
+        
+
+        marker_e35cbb6b0d31564aa632b57e0e652358.bindPopup(popup_5e21507ecab7ba5a43f947329f67c26d)
+        ;
+
+        
+    
+    
+            marker_e35cbb6b0d31564aa632b57e0e652358.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_e35cbb6b0d31564aa632b57e0e652358.setIcon(icon_acff6b47869b1bb3d2a5c6655b15aff0);
+            
+    
+            var marker_0b912db0254f39d22e742ff6634eaed1 = L.marker(
+                [40.825194334969574, -125.4190674408349],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_73ca017242a0374ee273419c725c695f = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_781d898fddd31d51d4c223618264269e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_7bcb0e313ab964eee9e0204194f36d4b = $(`<div id="html_7bcb0e313ab964eee9e0204194f36d4b" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.7 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.7 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.8252°N, 125.4191°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_781d898fddd31d51d4c223618264269e.setContent(html_7bcb0e313ab964eee9e0204194f36d4b);
+            
+        
+
+        marker_0b912db0254f39d22e742ff6634eaed1.bindPopup(popup_781d898fddd31d51d4c223618264269e)
+        ;
+
+        
+    
+    
+            marker_0b912db0254f39d22e742ff6634eaed1.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_0b912db0254f39d22e742ff6634eaed1.setIcon(icon_73ca017242a0374ee273419c725c695f);
+            
+    
+            var marker_063b156b120be74c0005143d5d78fc58 = L.marker(
+                [37.51527628485501, -125.75997265975106],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_93e805f0815c4d4b40591cb4c57a2669 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_ec871d9626b92ad2ca8b5472d96ad684 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_412a37c066904dfdf7a3b54fa5de0fc6 = $(`<div id="html_412a37c066904dfdf7a3b54fa5de0fc6" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.5153°N, 125.7600°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_ec871d9626b92ad2ca8b5472d96ad684.setContent(html_412a37c066904dfdf7a3b54fa5de0fc6);
+            
+        
+
+        marker_063b156b120be74c0005143d5d78fc58.bindPopup(popup_ec871d9626b92ad2ca8b5472d96ad684)
+        ;
+
+        
+    
+    
+            marker_063b156b120be74c0005143d5d78fc58.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_063b156b120be74c0005143d5d78fc58.setIcon(icon_93e805f0815c4d4b40591cb4c57a2669);
+            
+    
+            var marker_21a180fe046fcd0c52adbf8c8b1519bb = L.marker(
+                [38.40425427474983, -126.15286342524682],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_5277d17ab999a49724914dbf1b828dc4 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_824048636fee7cd4283d839da99349f5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2f06dedbc2fc7369a8128022913ddbad = $(`<div id="html_2f06dedbc2fc7369a8128022913ddbad" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.4043°N, 126.1529°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_824048636fee7cd4283d839da99349f5.setContent(html_2f06dedbc2fc7369a8128022913ddbad);
+            
+        
+
+        marker_21a180fe046fcd0c52adbf8c8b1519bb.bindPopup(popup_824048636fee7cd4283d839da99349f5)
+        ;
+
+        
+    
+    
+            marker_21a180fe046fcd0c52adbf8c8b1519bb.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_21a180fe046fcd0c52adbf8c8b1519bb.setIcon(icon_5277d17ab999a49724914dbf1b828dc4);
+            
+    
+            var marker_b43d690cc0364380ac9942780763311d = L.marker(
+                [40.691197652578225, -124.06644350771589],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_affbf1311681ba4814ad46d7e1728b66 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_5a09da35741c49baba75e267f31fe321 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_591d9884aa047a17ce20d5fe43fae146 = $(`<div id="html_591d9884aa047a17ce20d5fe43fae146" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.4 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.6912°N, 124.0664°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_5a09da35741c49baba75e267f31fe321.setContent(html_591d9884aa047a17ce20d5fe43fae146);
+            
+        
+
+        marker_b43d690cc0364380ac9942780763311d.bindPopup(popup_5a09da35741c49baba75e267f31fe321)
+        ;
+
+        
+    
+    
+            marker_b43d690cc0364380ac9942780763311d.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b43d690cc0364380ac9942780763311d.setIcon(icon_affbf1311681ba4814ad46d7e1728b66);
+            
+    
+            var marker_9dd12718fb45bb9141cf5b229dc2fb02 = L.marker(
+                [37.461277621801784, -125.54803158523427],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_0bf2628aa38282b8d08e4b1346b7d993 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_8b4683fd2f3f78bc0a4d4e008b099073 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_bf1efaf61155a0967cb2d9964b6f75d5 = $(`<div id="html_bf1efaf61155a0967cb2d9964b6f75d5" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -6.1 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.1 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.4613°N, 125.5480°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_8b4683fd2f3f78bc0a4d4e008b099073.setContent(html_bf1efaf61155a0967cb2d9964b6f75d5);
+            
+        
+
+        marker_9dd12718fb45bb9141cf5b229dc2fb02.bindPopup(popup_8b4683fd2f3f78bc0a4d4e008b099073)
+        ;
+
+        
+    
+    
+            marker_9dd12718fb45bb9141cf5b229dc2fb02.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9dd12718fb45bb9141cf5b229dc2fb02.setIcon(icon_0bf2628aa38282b8d08e4b1346b7d993);
+            
+    
+            var marker_176015872302dfdc1c7fff8064de69d8 = L.marker(
+                [37.98626462370817, -124.22140042540506],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_97c4ab2f895cf25be05d551fd0277011 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_646eddc4bc962ac8e33f51f86ffe73bc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_009dc95bb27ed4536b266cddd7894b53 = $(`<div id="html_009dc95bb27ed4536b266cddd7894b53" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.9863°N, 124.2214°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_646eddc4bc962ac8e33f51f86ffe73bc.setContent(html_009dc95bb27ed4536b266cddd7894b53);
+            
+        
+
+        marker_176015872302dfdc1c7fff8064de69d8.bindPopup(popup_646eddc4bc962ac8e33f51f86ffe73bc)
+        ;
+
+        
+    
+    
+            marker_176015872302dfdc1c7fff8064de69d8.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_176015872302dfdc1c7fff8064de69d8.setIcon(icon_97c4ab2f895cf25be05d551fd0277011);
+            
+    
+            var marker_4d54f0510f9b0ca37aa90e241db33b79 = L.marker(
+                [38.39125459660739, -125.6060154641115],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_383d92e456f8252368029cc1dc5f313b = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_9d6e0a817c1e4e610927df2cb7c53487 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_040c2fd743df7830ab886b6240c848c3 = $(`<div id="html_040c2fd743df7830ab886b6240c848c3" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.5 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.3913°N, 125.6060°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_9d6e0a817c1e4e610927df2cb7c53487.setContent(html_040c2fd743df7830ab886b6240c848c3);
+            
+        
+
+        marker_4d54f0510f9b0ca37aa90e241db33b79.bindPopup(popup_9d6e0a817c1e4e610927df2cb7c53487)
+        ;
+
+        
+    
+    
+            marker_4d54f0510f9b0ca37aa90e241db33b79.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_4d54f0510f9b0ca37aa90e241db33b79.setIcon(icon_383d92e456f8252368029cc1dc5f313b);
+            
+    
+            var marker_b94bd14801c71bd19b262ba90bb4794c = L.marker(
+                [39.4462284766288, -124.71526311791119],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_41177e993eb42b9c8e7fbe723c7f71f2 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_bcbbe8fbedc36d50653995d451cb2dee = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_607167f5b17226c0f56a24ea41e80011 = $(`<div id="html_607167f5b17226c0f56a24ea41e80011" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.3 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.4462°N, 124.7153°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_bcbbe8fbedc36d50653995d451cb2dee.setContent(html_607167f5b17226c0f56a24ea41e80011);
+            
+        
+
+        marker_b94bd14801c71bd19b262ba90bb4794c.bindPopup(popup_bcbbe8fbedc36d50653995d451cb2dee)
+        ;
+
+        
+    
+    
+            marker_b94bd14801c71bd19b262ba90bb4794c.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b94bd14801c71bd19b262ba90bb4794c.setIcon(icon_41177e993eb42b9c8e7fbe723c7f71f2);
+            
+    
+            var marker_9bac31b12ad476f37149a1009592c72a = L.marker(
+                [37.4882769533284, -125.2081260883677],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_ca7487574041aac437620bdf1dfb1404 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_9a2f988422528278138225f8951bc0f7 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4bd326d12c28d4304bc5085ec8c83292 = $(`<div id="html_4bd326d12c28d4304bc5085ec8c83292" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.4 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.4883°N, 125.2081°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_9a2f988422528278138225f8951bc0f7.setContent(html_4bd326d12c28d4304bc5085ec8c83292);
+            
+        
+
+        marker_9bac31b12ad476f37149a1009592c72a.bindPopup(popup_9a2f988422528278138225f8951bc0f7)
+        ;
+
+        
+    
+    
+            marker_9bac31b12ad476f37149a1009592c72a.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9bac31b12ad476f37149a1009592c72a.setIcon(icon_ca7487574041aac437620bdf1dfb1404);
+            
+    
+            var marker_817ac907be3f4c459e54945ce4f1da48 = L.marker(
+                [37.78726955060461, -124.38735428563992],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_46b96b50c5cce49773892dc833074c81 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_af4808ad47eae6746ddf2b4d4e3d1533 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_54ba0eb5695e66026d87a8854faeb7b1 = $(`<div id="html_54ba0eb5695e66026d87a8854faeb7b1" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.3 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.7873°N, 124.3874°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_af4808ad47eae6746ddf2b4d4e3d1533.setContent(html_54ba0eb5695e66026d87a8854faeb7b1);
+            
+        
+
+        marker_817ac907be3f4c459e54945ce4f1da48.bindPopup(popup_af4808ad47eae6746ddf2b4d4e3d1533)
+        ;
+
+        
+    
+    
+            marker_817ac907be3f4c459e54945ce4f1da48.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_817ac907be3f4c459e54945ce4f1da48.setIcon(icon_46b96b50c5cce49773892dc833074c81);
+            
+    
+            var marker_9aeaf1f95db85cccec4fb15b218b12da = L.marker(
+                [36.08131178821928, -125.50904242529957],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_363d6fe2b5eb425fb58a84317e9849a6 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_29e591874d85ed6a1ec899cd395bc35c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f4c09cb9938328774da60cc07296800b = $(`<div id="html_f4c09cb9938328774da60cc07296800b" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.0813°N, 125.5090°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_29e591874d85ed6a1ec899cd395bc35c.setContent(html_f4c09cb9938328774da60cc07296800b);
+            
+        
+
+        marker_9aeaf1f95db85cccec4fb15b218b12da.bindPopup(popup_29e591874d85ed6a1ec899cd395bc35c)
+        ;
+
+        
+    
+    
+            marker_9aeaf1f95db85cccec4fb15b218b12da.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9aeaf1f95db85cccec4fb15b218b12da.setIcon(icon_363d6fe2b5eb425fb58a84317e9849a6);
+            
+    
+            var marker_35fb70707122f8742eef37615c04595f = L.marker(
+                [39.313231769479174, -125.03817333993442],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_421946702e53632ce2a87ae5d20ac983 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_512ad2c680fc889e8ee22760fb6e9644 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d49bbe2482e90c3ba5e0820166d8c240 = $(`<div id="html_d49bbe2482e90c3ba5e0820166d8c240" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 2.3 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 2.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.3132°N, 125.0382°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_512ad2c680fc889e8ee22760fb6e9644.setContent(html_d49bbe2482e90c3ba5e0820166d8c240);
+            
+        
+
+        marker_35fb70707122f8742eef37615c04595f.bindPopup(popup_512ad2c680fc889e8ee22760fb6e9644)
+        ;
+
+        
+    
+    
+            marker_35fb70707122f8742eef37615c04595f.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_35fb70707122f8742eef37615c04595f.setIcon(icon_421946702e53632ce2a87ae5d20ac983);
+            
+    
+            var marker_208d1f806e9fed880e644850158c08c3 = L.marker(
+                [36.32930564816744, -125.94892012712688],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_2803743876fe436fca7ee23937d697c7 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_2da561f18b81c6e34705f190cf52782e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d0399c554c15e011a1bd07a6d8745c5e = $(`<div id="html_d0399c554c15e011a1bd07a6d8745c5e" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 2.4 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 2.4 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.3293°N, 125.9489°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_2da561f18b81c6e34705f190cf52782e.setContent(html_d0399c554c15e011a1bd07a6d8745c5e);
+            
+        
+
+        marker_208d1f806e9fed880e644850158c08c3.bindPopup(popup_2da561f18b81c6e34705f190cf52782e)
+        ;
+
+        
+    
+    
+            marker_208d1f806e9fed880e644850158c08c3.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_208d1f806e9fed880e644850158c08c3.setIcon(icon_2803743876fe436fca7ee23937d697c7);
+            
+    
+            var marker_3f747c155fffdd32742c5b440b8b06d7 = L.marker(
+                [37.21428373709535, -126.1758570323878],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_990d1330de20bd672e6f978bed22b987 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_3d233e6e5d5d6b3429e5406a94e86274 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_da1be1ffdc111ef5cf7bcb2caebf95fe = $(`<div id="html_da1be1ffdc111ef5cf7bcb2caebf95fe" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 0.6 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.2143°N, 126.1759°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_3d233e6e5d5d6b3429e5406a94e86274.setContent(html_da1be1ffdc111ef5cf7bcb2caebf95fe);
+            
+        
+
+        marker_3f747c155fffdd32742c5b440b8b06d7.bindPopup(popup_3d233e6e5d5d6b3429e5406a94e86274)
+        ;
+
+        
+    
+    
+            marker_3f747c155fffdd32742c5b440b8b06d7.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3f747c155fffdd32742c5b440b8b06d7.setIcon(icon_990d1330de20bd672e6f978bed22b987);
+            
+    
+            var marker_0a0eaf5b2e3253c7b6123c68c52abff1 = L.marker(
+                [39.10923682016698, -124.79424115983018],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_01a0f92a7e8c5808f6bd00575216fdf9 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_21640c9ef112bd407c625f056f4e6aa4 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e3bbff407d195510520c7c763ecc209c = $(`<div id="html_e3bbff407d195510520c7c763ecc209c" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 1.1 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.1092°N, 124.7942°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_21640c9ef112bd407c625f056f4e6aa4.setContent(html_e3bbff407d195510520c7c763ecc209c);
+            
+        
+
+        marker_0a0eaf5b2e3253c7b6123c68c52abff1.bindPopup(popup_21640c9ef112bd407c625f056f4e6aa4)
+        ;
+
+        
+    
+    
+            marker_0a0eaf5b2e3253c7b6123c68c52abff1.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_0a0eaf5b2e3253c7b6123c68c52abff1.setIcon(icon_01a0f92a7e8c5808f6bd00575216fdf9);
+            
+    
+            var marker_d54fdd1f3495c85cb8c0c8aa4ffc4db5 = L.marker(
+                [37.78726955060461, -125.67799545168324],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_86ddd91a3bac96cf824b2640db3e2bfd = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_bbdb97f6fe29d040f31e71c3fa8653cd = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b5425eb218d9a875bd050fb6c705629c = $(`<div id="html_b5425eb218d9a875bd050fb6c705629c" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 0.7 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.7 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.7873°N, 125.6780°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_bbdb97f6fe29d040f31e71c3fa8653cd.setContent(html_b5425eb218d9a875bd050fb6c705629c);
+            
+        
+
+        marker_d54fdd1f3495c85cb8c0c8aa4ffc4db5.bindPopup(popup_bbdb97f6fe29d040f31e71c3fa8653cd)
+        ;
+
+        
+    
+    
+            marker_d54fdd1f3495c85cb8c0c8aa4ffc4db5.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_d54fdd1f3495c85cb8c0c8aa4ffc4db5.setIcon(icon_86ddd91a3bac96cf824b2640db3e2bfd);
+            
+    
+            var marker_580a62e97fa5ee9e63d6b6b83e6bf635 = L.marker(
+                [38.1272611327916, -124.10943155584901],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_2e047a3acf1cacbddacf85b75338d65d = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_3d613035a3b2cc061ddf146689f5650f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f9e8ed1ed93e77b0ba2a84e9e2a82667 = $(`<div id="html_f9e8ed1ed93e77b0ba2a84e9e2a82667" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.5 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.1273°N, 124.1094°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_3d613035a3b2cc061ddf146689f5650f.setContent(html_f9e8ed1ed93e77b0ba2a84e9e2a82667);
+            
+        
+
+        marker_580a62e97fa5ee9e63d6b6b83e6bf635.bindPopup(popup_3d613035a3b2cc061ddf146689f5650f)
+        ;
+
+        
+    
+    
+            marker_580a62e97fa5ee9e63d6b6b83e6bf635.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_580a62e97fa5ee9e63d6b6b83e6bf635.setIcon(icon_2e047a3acf1cacbddacf85b75338d65d);
+            
+    
+            var marker_f78c13162368d0f4de00975040ffc457 = L.marker(
+                [38.71324662444331, -124.15641849218058],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_7cd4105e1cc6c5cbec882ab9fcc1dd7a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_ebdfda1bfac4d06e8e126458843ea13d = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5113120e22aa3f7aae40617aa07b9068 = $(`<div id="html_5113120e22aa3f7aae40617aa07b9068" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.3 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.7132°N, 124.1564°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_ebdfda1bfac4d06e8e126458843ea13d.setContent(html_5113120e22aa3f7aae40617aa07b9068);
+            
+        
+
+        marker_f78c13162368d0f4de00975040ffc457.bindPopup(popup_ebdfda1bfac4d06e8e126458843ea13d)
+        ;
+
+        
+    
+    
+            marker_f78c13162368d0f4de00975040ffc457.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_f78c13162368d0f4de00975040ffc457.setIcon(icon_7cd4105e1cc6c5cbec882ab9fcc1dd7a);
+            
+    
+            var marker_54348b61801f6dccdb8d1d1c32463718 = L.marker(
+                [36.85929252628246, -124.3983512281856],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_4497ebc69a004806cbe42ec6f2e3ad93 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_7903d9c28c679bbcf4177225624dc638 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6bdfddad1059c1c1a0edb53703f6152e = $(`<div id="html_6bdfddad1059c1c1a0edb53703f6152e" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.6 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.8593°N, 124.3984°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_7903d9c28c679bbcf4177225624dc638.setContent(html_6bdfddad1059c1c1a0edb53703f6152e);
+            
+        
+
+        marker_54348b61801f6dccdb8d1d1c32463718.bindPopup(popup_7903d9c28c679bbcf4177225624dc638)
+        ;
+
+        
+    
+    
+            marker_54348b61801f6dccdb8d1d1c32463718.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_54348b61801f6dccdb8d1d1c32463718.setIcon(icon_4497ebc69a004806cbe42ec6f2e3ad93);
+            
+    
+            var marker_d1be6214d5face922779cf853e5dd93d = L.marker(
+                [39.43223412158469, -117.85792309654869],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_8d75b5eb08d577a54e6621bafd8ae1fd = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_b33e51aa8343cf21cda5967d56be8ade = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_163552bc86d9a697c7db141c0a0995cd = $(`<div id="html_163552bc86d9a697c7db141c0a0995cd" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.6 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.6 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.4322°N, 117.8579°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_b33e51aa8343cf21cda5967d56be8ade.setContent(html_163552bc86d9a697c7db141c0a0995cd);
+            
+        
+
+        marker_d1be6214d5face922779cf853e5dd93d.bindPopup(popup_b33e51aa8343cf21cda5967d56be8ade)
+        ;
+
+        
+    
+    
+            marker_d1be6214d5face922779cf853e5dd93d.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_d1be6214d5face922779cf853e5dd93d.setIcon(icon_8d75b5eb08d577a54e6621bafd8ae1fd);
+            
+    
+            var marker_2dd436578eeb43efa525efba85aa35bc = L.marker(
+                [40.21521581355498, -124.73686234093987],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_8ff271146b41270d94a58e1c7045bd0a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_1d0cfec28b65b791f29f0a1406bbd3e4 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6b504f685c8b2ad515df1820f47a2cc4 = $(`<div id="html_6b504f685c8b2ad515df1820f47a2cc4" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.5 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.2152°N, 124.7369°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_1d0cfec28b65b791f29f0a1406bbd3e4.setContent(html_6b504f685c8b2ad515df1820f47a2cc4);
+            
+        
+
+        marker_2dd436578eeb43efa525efba85aa35bc.bindPopup(popup_1d0cfec28b65b791f29f0a1406bbd3e4)
+        ;
+
+        
+    
+    
+            marker_2dd436578eeb43efa525efba85aa35bc.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2dd436578eeb43efa525efba85aa35bc.setIcon(icon_8ff271146b41270d94a58e1c7045bd0a);
+            
+    
+            var marker_92aa68eea0337d7fdff97a8b5a8ff9b4 = L.marker(
+                [40.8302014336849, -122.2378844122099],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_579137b9b6491e6cb84f14da7eb69ab6 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_c3b74b645392669c055400aecf3c8c89 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_3c14b9dcfff77e4d18504886819dbf5a = $(`<div id="html_3c14b9dcfff77e4d18504886819dbf5a" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -7.0 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 7.0 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.8302°N, 122.2379°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_c3b74b645392669c055400aecf3c8c89.setContent(html_3c14b9dcfff77e4d18504886819dbf5a);
+            
+        
+
+        marker_92aa68eea0337d7fdff97a8b5a8ff9b4.bindPopup(popup_c3b74b645392669c055400aecf3c8c89)
+        ;
+
+        
+    
+    
+            marker_92aa68eea0337d7fdff97a8b5a8ff9b4.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_92aa68eea0337d7fdff97a8b5a8ff9b4.setIcon(icon_579137b9b6491e6cb84f14da7eb69ab6);
+            
+    
+            var marker_16010dd74a5859ea7eb9dc7a44707431 = L.marker(
+                [40.56920753636147, -122.51288198339866],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_8169e17d31fbaeb754a890ecc99fa6a2 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_8bfe3586339917a95f1f0f0f28e825b2 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6f84ef9c20c18caeecc4089700522560 = $(`<div id="html_6f84ef9c20c18caeecc4089700522560" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -6.1 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.1 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.5692°N, 122.5129°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_8bfe3586339917a95f1f0f0f28e825b2.setContent(html_6f84ef9c20c18caeecc4089700522560);
+            
+        
+
+        marker_16010dd74a5859ea7eb9dc7a44707431.bindPopup(popup_8bfe3586339917a95f1f0f0f28e825b2)
+        ;
+
+        
+    
+    
+            marker_16010dd74a5859ea7eb9dc7a44707431.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_16010dd74a5859ea7eb9dc7a44707431.setIcon(icon_8169e17d31fbaeb754a890ecc99fa6a2);
+            
+    
+            var marker_6bf5f456d2ebe7caec3bc9f93aab41b9 = L.marker(
+                [38.60425348180002, -114.50395271921361],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_6815173edc373202f57a59edbe3b6fd9 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_44f9e2dd91be63f133531b62a09c802f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_86bf4d13262a22a767f53da1c78a7951 = $(`<div id="html_86bf4d13262a22a767f53da1c78a7951" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.3 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.6043°N, 114.5040°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_44f9e2dd91be63f133531b62a09c802f.setContent(html_86bf4d13262a22a767f53da1c78a7951);
+            
+        
+
+        marker_6bf5f456d2ebe7caec3bc9f93aab41b9.bindPopup(popup_44f9e2dd91be63f133531b62a09c802f)
+        ;
+
+        
+    
+    
+            marker_6bf5f456d2ebe7caec3bc9f93aab41b9.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6bf5f456d2ebe7caec3bc9f93aab41b9.setIcon(icon_6815173edc373202f57a59edbe3b6fd9);
+            
+    
+            var marker_b5b59986387a7d64dc8a211f0f34264a = L.marker(
+                [36.55930129779078, -126.0268509476072],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_cd9dd92f9d166d8cfc07a1f44a5f3b75 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_1cf14d405453a9203ff52d21b9dd7af8 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_caeb8b49a6ff74cbeaa98f48b002c0f5 = $(`<div id="html_caeb8b49a6ff74cbeaa98f48b002c0f5" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -4.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.5593°N, 126.0269°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_1cf14d405453a9203ff52d21b9dd7af8.setContent(html_caeb8b49a6ff74cbeaa98f48b002c0f5);
+            
+        
+
+        marker_b5b59986387a7d64dc8a211f0f34264a.bindPopup(popup_1cf14d405453a9203ff52d21b9dd7af8)
+        ;
+
+        
+    
+    
+            marker_b5b59986387a7d64dc8a211f0f34264a.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b5b59986387a7d64dc8a211f0f34264a.setIcon(icon_cd9dd92f9d166d8cfc07a1f44a5f3b75);
+            
+    
+            var marker_dff686dc20e026bcdaca5250f9ec923a = L.marker(
+                [37.333283200198196, -119.71390670428093],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_05e78e18dc1794e3b26b74cc2e48de4a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_88468105fb1db9bfaa3fc16db8afbf66 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4f460416b4aacfa98acf4ed70c194734 = $(`<div id="html_4f460416b4aacfa98acf4ed70c194734" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.6 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.6 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.3333°N, 119.7139°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_88468105fb1db9bfaa3fc16db8afbf66.setContent(html_4f460416b4aacfa98acf4ed70c194734);
+            
+        
+
+        marker_dff686dc20e026bcdaca5250f9ec923a.bindPopup(popup_88468105fb1db9bfaa3fc16db8afbf66)
+        ;
+
+        
+    
+    
+            marker_dff686dc20e026bcdaca5250f9ec923a.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_dff686dc20e026bcdaca5250f9ec923a.setIcon(icon_05e78e18dc1794e3b26b74cc2e48de4a);
+            
+    
+            var marker_263fe245ae40c0a147225dcb09cf487c = L.marker(
+                [40.85520084913733, -120.36690093695827],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_b85bf30b2b91cc6d89dea398b0783304 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_b00200d670d5005b39f8f48bb84899c7 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e304fa4222d43d998cce943942e4de01 = $(`<div id="html_e304fa4222d43d998cce943942e4de01" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.8552°N, 120.3669°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_b00200d670d5005b39f8f48bb84899c7.setContent(html_e304fa4222d43d998cce943942e4de01);
+            
+        
+
+        marker_263fe245ae40c0a147225dcb09cf487c.bindPopup(popup_b00200d670d5005b39f8f48bb84899c7)
+        ;
+
+        
+    
+    
+            marker_263fe245ae40c0a147225dcb09cf487c.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_263fe245ae40c0a147225dcb09cf487c.setIcon(icon_b85bf30b2b91cc6d89dea398b0783304);
+            
+    
+            var marker_0019d6c369c897c48d0da1f4e586d5ac = L.marker(
+                [39.03224347434572, -118.88991398188257],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_af71e8a93b90b6316eb33e5d782167c0 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_20171ea07c3cc73e3f0d485c55163d2b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_adb21b2566cc1c4ba08f34e298f78d03 = $(`<div id="html_adb21b2566cc1c4ba08f34e298f78d03" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.8 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.0322°N, 118.8899°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_20171ea07c3cc73e3f0d485c55163d2b.setContent(html_adb21b2566cc1c4ba08f34e298f78d03);
+            
+        
+
+        marker_0019d6c369c897c48d0da1f4e586d5ac.bindPopup(popup_20171ea07c3cc73e3f0d485c55163d2b)
+        ;
+
+        
+    
+    
+            marker_0019d6c369c897c48d0da1f4e586d5ac.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_0019d6c369c897c48d0da1f4e586d5ac.setIcon(icon_af71e8a93b90b6316eb33e5d782167c0);
+            
+    
+            var marker_12750e584af787fa96f8a5f9cfc94c97 = L.marker(
+                [36.25430842927107, -123.92586950372498],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_d22a1db50cf6748e4175c8b400d0c2a4 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_57bff9d937fbecdc786937dda7456a1a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ac5bae55c30a1b93f9fe92585653778d = $(`<div id="html_ac5bae55c30a1b93f9fe92585653778d" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.3 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.2543°N, 123.9259°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_57bff9d937fbecdc786937dda7456a1a.setContent(html_ac5bae55c30a1b93f9fe92585653778d);
+            
+        
+
+        marker_12750e584af787fa96f8a5f9cfc94c97.bindPopup(popup_57bff9d937fbecdc786937dda7456a1a)
+        ;
+
+        
+    
+    
+            marker_12750e584af787fa96f8a5f9cfc94c97.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_12750e584af787fa96f8a5f9cfc94c97.setIcon(icon_d22a1db50cf6748e4175c8b400d0c2a4);
+            
+    
+            var marker_1201442e96e7a7164cab07b88414a6a3 = L.marker(
+                [36.14331102466225, -119.32391014877685],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_be5eba6bb28939842dc0b3dd7aa394ce = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_eee796dc7f00c97e2f8b6bd141d368a3 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0d6bc27736dc837dd18a2af3944e105e = $(`<div id="html_0d6bc27736dc837dd18a2af3944e105e" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 36.1433°N, 119.3239°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_eee796dc7f00c97e2f8b6bd141d368a3.setContent(html_0d6bc27736dc837dd18a2af3944e105e);
+            
+        
+
+        marker_1201442e96e7a7164cab07b88414a6a3.bindPopup(popup_eee796dc7f00c97e2f8b6bd141d368a3)
+        ;
+
+        
+    
+    
+            marker_1201442e96e7a7164cab07b88414a6a3.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_1201442e96e7a7164cab07b88414a6a3.setIcon(icon_be5eba6bb28939842dc0b3dd7aa394ce);
+            
+    
+            var marker_e671c3c9e4218ffea71df1d3875580aa = L.marker(
+                [37.685274969768486, -120.62989861413153],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_612fa54d7a246fd8089b61bdd8ac57f3 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_eebedcab77b4c7ec5157fe60e8e8bc15 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_353a63e5f600d54f1f5352a4ab59d320 = $(`<div id="html_353a63e5f600d54f1f5352a4ab59d320" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.8 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.6853°N, 120.6299°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_eebedcab77b4c7ec5157fe60e8e8bc15.setContent(html_353a63e5f600d54f1f5352a4ab59d320);
+            
+        
+
+        marker_e671c3c9e4218ffea71df1d3875580aa.bindPopup(popup_eebedcab77b4c7ec5157fe60e8e8bc15)
+        ;
+
+        
+    
+    
+            marker_e671c3c9e4218ffea71df1d3875580aa.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_e671c3c9e4218ffea71df1d3875580aa.setIcon(icon_612fa54d7a246fd8089b61bdd8ac57f3);
+            
+    
+            var marker_ba111ad0df8fe5142b9a9834887514a6 = L.marker(
+                [37.223285772207475, -117.68892458916359],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_5f57089c508e623776226b043ce5b5a7 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_8f8f38fa949c807f1c3b2409f99292ec = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_673ee822f9ea2b6f7f483cf95df93336 = $(`<div id="html_673ee822f9ea2b6f7f483cf95df93336" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 1.6 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.2233°N, 117.6889°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_8f8f38fa949c807f1c3b2409f99292ec.setContent(html_673ee822f9ea2b6f7f483cf95df93336);
+            
+        
+
+        marker_ba111ad0df8fe5142b9a9834887514a6.bindPopup(popup_8f8f38fa949c807f1c3b2409f99292ec)
+        ;
+
+        
+    
+    
+            marker_ba111ad0df8fe5142b9a9834887514a6.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_ba111ad0df8fe5142b9a9834887514a6.setIcon(icon_5f57089c508e623776226b043ce5b5a7);
+            
+    
+            var marker_66d3471b9fc9ab13cec1506285a7aad1 = L.marker(
+                [38.9232460229731, -124.54886400136354],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_de8721f5ac9c85128736c8b93c0b6105 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_38101d6cd16a25291132c721818bbb88 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_05ea08a4ea663671a7aa8cc87c8351fc = $(`<div id="html_05ea08a4ea663671a7aa8cc87c8351fc" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 2.1 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 2.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.9232°N, 124.5489°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_38101d6cd16a25291132c721818bbb88.setContent(html_05ea08a4ea663671a7aa8cc87c8351fc);
+            
+        
+
+        marker_66d3471b9fc9ab13cec1506285a7aad1.bindPopup(popup_38101d6cd16a25291132c721818bbb88)
+        ;
+
+        
+    
+    
+            marker_66d3471b9fc9ab13cec1506285a7aad1.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_66d3471b9fc9ab13cec1506285a7aad1.setIcon(icon_de8721f5ac9c85128736c8b93c0b6105);
+            
+    
+            var marker_3b2c3cd6106bc9d8f2d60b303aa23edf = L.marker(
+                [39.89922320223619, -114.58095203914647],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_eab3983bbb0227ac4d9cd13c21bd0ff9 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_72974d86ed4ba75c31edd38988be32be = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a4031d868a98b905d64fad63b45cdb91 = $(`<div id="html_a4031d868a98b905d64fad63b45cdb91" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 1.0 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.0 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.8992°N, 114.5810°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_72974d86ed4ba75c31edd38988be32be.setContent(html_a4031d868a98b905d64fad63b45cdb91);
+            
+        
+
+        marker_3b2c3cd6106bc9d8f2d60b303aa23edf.bindPopup(popup_72974d86ed4ba75c31edd38988be32be)
+        ;
+
+        
+    
+    
+            marker_3b2c3cd6106bc9d8f2d60b303aa23edf.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3b2c3cd6106bc9d8f2d60b303aa23edf.setIcon(icon_eab3983bbb0227ac4d9cd13c21bd0ff9);
+            
+    
+            var marker_7a5e4032781568abfce3729a847e56f9 = L.marker(
+                [38.91624618664642, -119.29891036957787],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_ca671c9e97b34f56e8479e52e15e9346 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_89d6ad2aa372e6557e34155408c6306c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2f3ba2ecb9b4aceef0aa1070b650a9b3 = $(`<div id="html_2f3ba2ecb9b4aceef0aa1070b650a9b3" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 0.8 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.9162°N, 119.2989°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_89d6ad2aa372e6557e34155408c6306c.setContent(html_2f3ba2ecb9b4aceef0aa1070b650a9b3);
+            
+        
+
+        marker_7a5e4032781568abfce3729a847e56f9.bindPopup(popup_89d6ad2aa372e6557e34155408c6306c)
+        ;
+
+        
+    
+    
+            marker_7a5e4032781568abfce3729a847e56f9.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_7a5e4032781568abfce3729a847e56f9.setIcon(icon_ca671c9e97b34f56e8479e52e15e9346);
+            
+    
+            var marker_997b38d279797e37e4f69c33463f4a13 = L.marker(
+                [39.83322474544176, -120.16990267687031],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_49df7f53f9e624103eebe7e00e27305f = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_6e229d92e798076f633ea11596e6ac7d = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1a31317f72c6a847d6465227aea60d0d = $(`<div id="html_1a31317f72c6a847d6465227aea60d0d" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 1.1 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 39.8332°N, 120.1699°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_6e229d92e798076f633ea11596e6ac7d.setContent(html_1a31317f72c6a847d6465227aea60d0d);
+            
+        
+
+        marker_997b38d279797e37e4f69c33463f4a13.bindPopup(popup_6e229d92e798076f633ea11596e6ac7d)
+        ;
+
+        
+    
+    
+            marker_997b38d279797e37e4f69c33463f4a13.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_997b38d279797e37e4f69c33463f4a13.setIcon(icon_49df7f53f9e624103eebe7e00e27305f);
+            
+    
+            var marker_f4d1c77b3da2671d742b61f593a12dad = L.marker(
+                [38.867247332359646, -121.7258889342148],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_c2301e2a6bd91328b03ef80ea744ddf0 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_5ac64741122bdf89f60f7ea8c309248e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_21a028b7721d9af09dbe5eff601bb32f = $(`<div id="html_21a028b7721d9af09dbe5eff601bb32f" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.4 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.4 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.8672°N, 121.7259°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_5ac64741122bdf89f60f7ea8c309248e.setContent(html_21a028b7721d9af09dbe5eff601bb32f);
+            
+        
+
+        marker_f4d1c77b3da2671d742b61f593a12dad.bindPopup(popup_5ac64741122bdf89f60f7ea8c309248e)
+        ;
+
+        
+    
+    
+            marker_f4d1c77b3da2671d742b61f593a12dad.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_f4d1c77b3da2671d742b61f593a12dad.setIcon(icon_c2301e2a6bd91328b03ef80ea744ddf0);
+            
+    
+            var marker_b02f54665fe5cbd99cf8c131d8de7c3e = L.marker(
+                [37.406281493319305, -124.36486562645905],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_88ba1502b6be9834ced721385cbf90f5 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_a62f4b157a643a00654e0340c3eaeb30 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e0276c61aaff2e1ad621e0eba537b17b = $(`<div id="html_e0276c61aaff2e1ad621e0eba537b17b" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.3 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.3 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.4063°N, 124.3649°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_a62f4b157a643a00654e0340c3eaeb30.setContent(html_e0276c61aaff2e1ad621e0eba537b17b);
+            
+        
+
+        marker_b02f54665fe5cbd99cf8c131d8de7c3e.bindPopup(popup_a62f4b157a643a00654e0340c3eaeb30)
+        ;
+
+        
+    
+    
+            marker_b02f54665fe5cbd99cf8c131d8de7c3e.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b02f54665fe5cbd99cf8c131d8de7c3e.setIcon(icon_88ba1502b6be9834ced721385cbf90f5);
+            
+    
+            var marker_6e49202781ff1de6c16d8238d3fc069e = L.marker(
+                [37.65727562446176, -122.09988563103153],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_33f98b847206a26d700601d459c7a979 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_4a73b7cfb75b6b1235c1926b63a7a331 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6d1c84fabe870fd02183aac368d1fb36 = $(`<div id="html_6d1c84fabe870fd02183aac368d1fb36" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.1 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.1 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.6573°N, 122.0999°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_4a73b7cfb75b6b1235c1926b63a7a331.setContent(html_6d1c84fabe870fd02183aac368d1fb36);
+            
+        
+
+        marker_6e49202781ff1de6c16d8238d3fc069e.bindPopup(popup_4a73b7cfb75b6b1235c1926b63a7a331)
+        ;
+
+        
+    
+    
+            marker_6e49202781ff1de6c16d8238d3fc069e.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6e49202781ff1de6c16d8238d3fc069e.setIcon(icon_33f98b847206a26d700601d459c7a979);
+            
+    
+            var marker_10b77aa571e429e254267f1cf0785df3 = L.marker(
+                [38.858193387715275, -114.38568266801573],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_92ed8df3541bfb682b08b7dc99cb9770 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_f182766a3d679d7b77a4a1c85d364610 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b30134c60ac4b198e1e05cdc21791038 = $(`<div id="html_b30134c60ac4b198e1e05cdc21791038" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.5 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.5 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.8582°N, 114.3857°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_f182766a3d679d7b77a4a1c85d364610.setContent(html_b30134c60ac4b198e1e05cdc21791038);
+            
+        
+
+        marker_10b77aa571e429e254267f1cf0785df3.bindPopup(popup_f182766a3d679d7b77a4a1c85d364610)
+        ;
+
+        
+    
+    
+            marker_10b77aa571e429e254267f1cf0785df3.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_10b77aa571e429e254267f1cf0785df3.setIcon(icon_92ed8df3541bfb682b08b7dc99cb9770);
+            
+    
+            var marker_87fc395d722bdde793340f01cdaeb4dd = L.marker(
+                [35.91519395899116, -112.6246955424216],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_b0a1663c8ce40bdab7b7dbdc9b912077 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_e2a642449b5b95271b5090b090f1a0c6 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d066a4af2b8187aeee3391ee6356b771 = $(`<div id="html_d066a4af2b8187aeee3391ee6356b771" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -6.4 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 6.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 35.9152°N, 112.6247°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_e2a642449b5b95271b5090b090f1a0c6.setContent(html_d066a4af2b8187aeee3391ee6356b771);
+            
+        
+
+        marker_87fc395d722bdde793340f01cdaeb4dd.bindPopup(popup_e2a642449b5b95271b5090b090f1a0c6)
+        ;
+
+        
+    
+    
+            marker_87fc395d722bdde793340f01cdaeb4dd.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_87fc395d722bdde793340f01cdaeb4dd.setIcon(icon_b0a1663c8ce40bdab7b7dbdc9b912077);
+            
+    
+            var marker_06394828269424142990ff533628f382 = L.marker(
+                [38.30019349603058, -114.18468413749648],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_1afcdea7989bca26cba0f5ca3ae639b9 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_853c1438e4b9ad6ce9987a6015f4e070 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_18cb25ab79246f4ea2c4742782c7be71 = $(`<div id="html_18cb25ab79246f4ea2c4742782c7be71" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground subsidence detected: -9.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 9.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.3002°N, 114.1847°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_853c1438e4b9ad6ce9987a6015f4e070.setContent(html_18cb25ab79246f4ea2c4742782c7be71);
+            
+        
+
+        marker_06394828269424142990ff533628f382.bindPopup(popup_853c1438e4b9ad6ce9987a6015f4e070)
+        ;
+
+        
+    
+    
+            marker_06394828269424142990ff533628f382.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_06394828269424142990ff533628f382.setIcon(icon_1afcdea7989bca26cba0f5ca3ae639b9);
+            
+    
+            var marker_8203f746af8c33201f542093a86b1728 = L.marker(
+                [35.5921940216898, -114.11868462001254],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_03898d847e5152e42610991cf11e803d = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_d5325b031b2a14432fef4947cde77916 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_916aa35ccac9f38b87342e4b866d4cd6 = $(`<div id="html_916aa35ccac9f38b87342e4b866d4cd6" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 35.5922°N, 114.1187°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_d5325b031b2a14432fef4947cde77916.setContent(html_916aa35ccac9f38b87342e4b866d4cd6);
+            
+        
+
+        marker_8203f746af8c33201f542093a86b1728.bindPopup(popup_d5325b031b2a14432fef4947cde77916)
+        ;
+
+        
+    
+    
+            marker_8203f746af8c33201f542093a86b1728.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_8203f746af8c33201f542093a86b1728.setIcon(icon_03898d847e5152e42610991cf11e803d);
+            
+    
+            var marker_4d144372855054cd38b36030d9acbe45 = L.marker(
+                [41.142192944360154, -112.6956950233513],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_894a41d89c3f08929fc28d70cdea478d = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_847fa1a1d724ef89d2092b53cfec2751 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_980f6c472e58fba6f958af39e9c5acc2 = $(`<div id="html_980f6c472e58fba6f958af39e9c5acc2" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -4.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 41.1422°N, 112.6957°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_847fa1a1d724ef89d2092b53cfec2751.setContent(html_980f6c472e58fba6f958af39e9c5acc2);
+            
+        
+
+        marker_4d144372855054cd38b36030d9acbe45.bindPopup(popup_847fa1a1d724ef89d2092b53cfec2751)
+        ;
+
+        
+    
+    
+            marker_4d144372855054cd38b36030d9acbe45.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_4d144372855054cd38b36030d9acbe45.setIcon(icon_894a41d89c3f08929fc28d70cdea478d);
+            
+    
+            var marker_cdb9076cabe5a8a3f562e8029ed106bd = L.marker(
+                [31.90519473738609, -114.23168379388656],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_5ac049953c5107e0e361f907151faa1f = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_3a2513ee856b493d97c640ea2ad4806a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_8be98561dd5088ce8ec13cb2570a6892 = $(`<div id="html_8be98561dd5088ce8ec13cb2570a6892" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -5.0 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 5.0 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 31.9052°N, 114.2317°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_3a2513ee856b493d97c640ea2ad4806a.setContent(html_8be98561dd5088ce8ec13cb2570a6892);
+            
+        
+
+        marker_cdb9076cabe5a8a3f562e8029ed106bd.bindPopup(popup_3a2513ee856b493d97c640ea2ad4806a)
+        ;
+
+        
+    
+    
+            marker_cdb9076cabe5a8a3f562e8029ed106bd.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_cdb9076cabe5a8a3f562e8029ed106bd.setIcon(icon_5ac049953c5107e0e361f907151faa1f);
+            
+    
+            var marker_d88a190696ec4017993ef35062dd716e = L.marker(
+                [30.018195103678174, -113.37569005197368],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_29f971b9c79103bdbfd33996af2fed06 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_93ee074a1f57e4416e27caccdf9d0677 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a4849b3f6df741d61fa441025848d2c4 = $(`<div id="html_a4849b3f6df741d61fa441025848d2c4" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground subsidence detected: -4.9 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.9 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 30.0182°N, 113.3757°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_93ee074a1f57e4416e27caccdf9d0677.setContent(html_a4849b3f6df741d61fa441025848d2c4);
+            
+        
+
+        marker_d88a190696ec4017993ef35062dd716e.bindPopup(popup_93ee074a1f57e4416e27caccdf9d0677)
+        ;
+
+        
+    
+    
+            marker_d88a190696ec4017993ef35062dd716e.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_d88a190696ec4017993ef35062dd716e.setIcon(icon_29f971b9c79103bdbfd33996af2fed06);
+            
+    
+            var marker_e59a35ca7789b64fba6cb3a13691d6ee = L.marker(
+                [35.58419402324271, -114.90467887368487],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_e50ccc6028a1b088c47c35b058456d67 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_7cf24305d77901a44e6c6bffdb537a6c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_725107f189225b1e1b3b4198ba87f271 = $(`<div id="html_725107f189225b1e1b3b4198ba87f271" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 35.5842°N, 114.9047°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_7cf24305d77901a44e6c6bffdb537a6c.setContent(html_725107f189225b1e1b3b4198ba87f271);
+            
+        
+
+        marker_e59a35ca7789b64fba6cb3a13691d6ee.bindPopup(popup_7cf24305d77901a44e6c6bffdb537a6c)
+        ;
+
+        
+    
+    
+            marker_e59a35ca7789b64fba6cb3a13691d6ee.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_e59a35ca7789b64fba6cb3a13691d6ee.setIcon(icon_e50ccc6028a1b088c47c35b058456d67);
+            
+    
+            var marker_04d85117d4d1bde79b55f4ed456891b7 = L.marker(
+                [37.96119356183504, -112.85869383168284],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_659c96f70c25a36d865dc7466681f39a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_ab360544725bb108a915c905a3ae114a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0c36c9ec78ece4ae1ebdd492ee155b6f = $(`<div id="html_0c36c9ec78ece4ae1ebdd492ee155b6f" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.3 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.3 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.9612°N, 112.8587°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_ab360544725bb108a915c905a3ae114a.setContent(html_0c36c9ec78ece4ae1ebdd492ee155b6f);
+            
+        
+
+        marker_04d85117d4d1bde79b55f4ed456891b7.bindPopup(popup_ab360544725bb108a915c905a3ae114a)
+        ;
+
+        
+    
+    
+            marker_04d85117d4d1bde79b55f4ed456891b7.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_04d85117d4d1bde79b55f4ed456891b7.setIcon(icon_659c96f70c25a36d865dc7466681f39a);
+            
+    
+            var marker_85a5e1ad32d72bc26a22bba4bea8d0f1 = L.marker(
+                [34.884194159122124, -115.1186773091631],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_57b266d247f4e1b6f34ff4cf8ed1f957 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_24a442df7cc2c7170fb2eb147b0e2069 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_987a9550bea00d2b9783a90e947a4c61 = $(`<div id="html_987a9550bea00d2b9783a90e947a4c61" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.4 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.4 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 34.8842°N, 115.1187°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_24a442df7cc2c7170fb2eb147b0e2069.setContent(html_987a9550bea00d2b9783a90e947a4c61);
+            
+        
+
+        marker_85a5e1ad32d72bc26a22bba4bea8d0f1.bindPopup(popup_24a442df7cc2c7170fb2eb147b0e2069)
+        ;
+
+        
+    
+    
+            marker_85a5e1ad32d72bc26a22bba4bea8d0f1.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_85a5e1ad32d72bc26a22bba4bea8d0f1.setIcon(icon_57b266d247f4e1b6f34ff4cf8ed1f957);
+            
+    
+            var marker_2762843a624cafdcf7c72f3b0f09e6e6 = L.marker(
+                [34.68319419813893, -111.7937016177375],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_14c840fdf85c386c9935ba9919581e16 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_148cfd45ee9ae13478d8c285358cce8c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f46239ff520dcfed35baa39470e19045 = $(`<div id="html_f46239ff520dcfed35baa39470e19045" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.2 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.2 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 34.6832°N, 111.7937°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_148cfd45ee9ae13478d8c285358cce8c.setContent(html_f46239ff520dcfed35baa39470e19045);
+            
+        
+
+        marker_2762843a624cafdcf7c72f3b0f09e6e6.bindPopup(popup_148cfd45ee9ae13478d8c285358cce8c)
+        ;
+
+        
+    
+    
+            marker_2762843a624cafdcf7c72f3b0f09e6e6.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2762843a624cafdcf7c72f3b0f09e6e6.setIcon(icon_14c840fdf85c386c9935ba9919581e16);
+            
+    
+            var marker_aca65de029b5372d79959a939f56ab95 = L.marker(
+                [30.373195034767896, -114.0326852487456],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_1a30509d6669f54e09d0fd3a2a05d198 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_49d98d0a6ba79b4fc6bf0e778f1f1284 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b58e3c0fd6c71a9e40fac07b604d474b = $(`<div id="html_b58e3c0fd6c71a9e40fac07b604d474b" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: red;">                     Insar Subsidence                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground subsidence detected: -4.8 mm subsidence                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is sinking at 4.8 millimeters. This could indicate underground voids, water extraction, mining activity, or natural compaction.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 30.3732°N, 114.0327°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_49d98d0a6ba79b4fc6bf0e778f1f1284.setContent(html_b58e3c0fd6c71a9e40fac07b604d474b);
+            
+        
+
+        marker_aca65de029b5372d79959a939f56ab95.bindPopup(popup_49d98d0a6ba79b4fc6bf0e778f1f1284)
+        ;
+
+        
+    
+    
+            marker_aca65de029b5372d79959a939f56ab95.bindTooltip(
+                `<div>
+                     Insar Subsidence: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_aca65de029b5372d79959a939f56ab95.setIcon(icon_1a30509d6669f54e09d0fd3a2a05d198);
+            
+    
+            var marker_ec2eb66e8ebafa0e020c40042dbab673 = L.marker(
+                [33.23219447979754, -115.29567601514275],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_3e621f44b3df20b3f97269440f822aaf = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_36ea9c5b4fb88efdf5cc51ad3aca11d5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6c0e3d4cdf5230b2705092ad4b1e4522 = $(`<div id="html_6c0e3d4cdf5230b2705092ad4b1e4522" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 2.7 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 2.7 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 33.2322°N, 115.2957°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_36ea9c5b4fb88efdf5cc51ad3aca11d5.setContent(html_6c0e3d4cdf5230b2705092ad4b1e4522);
+            
+        
+
+        marker_ec2eb66e8ebafa0e020c40042dbab673.bindPopup(popup_36ea9c5b4fb88efdf5cc51ad3aca11d5)
+        ;
+
+        
+    
+    
+            marker_ec2eb66e8ebafa0e020c40042dbab673.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_ec2eb66e8ebafa0e020c40042dbab673.setIcon(icon_3e621f44b3df20b3f97269440f822aaf);
+            
+    
+            var marker_fafbf8eb9d34248c7691ee3b1ae10e26 = L.marker(
+                [37.627193626668934, -114.38968263877234],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_098bc7e480a31401ab348b29d8173773 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_cae973e25299478baf5c1b99eeff896a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_c2717ee0bab4110070c6104e5f4c2166 = $(`<div id="html_c2717ee0bab4110070c6104e5f4c2166" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme ground uplift detected: 1.8 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 37.6272°N, 114.3897°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_cae973e25299478baf5c1b99eeff896a.setContent(html_c2717ee0bab4110070c6104e5f4c2166);
+            
+        
+
+        marker_fafbf8eb9d34248c7691ee3b1ae10e26.bindPopup(popup_cae973e25299478baf5c1b99eeff896a)
+        ;
+
+        
+    
+    
+            marker_fafbf8eb9d34248c7691ee3b1ae10e26.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_fafbf8eb9d34248c7691ee3b1ae10e26.setIcon(icon_098bc7e480a31401ab348b29d8173773);
+            
+    
+            var marker_44c1d37ad3cd4bd3fe74132346f0432f = L.marker(
+                [34.10219431091884, -114.70868030661137],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_96e2f9c95b34b635e69f7c77c0ec232c = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_3bbbe6f784872d33280c845c73cc5ad5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2fed46b6fa1cddb04bcd6b528b972f99 = $(`<div id="html_2fed46b6fa1cddb04bcd6b528b972f99" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 0.8 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.8 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 34.1022°N, 114.7087°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_3bbbe6f784872d33280c845c73cc5ad5.setContent(html_2fed46b6fa1cddb04bcd6b528b972f99);
+            
+        
+
+        marker_44c1d37ad3cd4bd3fe74132346f0432f.bindPopup(popup_3bbbe6f784872d33280c845c73cc5ad5)
+        ;
+
+        
+    
+    
+            marker_44c1d37ad3cd4bd3fe74132346f0432f.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_44c1d37ad3cd4bd3fe74132346f0432f.setIcon(icon_96e2f9c95b34b635e69f7c77c0ec232c);
+            
+    
+            var marker_b4cf96785510d8b0c75a3f3f952cffc3 = L.marker(
+                [31.840194750003466, -112.23969835709865],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_a14bd17cce98b0a1049c1ffd7b3432c9 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_e5300efcae2c2156b7bb4be49a1d7d2e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9d61195d90e6295e490638295148ce74 = $(`<div id="html_9d61195d90e6295e490638295148ce74" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 1.0 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.0 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 31.8402°N, 112.2397°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_e5300efcae2c2156b7bb4be49a1d7d2e.setContent(html_9d61195d90e6295e490638295148ce74);
+            
+        
+
+        marker_b4cf96785510d8b0c75a3f3f952cffc3.bindPopup(popup_e5300efcae2c2156b7bb4be49a1d7d2e)
+        ;
+
+        
+    
+    
+            marker_b4cf96785510d8b0c75a3f3f952cffc3.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b4cf96785510d8b0c75a3f3f952cffc3.setIcon(icon_a14bd17cce98b0a1049c1ffd7b3432c9);
+            
+    
+            var marker_2997da4cdd57597d8d1d07a427f2caa2 = L.marker(
+                [38.533193450802145, -112.06169965842984],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_634eebe73581df9f17eb658c0dd4155f = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_4137614ec8faf25a448d36ae6bbd499a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a26970ce7d5d53a58bd5e124c22976be = $(`<div id="html_a26970ce7d5d53a58bd5e124c22976be" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant ground uplift detected: 1.5 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 1.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 38.5332°N, 112.0617°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_4137614ec8faf25a448d36ae6bbd499a.setContent(html_a26970ce7d5d53a58bd5e124c22976be);
+            
+        
+
+        marker_2997da4cdd57597d8d1d07a427f2caa2.bindPopup(popup_4137614ec8faf25a448d36ae6bbd499a)
+        ;
+
+        
+    
+    
+            marker_2997da4cdd57597d8d1d07a427f2caa2.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2997da4cdd57597d8d1d07a427f2caa2.setIcon(icon_634eebe73581df9f17eb658c0dd4155f);
+            
+    
+            var marker_f562af3e08e7101ceeeab8641653922e = L.marker(
+                [40.209193125468005, -114.39268261683979],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_f614702686d8df1a2ea7da506e76fbe1 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_9ba42527fc16ac5243ed3bb82dcffb46 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e706719e7eb68be3015f35ed5b70f445 = $(`<div id="html_e706719e7eb68be3015f35ed5b70f445" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.5 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 40.2092°N, 114.3927°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_9ba42527fc16ac5243ed3bb82dcffb46.setContent(html_e706719e7eb68be3015f35ed5b70f445);
+            
+        
+
+        marker_f562af3e08e7101ceeeab8641653922e.bindPopup(popup_9ba42527fc16ac5243ed3bb82dcffb46)
+        ;
+
+        
+    
+    
+            marker_f562af3e08e7101ceeeab8641653922e.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_f562af3e08e7101ceeeab8641653922e.setIcon(icon_f614702686d8df1a2ea7da506e76fbe1);
+            
+    
+            var marker_86b2831734eb4e1120bc7dc5a5211498 = L.marker(
+                [33.131194499403, -115.13767717025696],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_9216c30bd3724c667fa539d4b1c09f54 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_18236f02e4daef1358ed98734436c753 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_675396017546764cb5e7c5df839a6f06 = $(`<div id="html_675396017546764cb5e7c5df839a6f06" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.5 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.5 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 33.1312°N, 115.1377°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_18236f02e4daef1358ed98734436c753.setContent(html_675396017546764cb5e7c5df839a6f06);
+            
+        
+
+        marker_86b2831734eb4e1120bc7dc5a5211498.bindPopup(popup_18236f02e4daef1358ed98734436c753)
+        ;
+
+        
+    
+    
+            marker_86b2831734eb4e1120bc7dc5a5211498.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_86b2831734eb4e1120bc7dc5a5211498.setIcon(icon_9216c30bd3724c667fa539d4b1c09f54);
+            
+    
+            var marker_90fec880b861052f63b007b8f354d994 = L.marker(
+                [30.160195076114064, -113.88168635268386],
+                {
+}
+            ).addTo(feature_group_628fdfd647e07093296bd6a6d56ba439);
+        
+    
+            var icon_d13e51575952b3b1fcd56cb0d716caa8 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_5c9ad3d02ed533fca43daad1ded172e7 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_667178747c7a19a860b30bc0b702b30a = $(`<div id="html_667178747c7a19a860b30bc0b702b30a" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: green;">                     Insar Uplift                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate ground uplift detected: 0.6 mm uplift                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     The ground here is rising at 0.6 millimeters. This could indicate volcanic activity, tectonic forces, groundwater recharge, or other subsurface processes.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 30.1602°N, 113.8817°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_5c9ad3d02ed533fca43daad1ded172e7.setContent(html_667178747c7a19a860b30bc0b702b30a);
+            
+        
+
+        marker_90fec880b861052f63b007b8f354d994.bindPopup(popup_5c9ad3d02ed533fca43daad1ded172e7)
+        ;
+
+        
+    
+    
+            marker_90fec880b861052f63b007b8f354d994.bindTooltip(
+                `<div>
+                     Insar Uplift: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_90fec880b861052f63b007b8f354d994.setIcon(icon_d13e51575952b3b1fcd56cb0d716caa8);
+            
+    
+            feature_group_628fdfd647e07093296bd6a6d56ba439.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var feature_group_4e7c8da2c288825c63df0c4713c0c624 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_a70e919198b8caa75e98fdfc03bd87d5 = L.marker(
+                [32.0775, -104.0575],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_e08422e1a61fde6f7b94eb932d2888a5 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_29a0682939f33e37a3f927a6d029cdd4 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_16d55e5e36cca1286d59aa9539f0c6b7 = $(`<div id="html_16d55e5e36cca1286d59aa9539f0c6b7" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme low gravity anomaly: -61.4 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.0775°N, 104.0575°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_29a0682939f33e37a3f927a6d029cdd4.setContent(html_16d55e5e36cca1286d59aa9539f0c6b7);
+            
+        
+
+        marker_a70e919198b8caa75e98fdfc03bd87d5.bindPopup(popup_29a0682939f33e37a3f927a6d029cdd4)
+        ;
+
+        
+    
+    
+            marker_a70e919198b8caa75e98fdfc03bd87d5.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a70e919198b8caa75e98fdfc03bd87d5.setIcon(icon_e08422e1a61fde6f7b94eb932d2888a5);
+            
+    
+            var marker_9ae49ca0786546ab66f0055ef1008023 = L.marker(
+                [32.0455, -104.0005],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_0d2bea606f99f920ac92a8dd2b42e93a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_05dd73fa204f855142b51fad72dda4d0 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f7842b7da0274c12291c7922f4c127d0 = $(`<div id="html_f7842b7da0274c12291c7922f4c127d0" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme low gravity anomaly: -67.7 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.0455°N, 104.0005°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_05dd73fa204f855142b51fad72dda4d0.setContent(html_f7842b7da0274c12291c7922f4c127d0);
+            
+        
+
+        marker_9ae49ca0786546ab66f0055ef1008023.bindPopup(popup_05dd73fa204f855142b51fad72dda4d0)
+        ;
+
+        
+    
+    
+            marker_9ae49ca0786546ab66f0055ef1008023.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9ae49ca0786546ab66f0055ef1008023.setIcon(icon_0d2bea606f99f920ac92a8dd2b42e93a);
+            
+    
+            var marker_6f321a270ecda3dfe29a7ca79cd6b886 = L.marker(
+                [32.0225, -104.2835],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_5497b045e25539d1d6edd5e4010bd68a = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_32eb4bda8f6b37872a9717034496845b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_cf479888d9cbcf74997f5f6b9ba947a4 = $(`<div id="html_cf479888d9cbcf74997f5f6b9ba947a4" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant low gravity anomaly: -49.8 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.0225°N, 104.2835°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_32eb4bda8f6b37872a9717034496845b.setContent(html_cf479888d9cbcf74997f5f6b9ba947a4);
+            
+        
+
+        marker_6f321a270ecda3dfe29a7ca79cd6b886.bindPopup(popup_32eb4bda8f6b37872a9717034496845b)
+        ;
+
+        
+    
+    
+            marker_6f321a270ecda3dfe29a7ca79cd6b886.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6f321a270ecda3dfe29a7ca79cd6b886.setIcon(icon_5497b045e25539d1d6edd5e4010bd68a);
+            
+    
+            var marker_58a818d99963f20d92c1d9de3ff58049 = L.marker(
+                [32.0865, -104.1665],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_e2da7066432a3b5e257af327ba365181 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_b37901b5b5d6047a21db40ebd0b1906b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_40cb623ca50e0de633b67c86d171abbf = $(`<div id="html_40cb623ca50e0de633b67c86d171abbf" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant low gravity anomaly: -53.6 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.0865°N, 104.1665°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_b37901b5b5d6047a21db40ebd0b1906b.setContent(html_40cb623ca50e0de633b67c86d171abbf);
+            
+        
+
+        marker_58a818d99963f20d92c1d9de3ff58049.bindPopup(popup_b37901b5b5d6047a21db40ebd0b1906b)
+        ;
+
+        
+    
+    
+            marker_58a818d99963f20d92c1d9de3ff58049.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_58a818d99963f20d92c1d9de3ff58049.setIcon(icon_e2da7066432a3b5e257af327ba365181);
+            
+    
+            var marker_a863d696fd8e30b85ceedfde040d3549 = L.marker(
+                [32.2995, -104.0225],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_cc2c3d0fa120331113746ec4ebc1e17c = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_19fd94f33e00599c26d605ade7fe7c8c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ccc6157aeb997cf5ce52938e505ef666 = $(`<div id="html_ccc6157aeb997cf5ce52938e505ef666" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate low gravity anomaly: -46.0 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.2995°N, 104.0225°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_19fd94f33e00599c26d605ade7fe7c8c.setContent(html_ccc6157aeb997cf5ce52938e505ef666);
+            
+        
+
+        marker_a863d696fd8e30b85ceedfde040d3549.bindPopup(popup_19fd94f33e00599c26d605ade7fe7c8c)
+        ;
+
+        
+    
+    
+            marker_a863d696fd8e30b85ceedfde040d3549.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a863d696fd8e30b85ceedfde040d3549.setIcon(icon_cc2c3d0fa120331113746ec4ebc1e17c);
+            
+    
+            var marker_61e8ee65b58f2330c1896fc5816ad935 = L.marker(
+                [32.1405, -104.2175],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_e9da6dec0987dbb5aa978aaa643b24c4 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "arrow-down",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_14bb007e6a15e4e168e54fba55fbd1dd = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_c9fcda4539240b58fc4e3eecc9a2b182 = $(`<div id="html_c9fcda4539240b58fc4e3eecc9a2b182" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: orange;">                     Gravity Low                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate low gravity anomaly: -46.7 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Lower than normal gravity suggests less dense material underground - possibly voids, caverns, porous rock formations, or sedimentary basins.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.1405°N, 104.2175°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_14bb007e6a15e4e168e54fba55fbd1dd.setContent(html_c9fcda4539240b58fc4e3eecc9a2b182);
+            
+        
+
+        marker_61e8ee65b58f2330c1896fc5816ad935.bindPopup(popup_14bb007e6a15e4e168e54fba55fbd1dd)
+        ;
+
+        
+    
+    
+            marker_61e8ee65b58f2330c1896fc5816ad935.bindTooltip(
+                `<div>
+                     Gravity Low: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_61e8ee65b58f2330c1896fc5816ad935.setIcon(icon_e9da6dec0987dbb5aa978aaa643b24c4);
+            
+    
+            var marker_cdf81cd55c6e2d6123e177d2191b3635 = L.marker(
+                [32.9865, -104.0115],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_c7c8055f5d988f4bfe68d439fffbc4dd = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_bfd802e3bf8a3764079abe9b9d7c182c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_cd2d7ea11b4c4c9dcde2d6315f72334e = $(`<div id="html_cd2d7ea11b4c4c9dcde2d6315f72334e" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme high gravity anomaly: 8.6 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9865°N, 104.0115°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_bfd802e3bf8a3764079abe9b9d7c182c.setContent(html_cd2d7ea11b4c4c9dcde2d6315f72334e);
+            
+        
+
+        marker_cdf81cd55c6e2d6123e177d2191b3635.bindPopup(popup_bfd802e3bf8a3764079abe9b9d7c182c)
+        ;
+
+        
+    
+    
+            marker_cdf81cd55c6e2d6123e177d2191b3635.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_cdf81cd55c6e2d6123e177d2191b3635.setIcon(icon_c7c8055f5d988f4bfe68d439fffbc4dd);
+            
+    
+            var marker_685cf2e661f2a14d899275424554dce6 = L.marker(
+                [32.9975, -104.0655],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_4fea81cf96379af94bc4fe4d5c36e975 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_d3b800454b1e1153a0a4506dfd96e13c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_96ac51507116d51563bebe0b2a33cd37 = $(`<div id="html_96ac51507116d51563bebe0b2a33cd37" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Extreme high gravity anomaly: 9.4 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9975°N, 104.0655°W<br>                     <strong>Severity:</strong> EXTREME                 </p>             </div>             </div>`)[0];
+                popup_d3b800454b1e1153a0a4506dfd96e13c.setContent(html_96ac51507116d51563bebe0b2a33cd37);
+            
+        
+
+        marker_685cf2e661f2a14d899275424554dce6.bindPopup(popup_d3b800454b1e1153a0a4506dfd96e13c)
+        ;
+
+        
+    
+    
+            marker_685cf2e661f2a14d899275424554dce6.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_685cf2e661f2a14d899275424554dce6.setIcon(icon_4fea81cf96379af94bc4fe4d5c36e975);
+            
+    
+            var marker_49c7b84d218ac13db067c642be5fa424 = L.marker(
+                [32.9725, -104.4465],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_f71aa1a82d9bdc906677b7c06bff0bfb = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_736c839ed49d46208015a2c255e9d77a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_88e2cdd086b52b62c4bf727a05dc7c90 = $(`<div id="html_88e2cdd086b52b62c4bf727a05dc7c90" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant high gravity anomaly: 7.1 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9725°N, 104.4465°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_736c839ed49d46208015a2c255e9d77a.setContent(html_88e2cdd086b52b62c4bf727a05dc7c90);
+            
+        
+
+        marker_49c7b84d218ac13db067c642be5fa424.bindPopup(popup_736c839ed49d46208015a2c255e9d77a)
+        ;
+
+        
+    
+    
+            marker_49c7b84d218ac13db067c642be5fa424.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_49c7b84d218ac13db067c642be5fa424.setIcon(icon_f71aa1a82d9bdc906677b7c06bff0bfb);
+            
+    
+            var marker_2f0e403eb7ad5a35f3d17fbddea5a298 = L.marker(
+                [32.9745, -104.6795],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_1cdb49c2d85ca5d68c0679fe83b12e13 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_d83711b9486698479e82c45f50c13c6f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_64ef26cb8aa9219fe003f968b6fc149c = $(`<div id="html_64ef26cb8aa9219fe003f968b6fc149c" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Significant high gravity anomaly: 7.0 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9745°N, 104.6795°W<br>                     <strong>Severity:</strong> HIGH                 </p>             </div>             </div>`)[0];
+                popup_d83711b9486698479e82c45f50c13c6f.setContent(html_64ef26cb8aa9219fe003f968b6fc149c);
+            
+        
+
+        marker_2f0e403eb7ad5a35f3d17fbddea5a298.bindPopup(popup_d83711b9486698479e82c45f50c13c6f)
+        ;
+
+        
+    
+    
+            marker_2f0e403eb7ad5a35f3d17fbddea5a298.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2f0e403eb7ad5a35f3d17fbddea5a298.setIcon(icon_1cdb49c2d85ca5d68c0679fe83b12e13);
+            
+    
+            var marker_c0ac1637300430f8e1701f9ca751b09b = L.marker(
+                [32.9185, -104.7745],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_f74ad5ee98e1160783fa9c8d9c3fac42 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_3cdd8f62fccb4efe019464f32a211d6f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1f499420b2e874b8b8ed8a2ec9ecf4a4 = $(`<div id="html_1f499420b2e874b8b8ed8a2ec9ecf4a4" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate high gravity anomaly: 5.6 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9185°N, 104.7745°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_3cdd8f62fccb4efe019464f32a211d6f.setContent(html_1f499420b2e874b8b8ed8a2ec9ecf4a4);
+            
+        
+
+        marker_c0ac1637300430f8e1701f9ca751b09b.bindPopup(popup_3cdd8f62fccb4efe019464f32a211d6f)
+        ;
+
+        
+    
+    
+            marker_c0ac1637300430f8e1701f9ca751b09b.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c0ac1637300430f8e1701f9ca751b09b.setIcon(icon_f74ad5ee98e1160783fa9c8d9c3fac42);
+            
+    
+            var marker_2616276307a970706e32f22a7b7f6e0a = L.marker(
+                [32.9565, -104.1445],
+                {
+}
+            ).addTo(feature_group_4e7c8da2c288825c63df0c4713c0c624);
+        
+    
+            var icon_ad922577bf5de9b2cfd69cb5f5344fdd = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "arrow-up",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_288403f2ef19491f34b995fec43ede77 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_84d73c4489a94cdb6742e2913581853d = $(`<div id="html_84d73c4489a94cdb6742e2913581853d" style="width: 100.0%; height: 100.0%;">             <div style="width: 300px; font-family: Arial, sans-serif;">                 <h4 style="margin: 0 0 10px 0; color: blue;">                     Gravity High                 </h4>                 <p style="margin: 5px 0;">                     <strong>What we detected:</strong><br>                     Moderate high gravity anomaly: 6.3 mGal                 </p>                 <p style="margin: 5px 0; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">                     <strong>What this means:</strong><br>                     Higher than normal gravity suggests denser rock underground, possibly indicating mineral deposits, intrusive igneous rocks, or other dense geological structures.                 </p>                 <p style="margin: 5px 0; font-size: 11px; color: #666;">                     <strong>Location:</strong> 32.9565°N, 104.1445°W<br>                     <strong>Severity:</strong> MEDIUM                 </p>             </div>             </div>`)[0];
+                popup_288403f2ef19491f34b995fec43ede77.setContent(html_84d73c4489a94cdb6742e2913581853d);
+            
+        
+
+        marker_2616276307a970706e32f22a7b7f6e0a.bindPopup(popup_288403f2ef19491f34b995fec43ede77)
+        ;
+
+        
+    
+    
+            marker_2616276307a970706e32f22a7b7f6e0a.bindTooltip(
+                `<div>
+                     Gravity High: Click for details
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2616276307a970706e32f22a7b7f6e0a.setIcon(icon_ad922577bf5de9b2cfd69cb5f5344fdd);
+            
+    
+            feature_group_4e7c8da2c288825c63df0c4713c0c624.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var feature_group_eef3ca34bddcf755fc3a0f9561fc510b = L.featureGroup(
+                {
+}
+            );
+        
+    
+            feature_group_eef3ca34bddcf755fc3a0f9561fc510b.addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+        
+    
+            var layer_control_f6aa377cc619ca38a849fba26b32a9f6_layers = {
+                base_layers : {
+                    "openstreetmap" : tile_layer_302c081775f88c1186a937a1227d7a06,
+                    "Light Map" : tile_layer_aa773d84ceaa8fe8e6fa87a03efae030,
+                    "Dark Map" : tile_layer_bf3f029c6aa245856597ffb401f892c8,
+                },
+                overlays :  {
+                    "\ud83c\udf0d Ground Movement (InSAR)" : feature_group_628fdfd647e07093296bd6a6d56ba439,
+                    "\u2696\ufe0f Gravity Anomalies" : feature_group_4e7c8da2c288825c63df0c4713c0c624,
+                    "\ud83e\uddf2 Magnetic Anomalies" : feature_group_eef3ca34bddcf755fc3a0f9561fc510b,
+                },
+            };
+            let layer_control_f6aa377cc619ca38a849fba26b32a9f6 = L.control.layers(
+                layer_control_f6aa377cc619ca38a849fba26b32a9f6_layers.base_layers,
+                layer_control_f6aa377cc619ca38a849fba26b32a9f6_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": false,
+  "autoZIndex": true,
+}
+            ).addTo(map_fd8f4b8807bef3e2a2d5558c6ff7b697);
+
+        
+</script>
+</html>
