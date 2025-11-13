@@ -24,18 +24,20 @@ import logging
 import argparse
 import sys
 from pathlib import Path
-from typing import Tuple, Optional, Dict, List
+from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
 import rasterio
 from rasterio.transform import from_bounds
-from rasterio.warp import reproject, Resampling, calculate_default_transform
+from rasterio.warp import Resampling, calculate_default_transform, reproject
 from rasterio.enums import Resampling as RioResampling
 from scipy import ndimage, signal
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
+
+from project_paths import DATA_DIR, OUTPUTS_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -44,10 +46,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ============================================================================
 
-BASE_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = BASE_DIR.parent
-DATA_DIR = PROJECT_ROOT / "data"
-OUTPUT_DIR = DATA_DIR / "outputs" / "multi_resolution"
+OUTPUT_DIR = OUTPUTS_DIR / "multi_resolution"
 
 # Data source configuration
 class DataSource(Enum):
@@ -646,6 +645,7 @@ Notes:
     logger.info("FUSION COMPLETE")
     logger.info(f"Report: {report_path}")
     logger.info("=" * 70)
+    return output_tif
 
 
 def main():

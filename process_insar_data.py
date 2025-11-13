@@ -14,8 +14,10 @@ import logging
 import sys
 from pathlib import Path
 import subprocess
-from typing import List, Dict
+from typing import Dict, List
 import json
+
+from project_paths import DATA_DIR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -426,7 +428,7 @@ class InSARProcessor:
 
 def main():
     """CLI interface."""
-    base_dir = Path(__file__).parent.parent / 'data'
+    base_dir = DATA_DIR
     
     try:
         processor = InSARProcessor(base_dir)

@@ -4,8 +4,8 @@ GeoAnomalyMapper contains a small collection of data processing utilities for
 combining publicly available geophysical datasets (gravity, magnetic, DEM and
 optional InSAR products) into consistent analysis-ready rasters. The repository
 keeps the focus on the processing and visualisation code that supports the
-fusion workflow – large datasets, helper downloads and internal documentation
-are deliberately excluded from version control.
+fusion workflow—large datasets, helper downloads and internal documentation are
+deliberately excluded from version control.
 
 ## Key capabilities
 
@@ -18,7 +18,7 @@ are deliberately excluded from version control.
 - **Multi-resolution fusion (`multi_resolution_fusion.py`)** – resamples
   available layers to a shared resolution and combines them using
   uncertainty-aware weighting.
-- **Void and anomaly assessment (`detect_voids.py`)** – calculates a simple
+- **Void and anomaly assessment (`detect_voids.py`)** – calculates a
   probability score for potential subsurface voids based on the fused
   geophysical layers.
 - **Visualisation utilities** – `create_visualization.py` and
@@ -36,13 +36,16 @@ step carried out outside of the repository.
 
 ```
 GeoAnomalyMapper/
+├── create_enhanced_visualization.py
+├── create_visualization.py
+├── detect_voids.py
+├── multi_resolution_fusion.py
 ├── process_data.py
 ├── process_insar_data.py
-├── multi_resolution_fusion.py
-├── detect_voids.py
-├── create_visualization.py
-├── create_enhanced_visualization.py
+├── project_paths.py
 ├── validate_against_known_features.py
+├── workflow.py
+├── utils/
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
@@ -73,13 +76,54 @@ environment of your choice:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e .          # core tools
+# or
+pip install -e .[all]     # core + COG + InSAR helpers
 ```
 
 Optional extras listed under `[project.optional-dependencies]` in
 `pyproject.toml` enable COG creation and advanced InSAR processing. Install them
 with, for example, `pip install .[insar]` if they are required for your
 workflow.
+
+## Configuring the data directory
+
+By default every script reads from and writes to `<repo>/data`. Set the
+`GEOANOMALYMAPPER_DATA_DIR` environment variable if you would like to store
+rasters elsewhere (for example on a larger external drive):
+
+```bash
+export GEOANOMALYMAPPER_DATA_DIR="/mnt/gis-volume/geoanomalymapper-data"
+```
+
+Every CLI tool (including the new workflow runner) honours the variable and
+creates any missing subdirectories on demand.
+
+## Command-line quick start
+
+The easiest way to run the full stack is via the consolidated workflow CLI:
+
+```bash
+geoanomalymapper --region "-105.5,31.5,-103.5,33.5" \
+    --output-name carlsbad_run \
+    --validate
+```
+
+The command performs preprocessing, fusion, void probability mapping, optional
+validation, and creates PNG/KMZ visualisations. Use `--skip-preprocessing` if
+you already have products in `data/processed/` and `--skip-visuals` for fully
+headless runs. All underlying scripts remain available individually via the
+following entry points:
+
+- `geoanomalymapper-process-data`
+- `geoanomalymapper-fuse`
+- `geoanomalymapper-detect`
+- `geoanomalymapper-visualize`
+- `geoanomalymapper-validate`
+- `geoanomalymapper-enhanced-viz`
+- `geoanomalymapper-insar-guide`
+
+Run any command with `--help` for detailed options.
 
 ## Preparing source data
 
@@ -96,7 +140,10 @@ workflow.
 If Sentinel or other services require credentials, copy `.env.example` to `.env`
 and populate it locally. Do not commit the resulting file.
 
-## Typical workflow
+## Typical workflow (manual steps)
+
+The workflow CLI runs everything for you, but the underlying scripts can still
+be executed individually when you need tighter control:
 
 1. **Process base layers**
    ```bash
@@ -107,8 +154,7 @@ and populate it locally. Do not commit the resulting file.
 
 2. **Process InSAR data (optional)**
    ```bash
-   python process_insar_data.py --input data/raw/insar/my_stack.tif \
-       --output data/processed/insar/insar_processed.tif
+   python process_insar_data.py
    ```
 
 3. **Run multi-resolution fusion**
@@ -134,33 +180,6 @@ and populate it locally. Do not commit the resulting file.
    ```
 
 Each command emits structured logging so processing steps can be audited.
-
-## Publishing the interactive viewer
-
-The repository ships with a static website (located in `docs/`) that can be
-deployed through GitHub Pages to let collaborators explore void detections and
-supporting context. The site renders GeoJSON exports from the processing
-pipeline, shows summary statistics, and provides an optional heat map overlay.
-
-### Enable GitHub Pages
-
-1. Push the repository to GitHub if you have not already done so.
-2. Open the repository settings, navigate to the **Pages** tab, and select the
-   `main` branch with the `/docs` folder as the publishing source.
-3. Save the configuration. GitHub will publish the site at
-   `https://<username>.github.io/<repository>/` within a few minutes.
-
-### Update the published data
-
-1. Export your processed detections as a GeoJSON FeatureCollection where every
-   feature represents one void. See `docs/data/sample_voids.geojson` for the
-   expected schema.
-2. Replace `docs/data/voids.geojson` with the freshly exported file.
-3. Commit the change, push to GitHub, and GitHub Pages will automatically deploy
-   the update.
-
-Optional supporting layers (e.g., raster thumbnails or cross-sections) can be
-added to `docs/data/` and surfaced by editing `docs/js/app.js`.
 
 ## Validation philosophy
 

@@ -1,4 +1,4 @@
-name: GlobeViewer Tests
+name: GeoAnomalyMapper CI
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }} - GlobeViewer
+    name: Python ${{ matrix.python-version }} - smoke
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -26,22 +26,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('GeoAnomalyMapper/requirements*.txt') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
-        shell: bash
+      - name: Install project
         run: |
           python -m pip install --upgrade pip wheel
-          if [ -f GeoAnomalyMapper/requirements.txt ]; then pip install -r GeoAnomalyMapper/requirements.txt; fi
-          if [ -f GeoAnomalyMapper/requirements-dashboard.txt ]; then pip install -r GeoAnomalyMapper/requirements-dashboard.txt; fi
-          python -m pip install --upgrade pytest
+          pip install -e .
 
-      - name: Run GlobeViewer test
+      - name: Smoke test (compile sources)
         env:
           MPLBACKEND: Agg
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/GeoAnomalyMapper
         run: |
-          pytest -q GeoAnomalyMapper/tests/test_globe_viewer.py
+          python -m compileall project_paths.py workflow.py process_data.py detect_voids.py multi_resolution_fusion.py create_visualization.py validate_against_known_features.py

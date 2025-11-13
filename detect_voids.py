@@ -19,14 +19,16 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Tuple, Optional, Dict
+from typing import Dict, Optional, Tuple
 import numpy as np
 import rasterio
 from rasterio.transform import from_bounds
-from rasterio.warp import reproject, Resampling, calculate_default_transform
+from rasterio.warp import reproject, Resampling
 from rasterio.merge import merge
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+
+from project_paths import DATA_DIR, OUTPUTS_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -35,10 +37,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ============================================================================
 
-BASE_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = BASE_DIR.parent
-DATA_DIR = PROJECT_ROOT / "data"
-OUTPUT_DIR = DATA_DIR / "outputs" / "void_detection"
+OUTPUT_DIR = OUTPUTS_DIR / "void_detection"
 
 # Data paths - using processed data
 GRAVITY_PATH = DATA_DIR / "processed" / "gravity" / "gravity_processed.tif"
@@ -447,6 +446,7 @@ def process_region(
     
     logger.info(f"Report saved: {report_path}")
     logger.info("Void detection complete!")
+    return output_tif
 
 
 def main():
