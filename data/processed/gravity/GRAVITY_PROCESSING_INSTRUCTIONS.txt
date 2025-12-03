@@ -1,9 +1,0 @@
-GRAVITY DATA PROCESSING INSTRUCTIONS
-============================================================
-1. Visit http://icgem.gfz-potsdam.de/calcgrid
-2. Select model: XGM2019e_2159
-3. Grid type: gravity_disturbance
-4. Region: -105.00, 32.00, -104.00, 33.00
-5. Grid step: 0.01 degrees (or finer)
-6. Output format: GeoTIFF
-7. Save the downloaded file to data/raw/gravity/

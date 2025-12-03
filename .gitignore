@@ -127,37 +127,136 @@ Thumbs.db
 nasadem_download.log
 processing.log
 
-# Large data files and directories
-data/raw/
-data/outputs/cog/
-data/outputs/multi_resolution/*.tif
-data/outputs/final/*.tif
-data/outputs/final/*.kmz
-data/outputs/final/*.kml
-data/outputs/final/*.vrt
-data/outputs/final/*.csv
-data/outputs/final/*.png
-data/outputs/void_detection/*.tif
-data/outputs/void_detection/*.png
+# Data directories (raw/processed/outputs - populate locally)
+data/
 
-# Embedded repositories and submodules (if not intended as submodule)
-GeoAnomalyMapper/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# GIS and large binary files
+# C extensions
+*.so
+*.pyd
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django/Flask
+*.log
+local_settings.py
+db.sqlite3
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+#Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Environments
+.env
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Conda
+.conda/
+conda/
+site-packages/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# GIS/large binaries (any not in data/)
 *.gdb/
 *.gpkg
-*.tif
-*.tiff
 *.nc
 *.grd
 *.tar.bz2
 
-# Temporary files
+# Temp files
 *.tmp
 *.temp
-pmtiles.exe
 
-# Roo and other tools
+# Roo/tools
 .roo/
 .roomodes
 .netrc

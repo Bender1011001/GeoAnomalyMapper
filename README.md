@@ -35,17 +35,15 @@ step carried out outside of the repository.
 ## Repository layout
 
 ```
-GeoAnomalyMapper/
-├── create_enhanced_visualization.py
-├── create_visualization.py
-├── detect_voids.py
-├── multi_resolution_fusion.py
-├── process_data.py
-├── process_insar_data.py
-├── project_paths.py
-├── validate_against_known_features.py
-├── workflow.py
-├── utils/
+.
+├── create_visualization.py          # PNG/KMZ from GeoTIFFs
+├── detect_voids.py                  # Void probability mapping
+├── multi_resolution_fusion.py       # Uncertainty-weighted fusion
+├── process_data.py                  # Clip/reproject raw rasters
+├── project_paths.py                 # Directory configuration
+├── validate_against_known_features.py # Objective quality checks
+├── workflow.py                      # End-to-end CLI orchestrator
+├── utils/                           # Raster/processing helpers
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
@@ -120,8 +118,6 @@ following entry points:
 - `geoanomalymapper-detect`
 - `geoanomalymapper-visualize`
 - `geoanomalymapper-validate`
-- `geoanomalymapper-enhanced-viz`
-- `geoanomalymapper-insar-guide`
 
 Run any command with `--help` for detailed options.
 

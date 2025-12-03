@@ -57,11 +57,9 @@ all = [
 [tool.setuptools]
 py-modules = [
     "process_data",
-    "process_insar_data",
     "multi_resolution_fusion",
     "detect_voids",
     "create_visualization",
-    "create_enhanced_visualization",
     "validate_against_known_features",
     "workflow",
     "project_paths",
