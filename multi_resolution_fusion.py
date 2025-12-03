@@ -33,14 +33,20 @@ import rasterio
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 from rasterio.enums import Resampling as RioResampling
-from scipy import ndimage, signal
-from scipy.interpolate import RegularGridInterpolator
-import matplotlib.pyplot as plt
+from scipy import ndimage
 
-from project_paths import DATA_DIR, OUTPUTS_DIR
+from project_paths import DATA_DIR, OUTPUTS_DIR, RAW_DIR, PROCESSED_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Public API
+__all__ = [
+    'DataSource',
+    'FusionMethod',
+    'process_multi_resolution',
+    'OUTPUT_DIR',
+]
 
 # ============================================================================
 # CONFIGURATION
@@ -427,9 +433,10 @@ def fuse_weighted(
     with np.errstate(invalid='ignore', divide='ignore'):
         weighted_sum = np.nansum(data_stack * weight_stack, axis=0)
         weight_sum = np.nansum(weight_stack, axis=0)
-        fused = weighted_sum / weight_sum
+        # Prevent division by zero
+        fused = np.where(weight_sum > 0, weighted_sum / weight_sum, np.nan)
     
-    # Set to NaN where all inputs are NaN
+    # Set to NaN where all inputs are NaN (redundant but explicit)
     all_nan = np.all(np.isnan(data_stack), axis=0)
     fused[all_nan] = np.nan
     
@@ -462,7 +469,8 @@ def process_multi_resolution(
     bounds: Tuple[float, float, float, float],
     target_resolution: float = 0.001,  # ~100m
     output_name: str = "multi_res_fusion",
-    data_sources: Optional[List[str]] = None
+    data_sources: Optional[List[str]] = None,
+    spectral_transition_px: float = 10.0,
 ):
     """
     Process region using multi-resolution fusion.
@@ -482,17 +490,26 @@ def process_multi_resolution(
     
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Define data paths (update these based on your data)
+    # Define data paths dynamically using project_paths
     data_paths = {
-        'gravity': DATA_DIR / "outputs" / "final" / "fused_anomaly.tif",
-        'gravity_hires': DATA_DIR / "raw" / "gravity" / "xgm2019e_gravity.tif",
-        'magnetic': DATA_DIR / "raw" / "emag2" / "EMAG2_V3_SeaLevel_DataTiff.tif",
-        'insar': DATA_DIR / "raw" / "insar" / "sentinel1_velocity.tif",
-        'dem': DATA_DIR / "raw" / "dem" / "srtm30.tif",
+        'gravity': OUTPUTS_DIR / "final" / "fused_anomaly.tif",
+        'gravity_hires': RAW_DIR / "gravity" / "xgm2019e_gravity.tif",
+        'magnetic': RAW_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff.tif",
+        'insar': RAW_DIR / "insar" / "sentinel1_velocity.tif",
+        'insar_coherence': PROCESSED_DIR / "insar" / "coherence.tif",
+        'dem': RAW_DIR / "dem" / "srtm30.tif",
     }
+    
+    # Log configured paths for transparency
+    logger.debug("Configured data paths:")
+    for key, path in data_paths.items():
+        exists_status = "✓" if path.exists() else "✗"
+        logger.debug(f"  {exists_status} {key}: {path}")
     
     # Load available layers
     layers = []
+    insar_layer: Optional[DataLayer] = None
+    gravity_layer: Optional[DataLayer] = None
     
     logger.info("Loading data layers...")
     logger.info("-" * 70)
@@ -508,9 +525,24 @@ def process_multi_resolution(
         if layer:
             layer.weight = 2.0  # High weight for direct measurements
             layer.unit = "mm/year"
-            layer.uncertainty = UncertaintyModel.estimate_uncertainty(
-                layer, DataSource.INSAR_SENTINEL1
-            )
+            # Prefer coherence-based uncertainty if available
+            insar_coh = None
+            if data_paths.get('insar_coherence') and data_paths['insar_coherence'].exists():
+                coh_layer = load_and_resample_adaptive(
+                    data_paths['insar_coherence'],
+                    bounds,
+                    target_resolution,
+                    data_type='continuous'
+                )
+                insar_coh = coh_layer.data if coh_layer else None
+            if insar_coh is not None:
+                # Map coherence (0..1) to uncertainty: high coherence → low uncertainty
+                layer.uncertainty = (0.02 + 0.18 * (1.0 - np.clip(insar_coh, 0, 1))).astype(np.float32)
+            else:
+                layer.uncertainty = UncertaintyModel.estimate_uncertainty(
+                    layer, DataSource.INSAR_SENTINEL1
+                )
+            insar_layer = layer
             layers.append(layer)
             logger.info(f"✓ InSAR (Sentinel-1): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
     
@@ -528,6 +560,7 @@ def process_multi_resolution(
             layer.uncertainty = UncertaintyModel.estimate_uncertainty(
                 layer, DataSource.GRAVITY_XGM2019E
             )
+            gravity_layer = layer
             layers.append(layer)
             logger.info(f"✓ Gravity (XGM2019e): {layer.resolution_meters:.0f}m resolution, weight={layer.weight}")
     
@@ -569,13 +602,41 @@ def process_multi_resolution(
     logger.info(f"Total layers loaded: {len(layers)}")
     logger.info("")
     
+    # Fallback identification by name if explicit references weren't set
+    if gravity_layer is None:
+        for _l in layers:
+            n = _l.name.lower()
+            if "gravity" in n:
+                gravity_layer = _l
+                break
+    if insar_layer is None:
+        for _l in layers:
+            n = _l.name.lower()
+            if "insar" in n or "sentinel" in n:
+                insar_layer = _l
+                break
+
     if not layers:
         logger.error("No data layers available! Please download data first.")
         return
     
-    # Perform fusion
-    logger.info("Performing weighted fusion...")
-    fused_layer = fuse_weighted(layers, use_uncertainty=True)
+    # Perform two-stage fusion
+    remaining_layers = list(layers)
+    if insar_layer is not None and gravity_layer is not None:
+        logger.info("Performing spectral fusion (InSAR high-frequency + Gravity low-frequency)...")
+        spectral_fused = SpectralFusion.fuse_spectral(
+            high_res_layer=insar_layer,
+            low_res_layer=gravity_layer,
+            transition_wavelength=spectral_transition_px,
+        )
+        # Remove originals from weighted set to avoid double counting
+        remaining_layers = [l for l in remaining_layers if l is not insar_layer and l is not gravity_layer]
+        remaining_layers = [spectral_fused] + remaining_layers
+    else:
+        logger.info("Spectral fusion skipped (missing InSAR or Gravity). Proceeding with weighted fusion only.")
+
+    logger.info("Performing uncertainty-weighted fusion across layers...")
+    fused_layer = fuse_weighted(remaining_layers, use_uncertainty=True)
     
     # Save output
     output_tif = OUTPUT_DIR / f"{output_name}.tif"

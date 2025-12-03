@@ -10,18 +10,36 @@ logic in every CLI tool.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Iterable
+
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent
 
 
 def _resolve_data_root() -> Path:
-    """Return the configured data directory, expanding user overrides."""
+    """Return the configured data directory, expanding user overrides with validation."""
     custom = os.environ.get("GEOANOMALYMAPPER_DATA_DIR")
     if custom:
-        return Path(custom).expanduser().resolve()
+        data_path = Path(custom).expanduser().resolve()
+        
+        # Validate the path exists
+        if not data_path.exists():
+            logger.warning(f"Data directory does not exist: {data_path}. Creating it.")
+            try:
+                data_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                raise PermissionError(f"Cannot create data directory {data_path}: {e}")
+        
+        # Check if writable
+        if not os.access(data_path, os.W_OK):
+            raise PermissionError(f"Data directory is not writable: {data_path}")
+        
+        logger.info(f"Using custom data directory: {data_path}")
+        return data_path
     return REPO_ROOT / "data"
 
 

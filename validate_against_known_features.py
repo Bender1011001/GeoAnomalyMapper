@@ -18,12 +18,16 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple
+from pyproj import Geod
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Initialize geodesic calculator for accurate distance calculations
+geod = Geod(ellps='WGS84')
 
 
 DETECTION_THRESHOLD_SIGMA = 0.5  # Require at least ±0.5σ signal strength
@@ -172,18 +176,41 @@ KNOWN_FEATURES = [
 ]
 
 
-def sample_anomaly_at_location(raster_path: Path, lon: float, lat: float, 
+def sample_anomaly_at_location(raster_path: Path, lon: float, lat: float,
                                 buffer_km: float = 2.0) -> Dict:
-    """Sample anomaly value at a specific location with spatial averaging."""
+    """Sample anomaly value at a specific location with spatial averaging.
     
-    # Convert buffer from km to degrees (approximate)
-    buffer_deg = buffer_km / 111.0  # 1 degree ≈ 111 km
+    Uses proper geodesic calculations to convert buffer distance to degrees,
+    accounting for latitude-dependent longitude scaling.
+    
+    Args:
+        raster_path: Path to raster file
+        lon: Longitude of sample point
+        lat: Latitude of sample point
+        buffer_km: Buffer distance in kilometers (default: 2.0)
+    
+    Returns:
+        Dictionary with statistics (mean, median, std, min, max, valid_pixels, in_bounds)
+    """
+    
+    # Convert buffer from km to degrees using proper geodesic calculations
+    # Calculate degree offset at this latitude for both longitude and latitude
+    
+    # For longitude: calculate distance at this latitude going east
+    _, _, lon_at_buffer = geod.fwd(lon, lat, 90, buffer_km * 1000)  # 90 deg azimuth = east, distance in meters
+    buffer_deg_lon = abs(lon_at_buffer - lon)
+    
+    # For latitude: calculate distance going north
+    _, _, lat_at_buffer = geod.fwd(lon, lat, 0, buffer_km * 1000)  # 0 deg azimuth = north, distance in meters
+    buffer_deg_lat = abs(lat_at_buffer - lat)
+    
+    logger.debug(f"Buffer {buffer_km}km at lat {lat}: lon_deg={buffer_deg_lon:.6f}, lat_deg={buffer_deg_lat:.6f}")
     
     with rasterio.open(raster_path) as src:
-        # Define window around point
+        # Define window around point using latitude-adjusted buffer
         window = from_bounds(
-            lon - buffer_deg, lat - buffer_deg,
-            lon + buffer_deg, lat + buffer_deg,
+            lon - buffer_deg_lon, lat - buffer_deg_lat,
+            lon + buffer_deg_lon, lat + buffer_deg_lat,
             src.transform
         )
         
@@ -559,6 +586,12 @@ def main():
         default=None,
         help='Output directory for validation results'
     )
+    parser.add_argument(
+        '--thresholds',
+        type=str,
+        default=None,
+        help='Comma-separated list of sigma thresholds to sweep (e.g., "0.5,1,1.5,2,2.5,3")'
+    )
     
     args = parser.parse_args()
     
@@ -573,33 +606,66 @@ def main():
     else:
         output_dir = raster_path.parent
     
-    # Run validation
-    validation = validate_features(raster_path, KNOWN_FEATURES, args.buffer)
-    
-    # Generate report
-    report_path = output_dir / f"{raster_path.stem}_validation_report.txt"
-    generate_validation_report(validation, report_path)
-    
-    # Create map
-    map_path = output_dir / f"{raster_path.stem}_validation_map.png"
-    create_validation_map(validation, raster_path, map_path)
-    
-    # Print summary
-    summary = validation['summary']
-    print("\n" + "=" * 70)
-    print("VALIDATION COMPLETE")
-    print("=" * 70)
-    print(f"\nTested: {summary['testable']} features")
-    print(f"Correct: {summary['correct']}")
-    print(f"Incorrect: {summary['incorrect']}")
-    print(f"Out of Bounds: {summary['out_of_bounds']}")
-    print(f"No Data: {summary['no_data']}")
-    print(f"Insufficient Data: {summary['insufficient_data']}")
-    print(f"Success Rate: {summary['success_rate']:.1%}")
-    print(f"\nReports:")
-    print(f"  Text: {report_path}")
-    print(f"  Map:  {map_path}")
-    print("=" * 70 + "\n")
+    if args.thresholds:
+        # Sweep thresholds and output a CSV summary
+        import csv
+        thresholds = [float(t.strip()) for t in args.thresholds.split(',') if t.strip()]
+        results = []
+        global DETECTION_THRESHOLD_SIGMA
+        for th in thresholds:
+            DETECTION_THRESHOLD_SIGMA = th
+            val = validate_features(raster_path, KNOWN_FEATURES, args.buffer)
+            summ = val['summary']
+            results.append({
+                'threshold_sigma': th,
+                'success_rate': summ['success_rate'],
+                'testable': summ['testable'],
+                'correct': summ['correct'],
+                'incorrect': summ['incorrect'],
+                'no_data': summ['no_data'],
+                'insufficient_data': summ['insufficient_data'],
+            })
+        csv_path = output_dir / f"{raster_path.stem}_threshold_sweep.csv"
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(results[0].keys()))
+            writer.writeheader()
+            writer.writerows(results)
+
+        print("\n" + "=" * 70)
+        print("VALIDATION THRESHOLD SWEEP")
+        print("=" * 70)
+        for r in results:
+            print(f"σ≥{r['threshold_sigma']:.2f}  →  success={r['success_rate']:.1%} (n={r['testable']})")
+        print(f"\nCSV: {csv_path}")
+        print("=" * 70 + "\n")
+    else:
+        # Single-threshold run
+        validation = validate_features(raster_path, KNOWN_FEATURES, args.buffer)
+        
+        # Generate report
+        report_path = output_dir / f"{raster_path.stem}_validation_report.txt"
+        generate_validation_report(validation, report_path)
+        
+        # Create map
+        map_path = output_dir / f"{raster_path.stem}_validation_map.png"
+        create_validation_map(validation, raster_path, map_path)
+        
+        # Print summary
+        summary = validation['summary']
+        print("\n" + "=" * 70)
+        print("VALIDATION COMPLETE")
+        print("=" * 70)
+        print(f"\nTested: {summary['testable']} features")
+        print(f"Correct: {summary['correct']}")
+        print(f"Incorrect: {summary['incorrect']}")
+        print(f"Out of Bounds: {summary['out_of_bounds']}")
+        print(f"No Data: {summary['no_data']}")
+        print(f"Insufficient Data: {summary['insufficient_data']}")
+        print(f"Success Rate: {summary['success_rate']:.1%}")
+        print(f"\nReports:")
+        print(f"  Text: {report_path}")
+        print(f"  Map:  {map_path}")
+        print("=" * 70 + "\n")
 
 
 if __name__ == '__main__':

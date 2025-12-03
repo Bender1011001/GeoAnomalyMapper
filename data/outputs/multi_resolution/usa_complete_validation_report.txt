@@ -1,0 +1,204 @@
+
+VALIDATION REPORT: Multi-Resolution Fusion vs Known Features
+======================================================================
+
+SUMMARY
+-------
+Total Features Tested: 14
+Testable (within bounds, has data): 14
+Correct Detections: 3
+Incorrect Detections: 11
+Out of Bounds: 0
+No Data: 0
+
+SUCCESS RATE: 21.4%
+
+======================================================================
+
+DETAILED RESULTS
+----------------
+
+
+CAVE SYSTEM
+----------------------------------------------------------------------
+
+Carlsbad Caverns, NM
+  Location: 32.1751°N, 104.4434°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Large limestone cave system with massive chambers
+  Measured Anomaly: -0.417σ (±0.012)
+  Range: -0.445σ to -0.389σ
+  Valid Pixels: 1296
+  Result: ✓ Detected negative anomaly (-0.417σ)
+
+Mammoth Cave, KY
+  Location: 37.1862°N, 86.1000°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: World's longest known cave system (400+ miles)
+  Measured Anomaly: -0.142σ (±0.006)
+  Range: -0.157σ to -0.127σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got -0.142σ
+
+Lechuguilla Cave, NM
+  Location: 32.1855°N, 104.4469°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Deep cave system, 8th longest in world
+  Measured Anomaly: -0.407σ (±0.012)
+  Range: -0.435σ to -0.379σ
+  Valid Pixels: 1296
+  Result: ✓ Detected negative anomaly (-0.407σ)
+
+Wind Cave, SD
+  Location: 43.5571°N, 103.4789°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Complex boxwork cave system
+  Measured Anomaly: 0.637σ (±0.020)
+  Range: 0.591σ to 0.684σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got 0.637σ
+
+Jewel Cave, SD
+  Location: 43.7306°N, 103.8290°W
+  Type: cave_system
+  Expected: negative anomaly
+  Description: Third longest cave in world
+  Measured Anomaly: 1.471σ (±0.020)
+  Range: 1.421σ to 1.515σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got 1.471σ
+
+COPPER ORE
+----------------------------------------------------------------------
+
+Bingham Canyon Mine, UT
+  Location: 40.5225°N, 112.1486°W
+  Type: copper_ore
+  Expected: positive anomaly
+  Description: Large open-pit copper mine
+  Measured Anomaly: -0.559σ (±0.005)
+  Range: -0.571σ to -0.549σ
+  Valid Pixels: 1296
+  Result: ✗ Expected positive, got -0.559σ
+
+IMPACT CRATER
+----------------------------------------------------------------------
+
+Sudbury Basin, ON (USA border)
+  Location: 46.5000°N, 81.0000°W
+  Type: impact_crater
+  Expected: positive anomaly
+  Description: Meteorite impact with dense minerals
+  Measured Anomaly: -0.123σ (±0.003)
+  Range: -0.128σ to -0.118σ
+  Valid Pixels: 1296
+  Result: ✗ Expected positive, got -0.123σ
+
+IRON ORE
+----------------------------------------------------------------------
+
+Iron Range, MN
+  Location: 47.5211°N, 92.5369°W
+  Type: iron_ore
+  Expected: positive anomaly
+  Description: Major iron ore deposits
+  Measured Anomaly: -0.029σ (±0.009)
+  Range: -0.051σ to -0.007σ
+  Valid Pixels: 1296
+  Result: ✗ Expected positive, got -0.029σ
+
+KARST
+----------------------------------------------------------------------
+
+The Sinks, TN
+  Location: 35.6556°N, 83.9397°W
+  Type: karst
+  Expected: negative anomaly
+  Description: Karst sinkhole and disappearing stream
+  Measured Anomaly: -0.312σ (±0.011)
+  Range: -0.337σ to -0.288σ
+  Valid Pixels: 1296
+  Result: ✓ Detected negative anomaly (-0.312σ)
+
+LAVA TUBE
+----------------------------------------------------------------------
+
+Lava Beds National Monument, CA
+  Location: 41.7138°N, 121.5089°W
+  Type: lava_tube
+  Expected: negative anomaly
+  Description: Extensive lava tube cave system
+  Measured Anomaly: 0.126σ (±0.002)
+  Range: 0.123σ to 0.130σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got 0.126σ
+
+Ape Cave, WA
+  Location: 46.1103°N, 122.2053°W
+  Type: lava_tube
+  Expected: negative anomaly
+  Description: Third longest lava tube in North America
+  Measured Anomaly: 0.354σ (±0.002)
+  Range: 0.350σ to 0.359σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got 0.354σ
+
+SALT CAVERN
+----------------------------------------------------------------------
+
+Strategic Petroleum Reserve, LA
+  Location: 29.8969°N, 92.0369°W
+  Type: salt_cavern
+  Expected: negative anomaly
+  Description: Underground salt cavern oil storage
+  Measured Anomaly: -0.059σ (±0.006)
+  Range: -0.074σ to -0.047σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got -0.059σ
+
+SALT DOME
+----------------------------------------------------------------------
+
+Grand Saline Salt Dome, TX
+  Location: 32.6718°N, 95.7094°W
+  Type: salt_dome
+  Expected: negative anomaly
+  Description: Large salt dome (lower density than surrounding rock)
+  Measured Anomaly: 0.393σ (±0.005)
+  Range: 0.384σ to 0.401σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got 0.393σ
+
+SINKHOLE
+----------------------------------------------------------------------
+
+Winter Park Sinkhole, FL
+  Location: 28.6000°N, 81.3397°W
+  Type: sinkhole
+  Expected: negative anomaly
+  Description: Major collapse sinkhole (1981)
+  Measured Anomaly: -0.019σ (±0.002)
+  Range: -0.025σ to -0.016σ
+  Valid Pixels: 1296
+  Result: ✗ Expected negative, got -0.019σ
+
+======================================================================
+
+INTERPRETATION
+----------------------------------------------------------------------
+
+A successful detection means the measured anomaly matches the expected signature:
+- Caves/voids/karst: Should show NEGATIVE anomalies (< -0.3σ)
+- Dense structures/ores: Should show POSITIVE anomalies (> +0.3σ)
+
+Success rate of 21.4% indicates the fusion pipeline is
+needs improvement at detecting known subsurface features.
+
+NOTES:
+- Values in sigma (σ) units = standard deviations from regional mean
+- 2km buffer used for spatial averaging
+- Threshold: |0.3σ| for detection significance

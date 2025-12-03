@@ -1,0 +1,46 @@
+{
+  "source": "Synthetic (Permian Basin geological model)",
+  "region_bounds": [
+    -105.0,
+    32.0,
+    -104.0,
+    33.0
+  ],
+  "crs": "EPSG:4326",
+  "resolution_degrees": 0.001,
+  "raster_shape": [
+    1000,
+    1000
+  ],
+  "lithology_codes": {
+    "limestone": 1,
+    "dolostone": 2,
+    "dolomite": 2,
+    "sandstone": 3,
+    "shale": 4,
+    "evaporite": 5,
+    "gypsum": 6,
+    "anhydrite": 7,
+    "salt": 8,
+    "halite": 8,
+    "siltstone": 9,
+    "mudstone": 10,
+    "conglomerate": 11,
+    "breccia": 12,
+    "quartzite": 13,
+    "chert": 14,
+    "coal": 15,
+    "default": 0
+  },
+  "lithology_distribution": {
+    "limestone": 166631,
+    "dolomite": 56260,
+    "sandstone": 205250,
+    "shale": 299002,
+    "gypsum": 147169,
+    "anhydrite": 74292,
+    "halite": 51396
+  },
+  "geological_model": "Delaware Basin with carbonate platform and evaporite basin",
+  "note": "Synthetic data created due to MacroStrat download failure"
+}

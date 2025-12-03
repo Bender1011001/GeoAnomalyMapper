@@ -1,0 +1,21 @@
+VOID DETECTION REPORT
+======================================================================
+
+Region: (-167.101, 17.097, -53.889, 77.287)
+Resolution: 0.010759376803768362° (~1 km)
+
+Data Layers Used:
+  - Gravity: YES
+  - Magnetic: YES
+  - InSAR: NO
+  - Lithology: YES
+  - Seismic: NO
+
+Results:
+  - High-probability zones (>0.7): 0
+  - Mean probability: 0.292
+  - Max probability: 0.438
+
+Outputs:
+  - Probability map: C:\Users\admin\Desktop\GitHub-projects\GeoAnomalyMapper-1\data\outputs\void_detection\north_america_void_probability.tif
+  - Visualization: C:\Users\admin\Desktop\GitHub-projects\GeoAnomalyMapper-1\data\outputs\void_detection\north_america_void_probability.png

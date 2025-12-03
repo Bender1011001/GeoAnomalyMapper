@@ -17,14 +17,13 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import rasterio
-from rasterio.transform import from_bounds
-from rasterio.warp import Resampling, reproject
-
 from project_paths import PROCESSED_DIR, RAW_DIR, ensure_directories
+from utils.raster_utils import clip_and_reproject_raster
+from download_lithology import create_synthetic_lithology
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,67 +46,8 @@ ensure_directories(
 )
 
 
-def clip_and_reproject_raster(
-    input_path: Path,
-    output_path: Path,
-    bounds: Tuple[float, float, float, float],
-    resolution: float,
-    target_crs: str = "EPSG:4326",
-) -> bool:
-    """Clip ``input_path`` to ``bounds`` and resample it onto a common grid."""
-
-    if resolution <= 0:
-        raise ValueError("Resolution must be positive")
-
-    if not input_path.exists():
-        logger.warning("Input file not found: %s", input_path)
-        return False
-
-    minx, miny, maxx, maxy = bounds
-    if minx >= maxx or miny >= maxy:
-        raise ValueError(f"Invalid bounds: {bounds}")
-
-    width = max(1, int(round((maxx - minx) / resolution)))
-    height = max(1, int(round((maxy - miny) / resolution)))
-    transform = from_bounds(minx, miny, maxx, maxy, width, height)
-
-    logger.info("Processing %s → %s", input_path.name, output_path.name)
-
-    with rasterio.open(input_path) as src:
-        dst_array = np.full((height, width), src.nodata or np.nan, dtype=np.float32)
-        reproject(
-            source=rasterio.band(src, 1),
-            destination=dst_array,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=transform,
-            dst_crs=target_crs,
-            resampling=Resampling.bilinear,
-            src_nodata=src.nodata,
-            dst_nodata=np.nan,
-        )
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        output_path,
-        'w',
-        driver='GTiff',
-        height=height,
-        width=width,
-        count=1,
-        dtype=dst_array.dtype,
-        crs=target_crs,
-        transform=transform,
-        nodata=np.nan,
-        compress='DEFLATE',
-    ) as dst:
-        dst.write(dst_array, 1)
-
-    logger.info("Saved %s", output_path)
-    return True
-
-
 def _write_text_file(path: Path, content: str) -> None:
+    """Write text content to a file, creating directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding='utf-8')
     logger.info("Wrote %s", path)
@@ -137,6 +77,14 @@ def process_gravity_data(region: Tuple[float, float, float, float], resolution: 
         logger.warning("No gravity GeoTIFF found; instructions generated.")
         return False
 
+    # Handle multiple gravity files - use most recent if multiple exist
+    if len(gravity_files) > 1:
+        # Sort by modification time, newest first
+        gravity_files.sort(key=lambda f: Path(f).stat().st_mtime, reverse=True)
+        logger.info(f"Multiple gravity files found ({len(gravity_files)}). Using most recent: {gravity_files[0].name}")
+    else:
+        logger.info(f"Using gravity file: {gravity_files[0].name}")
+    
     output_file = output_dir / "gravity_processed.tif"
     return clip_and_reproject_raster(gravity_files[0], output_file, region, resolution)
 
@@ -158,8 +106,9 @@ def process_dem_data(region: Tuple[float, float, float, float], resolution: floa
         return False
 
     dem_output = PROCESSED_DIR / "dem" / "dem_processed.tif"
-    dem_resolution = min(resolution, 0.0001)  # keep high detail when possible
-    return clip_and_reproject_raster(dem_files[0], dem_output, region, dem_resolution)
+
+    # Ensure DEM uses the same target resolution as other layers to maintain a common grid
+    return clip_and_reproject_raster(dem_files[0], dem_output, region, resolution)
 
 
 def process_insar_data(region: Tuple[float, float, float, float], resolution: float) -> bool:

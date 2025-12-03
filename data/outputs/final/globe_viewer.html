@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GeoAnomalyMapper - Interactive Globe</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.109/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.109/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #info-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        #info-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        #info-panel p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .legend {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+        .legend-color {
+            width: 30px;
+            height: 15px;
+            margin-right: 8px;
+            border: 1px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <div id="info-panel">
+        <h2>GeoAnomalyMapper</h2>
+        <p><strong>Global Anomaly Map</strong></p>
+        <p style="font-size: 12px;">Fused magnetic + gravity anomalies</p>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgb(0,0,139);"></div>
+                <span style="font-size: 12px;">Strong negative (-6σ)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgb(135,206,250);"></div>
+                <span style="font-size: 12px;">Moderate negative</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(255,255,255,0.5);"></div>
+                <span style="font-size: 12px;">Near zero</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgb(255,255,0);"></div>
+                <span style="font-size: 12px;">Moderate positive</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgb(255,0,0);"></div>
+                <span style="font-size: 12px;">Strong positive (+3.5σ)</span>
+            </div>
+        </div>
+        <p style="font-size: 11px; margin-top: 10px; color: #888;">
+            Use mouse to rotate, zoom. Click sites for info.
+        </p>
+    </div>
+    <div id="cesiumContainer"></div>
+    
+    <script>
+        // Initialize Cesium Viewer
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc5YzciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk';
+        
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrainProvider: Cesium.createWorldTerrain(),
+            baseLayerPicker: true,
+            geocoder: true,
+            homeButton: true,
+            sceneModePicker: true,
+            navigationHelpButton: true,
+            animation: false,
+            timeline: false,
+        });
+        
+        // Add the anomaly overlay as an ImageryLayer
+        const imageryProvider = new Cesium.SingleTileImageryProvider({
+            url: 'fused_anomaly_overlay.png',
+            rectangle: Cesium.Rectangle.fromDegrees(-180, -90, 180, 90)
+        });
+        
+        viewer.imageryLayers.addImageryProvider(imageryProvider);
+        
+        // Add reference sites
+        const referenceSites = [
+            {name: 'Carlsbad Caverns, NM', lon: -104.4, lat: 32.4, desc: 'Known cave system'},
+            {name: 'Vredefort Dome, South Africa', lon: 27.0, lat: -27.0, desc: 'Impact crater'},
+            {name: 'Rio Tinto, Spain', lon: -6.6, lat: 37.4, desc: 'Mining district'},
+            {name: 'Dead Sea Rift', lon: 35.5, lat: 30.0, desc: 'Tectonic feature'},
+            {name: 'Grand Canyon, AZ', lon: -112.0, lat: 36.0, desc: 'Geological formation'},
+            {name: 'Mount Fuji, Japan', lon: 139.7, lat: 35.7, desc: 'Volcano'},
+            {name: 'Kilauea, Hawaii', lon: -155.3, lat: 19.4, desc: 'Active volcano'},
+            {name: 'Chicxulub Crater, Mexico', lon: -89.5, lat: 21.3, desc: 'Impact crater'},
+        ];
+        
+        referenceSites.forEach(site => {
+            viewer.entities.add({
+                position: Cesium.Cartesian3.fromDegrees(site.lon, site.lat),
+                point: {
+                    pixelSize: 10,
+                    color: Cesium.Color.YELLOW,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2
+                },
+                label: {
+                    text: site.name,
+                    font: '12px sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    pixelOffset: new Cesium.Cartesian2(0, -10)
+                },
+                description: site.desc
+            });
+        });
+        
+        // Set initial camera view
+        viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(0, 0, 20000000)
+        });
+    </script>
+</body>
+</html>

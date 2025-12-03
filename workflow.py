@@ -27,14 +27,17 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def _parse_region(value: str) -> Tuple[float, float, float, float]:
-    coords = [float(v.strip()) for v in value.split(",")]
-    if len(coords) != 4:
-        raise ValueError("Region must have four comma-separated values.")
-    lon_min, lat_min, lon_max, lat_max = coords
+def _parse_region(region_str: str) -> Tuple[float, float, float, float]:
+    """Parse region string handling spaces and quotes."""
+    # Remove quotes and extra spaces
+    cleaned = region_str.strip().strip('"').strip("'")
+    parts = [float(x.strip()) for x in cleaned.split(',')]
+    if len(parts) != 4:
+        raise ValueError(f"Region must have 4 values, got {len(parts)}")
+    lon_min, lat_min, lon_max, lat_max = parts
     if lon_min >= lon_max or lat_min >= lat_max:
         raise ValueError("Minimum coordinates must be smaller than maximum coordinates.")
-    return lon_min, lat_min, lon_max, lat_max
+    return tuple(parts)
 
 
 def run_workflow(
@@ -52,9 +55,28 @@ def run_workflow(
     ensure_directories()
     summary: Dict[str, object] = {
         "region": region,
-        "resolution_deg": resolution,
         "output_name": output_name,
     }
+
+    # Auto-adjust resolution for large regions to prevent memory exhaustion
+    import numpy as np
+    lon_min, lat_min, lon_max, lat_max = region
+    lon_span = lon_max - lon_min
+    lat_span = lat_max - lat_min
+    mid_lat_rad = np.deg2rad((lat_min + lat_max) / 2)
+    approx_area_deg2 = lon_span * lat_span * np.cos(mid_lat_rad)
+    target_pixels = 40_000_000  # Conservative limit (~160 MB float32 array)
+    auto_resolution = max(resolution, np.sqrt(approx_area_deg2 / target_pixels))
+    if auto_resolution > resolution * 1.1:  # 10% tolerance
+        logger.warning(
+            "Large region detected (approx. area: %.0f deg²). "
+            "Auto-adjusting resolution from %.6f° → %.6f° (~%.0f m/pixel) "
+            "to prevent out-of-memory errors.",
+            approx_area_deg2, resolution, auto_resolution, auto_resolution * 111_000
+        )
+        resolution = auto_resolution
+    summary["resolution_deg"] = resolution
+    logger.info("Effective processing resolution: %.6f°", resolution)
 
     if not skip_preprocessing:
         logger.info("Step 1/4: Processing raw datasets")
@@ -63,13 +85,19 @@ def run_workflow(
         logger.info("Skipping preprocessing step (per CLI option).")
 
     logger.info("Step 2/4: Multi-resolution fusion")
-    fused_tif = fusion.process_multi_resolution(
-        region,
-        target_resolution=resolution,
-        output_name=output_name,
-        data_sources=None,
-    )
-    summary["fusion_tif"] = fused_tif
+    try:
+        fused_tif = fusion.process_multi_resolution(
+            region,
+            target_resolution=resolution,
+            output_name=output_name,
+            data_sources=None,
+        )
+        summary["fusion_tif"] = fused_tif
+    except Exception as e:
+        logger.error(f"Multi-resolution fusion failed: {e}", exc_info=True)
+        summary["fusion_tif"] = None
+        summary["fusion_error"] = str(e)
+        # Continue with partial results - other steps may still be valuable
 
     logger.info("Step 3/4: Void probability mapping")
     void_output_name = f"{output_name}_void_probability"

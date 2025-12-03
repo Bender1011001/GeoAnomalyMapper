@@ -25,7 +25,7 @@ import logging
 import random
 import socket
 import time
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union, overload
 from urllib.parse import urlparse
 
 import requests
@@ -41,6 +41,14 @@ from requests.exceptions import (
     SSLError,
     Timeout,
 )
+
+# Optional tqdm import
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    tqdm = None
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +175,16 @@ def ensure_dns(hosts: list[str], timeout: int = 5, max_retries: int = 3) -> None
                 logger.warning(f"DNS retry {attempt+1} for {host} in {wait:.1f}s")
                 time.sleep(wait)
 
+F = TypeVar('F', bound=Callable[..., Any])
+
+@overload
+def retry_with_backoff(func: F) -> F:
+    """Direct decorator usage: @retry_with_backoff"""
+    ...
+
+@overload
 def retry_with_backoff(
+    *,
     max_retries: int = 3,
     base_delay: float = 1.0,
     backoff_factor: float = 2.0,
@@ -175,8 +192,55 @@ def retry_with_backoff(
     raise_on_permanent: bool = True,
     expected_exceptions: tuple = (RequestException,),
     circuit_breaker: Optional[CircuitBreaker] = None,
-) -> Callable:
-    """Decorator for exponential backoff retry with jitter and error categorization."""
+) -> Callable[[F], F]:
+    """Parameterized decorator usage: @retry_with_backoff(max_retries=5)"""
+    ...
+
+def retry_with_backoff(
+    func: Optional[F] = None,
+    *,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True,
+    raise_on_permanent: bool = True,
+    expected_exceptions: tuple = (RequestException,),
+    circuit_breaker: Optional[CircuitBreaker] = None,
+) -> Union[F, Callable[[F], F]]:
+    """Decorator for exponential backoff retry with jitter and error categorization.
+    
+    Can be used as a direct decorator or with parameters:
+    
+    Examples:
+        # Direct usage (uses defaults)
+        @retry_with_backoff
+        def my_function():
+            ...
+        
+        # With parameters
+        @retry_with_backoff(max_retries=5, backoff_factor=2.0)
+        def my_function():
+            ...
+    
+    Args:
+        func: Function to decorate (when used directly)
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Initial delay in seconds (default: 1.0)
+        backoff_factor: Multiplier for exponential backoff (default: 2.0)
+        jitter: Add random jitter to delays (default: True)
+        raise_on_permanent: Raise PermanentError on non-retryable failures (default: True)
+        expected_exceptions: Tuple of exceptions to catch and retry (default: (RequestException,))
+        circuit_breaker: Optional CircuitBreaker instance for fail-fast behavior
+    
+    Returns:
+        Decorated function or decorator callable
+    
+    Raises:
+        RetryableError: When max retries exhausted for transient errors
+        PermanentError: For permanent errors or auth failures
+        AuthError: For authentication failures
+        RateLimitError: For rate limiting errors
+    """
     
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -373,24 +437,42 @@ class RobustDownloader:
             last_throttle_time = start_time
             throttle_interval = chunk_size / self.bandwidth_throttle if self.bandwidth_throttle else 0
             
-            with open(output_path, "wb") as f, tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=desc or urlparse(url).netloc,
-            ) as pbar:
-                for chunk in resp.iter_content(chunk_size=chunk_size):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        pbar.update(len(chunk))
-                        
-                        # Bandwidth throttling
-                        if self.bandwidth_throttle:
-                            elapsed = time.time() - last_throttle_time
-                            if elapsed < throttle_interval:
-                                time.sleep(throttle_interval - elapsed)
-                            last_throttle_time = time.time()
+            # Use tqdm if available, otherwise simple progress
+            if HAS_TQDM and tqdm:
+                with open(output_path, "wb") as f, tqdm(
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=desc or urlparse(url).netloc,
+                ) as pbar:
+                    for chunk in resp.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            pbar.update(len(chunk))
+                            
+                            # Bandwidth throttling
+                            if self.bandwidth_throttle:
+                                elapsed = time.time() - last_throttle_time
+                                if elapsed < throttle_interval:
+                                    time.sleep(throttle_interval - elapsed)
+                                last_throttle_time = time.time()
+            else:
+                # Fallback without progress bar
+                with open(output_path, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            # Bandwidth throttling
+                            if self.bandwidth_throttle:
+                                elapsed = time.time() - last_throttle_time
+                                if elapsed < throttle_interval:
+                                    time.sleep(throttle_interval - elapsed)
+                                last_throttle_time = time.time()
+                
+                logger.info(f"Downloaded {downloaded} bytes to {output_path}")
             
             logger.info(f"✓ Downloaded: {output_path} ({downloaded} bytes)")
             return self._validate_file(output_path, checksum, expected_size or total_size)

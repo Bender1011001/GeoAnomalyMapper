@@ -31,13 +31,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def analyze_data_range(geotiff_path: Path) -> Tuple[float, float, float, float]:
-    """Inspect the raster and determine sensible color scale limits."""
-
+def analyze_data_range(geotiff_path: Path, clip_outliers: bool = True) -> Tuple[float, float, float, float]:
+    """Inspect the raster and determine sensible color scale limits.
+    
+    Args:
+        geotiff_path: Path to GeoTIFF file
+        clip_outliers: If True, use IQR-based outlier detection (default: True)
+    
+    Returns:
+        Tuple of (vmin, vmax, mean, std) for visualization scaling
+    """
     with rasterio.open(geotiff_path) as src:
         data = src.read(1, masked=True)
 
     valid = data.compressed()
+    
+    if clip_outliers:
+        # IQR-based outlier detection
+        q1, q3 = np.percentile(valid, [25, 75])
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        
+        # Clip outliers for statistics
+        valid_clipped = valid[(valid >= lower_bound) & (valid <= upper_bound)]
+        logger.info(f"Outlier filtering: {len(valid) - len(valid_clipped)} outliers removed ({(len(valid) - len(valid_clipped))/len(valid)*100:.1f}%)")
+        valid = valid_clipped
+    
     p1, p5, p95, p99 = np.percentile(valid, [1, 5, 95, 99])
     mean = float(np.mean(valid))
     std = float(np.std(valid))
@@ -57,8 +77,25 @@ def create_visualization_png(
     vmin: float,
     vmax: float,
     max_dimension: int = 8000,
+    dpi: int = 150,
 ) -> None:
-    """Render a transparent PNG overlay with adaptive downsampling."""
+    """Render a transparent PNG overlay with adaptive downsampling.
+    
+    Args:
+        geotiff_path: Path to input GeoTIFF file
+        output_path: Path to output PNG file
+        vmin: Minimum value for color scale
+        vmax: Maximum value for color scale
+        max_dimension: Maximum dimension (width or height) in pixels (default: 8000).
+            Larger images will be downsampled to fit this constraint.
+        dpi: Resolution in dots per inch for output PNG (default: 150).
+            Higher values produce sharper images but larger file sizes.
+    
+    Notes:
+        - Automatically downsamples large rasters to fit max_dimension
+        - Uses adaptive alpha blending based on anomaly magnitude
+        - Produces transparent PNG suitable for overlay on maps
+    """
 
     with rasterio.open(geotiff_path) as src:
         height, width = src.height, src.width
@@ -89,7 +126,7 @@ def create_visualization_png(
     rgba[:, :, 3] = alpha
 
     height, width = data.shape
-    dpi = min(100, int(8000 / max(height, width) * 100))
+    # Calculate figure size based on DPI to maintain pixel dimensions
     figsize = (width / dpi, height / dpi)
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
