@@ -255,16 +255,135 @@ def generate_visualization_bundle(
     }
 
 
+def create_v2_visualizations_suite(global_dir: Path, output_dir: Path) -> Dict[str, Path]:
+    """Create specialized visualizations for GeoAnomalyMapper v2 outputs."""
+    logger.info("Creating v2 visualization suite...")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    v2_paths = {
+        'gravity_residual': global_dir / 'global_gravity_residual.tif',
+        'gravity_tdr': global_dir / 'global_gravity_tdr.tif',
+        'structural_artificiality': global_dir / 'global_structural_artificiality.tif',
+        'poisson_correlation': global_dir / 'global_poisson_correlation.tif',
+        'gravity_prior_highres': global_dir / 'global_gravity_prior_highres.tif',
+        'fused_belief_reinforced': global_dir / 'global_fused_belief_reinforced.tif',
+        'dumb_probability_v2': global_dir / 'global_dumb_probability_v2.tif',
+    }
+    
+    outputs = {}
+    
+    # 1. Gravity Anomaly Separation
+    fig, axs = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('Gravity Anomaly Separation (v2)', fontsize=16, fontweight='bold')
+    
+    for i, layer in enumerate(['gravity_residual', 'gravity_tdr']):
+        path = v2_paths[layer]
+        if path.exists():
+            vmin, vmax, mean, std = analyze_data_range(path)
+            with rasterio.open(path) as src:
+                bounds = src.bounds
+                h, w = src.height // 20, src.width // 20
+                data = src.read(1, masked=True, out_shape=(h, w), resampling=RIOResampling.average)
+            norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+            im = axs[i].imshow(data, cmap='RdBu_r', norm=norm, extent=[bounds.left, bounds.right, bounds.bottom, bounds.top])
+            axs[i].set_title(layer.replace('_', ' ').title())
+            axs[i].set_xlabel('Longitude')
+            axs[i].set_ylabel('Latitude')
+            fig.colorbar(im, ax=axs[i], fraction=0.046, pad=0.04)
+        else:
+            axs[i].text(0.5, 0.5, f'{layer}.tif missing', ha='center', va='center', transform=axs[i].transAxes, fontsize=14)
+    
+    plt.tight_layout()
+    gravity_path = output_dir / 'v2_gravity_separation.png'
+    plt.savefig(gravity_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    outputs['gravity_separation'] = gravity_path
+    
+    # 2. InSAR Feature Extraction
+    fig, ax = plt.subplots(figsize=(10, 8))
+    path = v2_paths['structural_artificiality']
+    title = 'Structural Artificiality (InSAR Features)'
+    if path.exists():
+        vmin, vmax, mean, std = analyze_data_range(path)
+        with rasterio.open(path) as src:
+            bounds = src.bounds
+            h, w = src.height // 20, src.width // 20
+            data = src.read(1, masked=True, out_shape=(h, w), resampling=RIOResampling.average)
+        norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+        im = ax.imshow(data, cmap='RdBu_r', norm=norm, extent=[bounds.left, bounds.right, bounds.bottom, bounds.top])
+        ax.set_title(title)
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Score (σ)')
+    else:
+        ax.text(0.5, 0.5, 'structural_artificiality.tif missing', ha='center', va='center', transform=ax.transAxes, fontsize=14)
+    
+    plt.tight_layout()
+    insar_path = output_dir / 'v2_insar_artificiality.png'
+    plt.savefig(insar_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    outputs['insar_artificiality'] = insar_path
+    
+    # 3. Physics-Based Fusion
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle('Physics-Based Fusion (v2)', fontsize=16, fontweight='bold')
+    
+    fusion_layers = ['poisson_correlation', 'fused_belief_reinforced', 'dumb_probability_v2']
+    for i, layer in enumerate(fusion_layers):
+        path = v2_paths[layer]
+        if path.exists():
+            if 'dumb_probability' in layer:
+                vmin, vmax = 0.0, 1.0
+                norm = plt.Normalize(vmin, vmax)
+                cmap = 'Reds'
+                unit = 'Prob'
+            else:
+                vmin, vmax, _, _ = analyze_data_range(path)
+                norm = mcolors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+                cmap = 'RdBu_r'
+                unit = 'σ'
+            
+            with rasterio.open(path) as src:
+                bounds = src.bounds
+                h, w = src.height // 20, src.width // 20
+                data = src.read(1, masked=True, out_shape=(h, w), resampling=RIOResampling.average)
+            
+            im = axs[i].imshow(data, cmap=cmap, norm=norm, extent=[bounds.left, bounds.right, bounds.bottom, bounds.top])
+            axs[i].set_title(layer.replace('_', ' ').title() + f' ({unit})')
+            axs[i].set_xlabel('Longitude')
+            fig.colorbar(im, ax=axs[i], fraction=0.046, pad=0.04)
+        else:
+            axs[i].text(0.5, 0.5, f'{layer}.tif missing', ha='center', va='center', transform=axs[i].transAxes, fontsize=12)
+    
+    plt.tight_layout()
+    physics_path = output_dir / 'v2_physics_fusion.png'
+    plt.savefig(physics_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    outputs['physics_fusion'] = physics_path
+    
+    # Individual layer bundles
+    for name, path in v2_paths.items():
+        if path.exists():
+            bundle = generate_visualization_bundle(path, output_dir)
+            for k, v in bundle.items():
+                outputs[f"{name}_{k.stem}"] = v
+    
+    logger.info("v2 visualization suite complete")
+    return outputs
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create PNG, KMZ and preview images for GeoTIFF outputs.",
+        description="Create PNG, KMZ and preview images for GeoTIFF outputs (v1/v2).",
     )
-    parser.add_argument("input_tif", type=str, help="Input GeoTIFF file.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("input_tif", nargs="?", type=str, help="Single input GeoTIFF (v1 mode)")
+    group.add_argument("--v2", dest="v2_suite", action="store_true", help="v2 multi-layer suite")
+    parser.add_argument("--global-dir", type=str, help="Directory with global_*.tif (required for --v2)")
     parser.add_argument(
         "--output-dir",
         type=str,
         default=None,
-        help="Optional directory for generated graphics (default: alongside the input).",
+        help="Output directory (default: alongside input)",
     )
     return parser
 

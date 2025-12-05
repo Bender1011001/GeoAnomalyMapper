@@ -23,6 +23,7 @@ import numpy as np
 import rasterio
 from project_paths import PROCESSED_DIR, RAW_DIR, ensure_directories
 from utils.raster_utils import clip_and_reproject_raster
+import pywt
 from download_lithology import create_synthetic_lithology
 
 logging.basicConfig(
@@ -44,6 +45,104 @@ ensure_directories(
         PROCESSED_DIR,
     ]
 )
+
+
+def wavelet_decompose_gravity(
+    gravity_path: Path,
+    output_residual_path: Path,
+    wavelet: str = "db4",
+    level: Optional[int] = None,
+) -> None:
+    """
+    Compute shallow gravity residual using Discrete Wavelet Transform (DWT).
+    
+    Decomposes the gravity signal into approximation (deep/low-freq) and detail
+    (shallow/high-freq) coefficients. Reconstructs the signal using ONLY the
+    detail coefficients to isolate shallow anomalies.
+
+    Args:
+        gravity_path: Input gravity GeoTIFF path.
+        output_residual_path: Output residual GeoTIFF path.
+        wavelet: Wavelet family (default: "db4").
+        level: Decomposition level. If None, calculated based on image size.
+
+    Returns:
+        None. Writes output file.
+    """
+    with rasterio.open(gravity_path) as src:
+        grav = src.read(1).astype(np.float64)
+        profile = src.profile.copy()
+        
+    # Fill NaNs
+    grav = np.where(np.isnan(grav), np.nanmean(grav), grav)
+
+    # Determine max level if not provided
+    if level is None:
+        level = pywt.dwt_max_level(min(grav.shape), pywt.Wavelet(wavelet).dec_len)
+        # Limit level to avoid over-smoothing, usually 3-4 is sufficient for regional/residual separation
+        level = min(level, 4)
+
+    # 2D Multilevel decomposition
+    coeffs = pywt.wavedec2(grav, wavelet, level=level)
+    
+    # coeffs[0] is the approximation (cA) at the coarsest level (deep sources)
+    # coeffs[1:] are tuples of details (cH, cV, cD) at finer scales
+    
+    # To get the residual (shallow sources), we set the approximation to zero
+    coeffs[0] = np.zeros_like(coeffs[0])
+    
+    # Reconstruct
+    residual = pywt.waverec2(coeffs, wavelet)
+    
+    # Crop to original shape if reconstruction is slightly larger due to padding
+    residual = residual[:grav.shape[0], :grav.shape[1]]
+
+    profile.update(dtype="float32", nodata=np.nan)
+    output_residual_path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(output_residual_path, "w", **profile) as dst:
+        dst.write(residual.astype(np.float32), 1)
+    logger.info("Phase 1: Saved gravity residual (DWT): %s", output_residual_path)
+
+
+def compute_tilt_derivative(
+    residual_path: Path,
+    output_tdr_path: Path,
+) -> None:
+    """
+    Compute Tilt Derivative (TDR) = arctan2(VDR, THG).
+
+    VDR ≈ vertical derivative proxy (row gradient, axis=0),
+    THG = horizontal gradient magnitude sqrt(dx^2 + dy^2).
+    Handles THG=0 via arctan2 (sign(VDR)*pi/2).
+    Output range: [-pi/2, pi/2] rad.
+
+    Args:
+        residual_path: Input residual GeoTIFF.
+        output_tdr_path: Output TDR GeoTIFF.
+
+    Returns:
+        None. Writes output file.
+
+    Example:
+        res = np.array([[0.,1.],[2.,0.]])
+        dy ≈ [[1., -1.], [1., -1.]], dx ≈ [[0.5, -0.5], [0.5, -0.5]]
+        vdr=dy, thg≈1.12, tdr≈arctan2(1,1.12)≈0.72 rad (varies by exact gradient).
+    """
+    with rasterio.open(residual_path) as src:
+        res = src.read(1).astype(np.float32)
+        profile = src.profile.copy()
+
+    res = np.nan_to_num(res, nan=0.0)
+    vdr = np.gradient(res, axis=0)
+    grad_y, grad_x = np.gradient(res)
+    thg = np.sqrt(grad_x**2 + grad_y**2)
+    tdr = np.arctan2(vdr, thg)
+
+    profile.update(dtype="float32", nodata=np.nan)
+    output_tdr_path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(output_tdr_path, "w", **profile) as dst:
+        dst.write(tdr, 1)
+    logger.info("Phase 1: Saved gravity TDR: %s", output_tdr_path)
 
 
 def _write_text_file(path: Path, content: str) -> None:

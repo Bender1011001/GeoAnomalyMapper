@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 geod = Geod(ellps='WGS84')
 
 
-DETECTION_THRESHOLD_SIGMA = 0.5  # Require at least ±0.5σ signal strength
+DETECTION_THRESHOLD_SIGMA = 0.5  # DUMB probability threshold (>=0.5 = high confidence void)
 MIN_VALID_PIXELS = 25            # Ignore samples with insufficient coverage
 
 
@@ -300,31 +300,31 @@ def validate_features(raster_path: Path, features: List[Dict],
             mean_value = float(stats['mean'])
             expected_sign = feature.get('expected', 'any').lower()
             threshold = DETECTION_THRESHOLD_SIGMA
-
-            if expected_sign == 'negative':
-                meets_expectation = mean_value <= -threshold
-                requirement = f"≤ -{threshold:.2f}σ"
-                expectation_desc = 'negative'
-            elif expected_sign == 'positive':
+    
+            if expected_sign == 'negative':  # voids/DUMBs expect high prob
                 meets_expectation = mean_value >= threshold
-                requirement = f"≥ {threshold:.2f}σ"
-                expectation_desc = 'positive'
+                requirement = f"≥ {threshold:.2f}"
+                expectation_desc = 'high probability'
+            elif expected_sign == 'positive':  # dense expect low prob
+                meets_expectation = mean_value <= (1.0 - threshold)
+                requirement = f"≤ {1.0-threshold:.2f}"
+                expectation_desc = 'low probability'
             else:
-                meets_expectation = abs(mean_value) >= threshold
-                requirement = f"|σ| ≥ {threshold:.2f}"
-                expectation_desc = 'positive or negative'
-
+                meets_expectation = mean_value >= threshold
+                requirement = f"≥ {threshold:.2f}"
+                expectation_desc = 'high probability'
+    
             detected_correctly = bool(meets_expectation)
-
+    
             if detected_correctly:
                 explanation = (
-                    f"✓ Mean anomaly {mean_value:.3f}σ meets the {expectation_desc} "
+                    f"✓ Mean probability {mean_value:.3f} meets the {expectation_desc} "
                     f"requirement ({requirement})."
                 )
                 correct_detections += 1
             else:
                 explanation = (
-                    f"✗ Mean anomaly {mean_value:.3f}σ does not satisfy the expected "
+                    f"✗ Mean probability {mean_value:.3f} does not satisfy the expected "
                     f"{expectation_desc} requirement ({requirement})."
                 )
                 incorrect_detections += 1
@@ -474,13 +474,13 @@ def create_validation_map(validation: Dict, raster_path: Path, output_path: Path
     # Create figure
     fig, ax = plt.subplots(figsize=(16, 10))
     
-    # Plot anomaly map
+    # Plot probability map
     im = ax.imshow(
         data,
         extent=[bounds.left, bounds.right, bounds.bottom, bounds.top],
-        cmap='RdBu_r',
-        vmin=-1.5,
-        vmax=1.5,
+        cmap='Reds',
+        vmin=0,
+        vmax=1,
         alpha=0.7,
         interpolation='bilinear'
     )
@@ -539,12 +539,12 @@ def create_validation_map(validation: Dict, raster_path: Path, output_path: Path
     
     # Add colorbar
     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label('Anomaly Strength (σ)', fontsize=12)
+    cbar.set_label('DUMB Probability (0-1)', fontsize=12)
     
     # Labels and title
     ax.set_xlabel('Longitude (°)', fontsize=12)
     ax.set_ylabel('Latitude (°)', fontsize=12)
-    ax.set_title('Validation: Known Features vs Detected Anomalies', 
+    ax.set_title('Validation v2: Known Features vs DUMB Probabilities',
                 fontsize=14, fontweight='bold')
     
     # Legend
@@ -567,12 +567,12 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Validate fusion results against known underground features"
+        description="Validate v2 DUMB probability against known underground features"
     )
     parser.add_argument(
         'raster',
         type=str,
-        help='Path to fused anomaly GeoTIFF'
+        help='Path to dumb_probability_v2.tif (global or tile mosaic)'
     )
     parser.add_argument(
         '--buffer',

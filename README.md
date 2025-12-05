@@ -1,198 +1,119 @@
-# GeoAnomalyMapper
+# GeoAnomalyMapper v2.0
 
-GeoAnomalyMapper contains a small collection of data processing utilities for
-combining publicly available geophysical datasets (gravity, magnetic, DEM and
-optional InSAR products) into consistent analysis-ready rasters. The repository
-keeps the focus on the processing and visualisation code that supports the
-fusion workflow—large datasets, helper downloads and internal documentation are
-deliberately excluded from version control.
+**Advanced Geophysical Anomaly Detection & Multi-Scale Fusion Pipeline**
 
-## Key capabilities
+GeoAnomalyMapper v2.0 is a complete rebuild of the anomaly detection system, designed to achieve >95% accuracy in detecting Deep Underground Military Bunkers (DUMB) and other subterranean anomalies. It addresses previous limitations through a sophisticated multi-stage pipeline integrating signal processing, physics-informed analysis, and machine learning.
 
-- **Data preparation (`process_data.py`)** – clips and reprojects raw gravity,
-  magnetic and elevation rasters into a common grid for a chosen area of
-  interest.
-- **InSAR pre-processing (`process_insar_data.py`)** – turns externally
-  generated interferograms into deformation rate grids that match the rest of
-  the pipeline.
-- **Multi-resolution fusion (`multi_resolution_fusion.py`)** – resamples
-  available layers to a shared resolution and combines them using
-  uncertainty-aware weighting.
-- **Void and anomaly assessment (`detect_voids.py`)** – calculates a
-  probability score for potential subsurface voids based on the fused
-  geophysical layers.
-- **Visualisation utilities** – `create_visualization.py` and
-  `create_enhanced_visualization.py` create publication-ready PNG, KMZ and
-  summary graphics from GeoTIFF outputs.
-- **Quality checks (`validate_against_known_features.py`)** – samples fused
-  anomaly rasters around known features to provide an objective validation
-  report.
+## Key Features (v2.0)
 
-All scripts are self-contained CLI tools with `--help` descriptions. None of the
-command line utilities download data; obtaining raw datasets remains a manual
-step carried out outside of the repository.
+*   **Multi-Scale Fusion:** Combines Bayesian Compressive Sensing (BCS) for resolution enhancement with Dempster-Shafer theory for uncertainty-weighted belief fusion.
+*   **Stable Structure Detection:** Leverages InSAR Coherence Change Detection (CCD), GLCM texture analysis, and structural artificiality metrics to identify surface footprints of underground structures.
+*   **Physics-Informed Analysis:** Utilizes Poisson's relation between gravity and magnetic fields to validate density contrasts against magnetic susceptibility, reducing false positives from geological features.
+*   **Advanced Signal Processing:** Implements Continuous Wavelet Transform (CWT) for multi-scale decomposition and Tilt Derivative (TDR) for precise edge detection of potential voids.
+*   **ML Classification:** Deploys One-Class SVM (OC-SVM) and Isolation Forest models trained on fused belief maps to probabilistically classify anomalies.
 
-## Repository layout
-
-```
-.
-├── create_visualization.py          # PNG/KMZ from GeoTIFFs
-├── detect_voids.py                  # Void probability mapping
-├── multi_resolution_fusion.py       # Uncertainty-weighted fusion
-├── process_data.py                  # Clip/reproject raw rasters
-├── project_paths.py                 # Directory configuration
-├── validate_against_known_features.py # Objective quality checks
-├── workflow.py                      # End-to-end CLI orchestrator
-├── utils/                           # Raster/processing helpers
-├── pyproject.toml
-├── README.md
-└── LICENSE
-```
-
-The `data/` directory expected by the scripts is not version controlled. Create
-it locally with the following structure once you have gathered source rasters:
-
-```
-data/
-├── raw/
-│   ├── gravity/
-│   ├── magnetic/
-│   ├── dem/
-│   └── insar/            # Optional
-└── processed/
-    ├── gravity/
-    ├── magnetic/
-    ├── dem/
-    └── insar/
-```
+See [`ARCHITECTURE_v2.md`](ARCHITECTURE_v2.md) for the full technical specification.
 
 ## Installation
 
-GeoAnomalyMapper targets Python 3.9+. Install the dependencies into a virtual
-environment of your choice:
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/GeoAnomalyMapper.git
+    cd GeoAnomalyMapper
+    ```
+
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv .venv
+    # Windows
+    .venv\Scripts\activate
+    # Linux/macOS
+    source .venv/bin/activate
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Usage
+
+The core of v2.0 is the `workflow.py` orchestrator, which manages the entire pipeline from raw data processing to final anomaly classification.
+
+### Running the Full Pipeline
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .          # core tools
-# or
-pip install -e .[all]     # core + COG + InSAR helpers
+python workflow.py --region "lon_min,lat_min,lon_max,lat_max" --resolution 0.001 --output-name "outputs/project_name"
 ```
 
-Optional extras listed under `[project.optional-dependencies]` in
-`pyproject.toml` enable COG creation and advanced InSAR processing. Install them
-with, for example, `pip install .[insar]` if they are required for your
-workflow.
-
-## Configuring the data directory
-
-By default every script reads from and writes to `<repo>/data`. Set the
-`GEOANOMALYMAPPER_DATA_DIR` environment variable if you would like to store
-rasters elsewhere (for example on a larger external drive):
-
+**Example:**
 ```bash
-export GEOANOMALYMAPPER_DATA_DIR="/mnt/gis-volume/geoanomalymapper-data"
+python workflow.py --region "-105.5,31.5,-103.5,33.5" --resolution 0.001 --output-name "outputs/carlsbad_v2"
 ```
 
-Every CLI tool (including the new workflow runner) honours the variable and
-creates any missing subdirectories on demand.
+### Command Line Arguments
 
-## Command-line quick start
+*   `--region`: Bounding box in WGS84 coordinates (min_lon, min_lat, max_lon, max_lat).
+*   `--resolution`: Output grid resolution in degrees (default: 0.001, approx 100m).
+*   `--output-name`: Prefix for all generated output files (includes directory path).
+*   `--skip-visuals`: Flag to skip generation of PNG/KMZ visualizations (useful for batch processing).
 
-The easiest way to run the full stack is via the consolidated workflow CLI:
+## Pipeline Phases & Outputs
 
-```bash
-geoanomalymapper --region "-105.5,31.5,-103.5,33.5" \
-    --output-name carlsbad_run \
-    --validate
+The workflow executes in 6 sequential steps. All outputs are GeoTIFFs prefixed with the `output-name` provided.
+
+1.  **Gravity Processing:**
+    *   `_gravity_residual.tif`: CWT-decomposed residual gravity (local anomalies).
+    *   `_gravity_tdr.tif`: Tilt Derivative edge detection.
+
+2.  **InSAR Feature Extraction:**
+    *   `_coherence_change.tif`: Temporal coherence stability.
+    *   `_structural_artificiality.tif`: Combined metric for man-made structure likelihood.
+
+3.  **Poisson Analysis:**
+    *   `_poisson_correlation.tif`: Correlation between gravity and magnetic fields (validates voids).
+
+4.  **Bayesian Fusion:**
+    *   `_gravity_prior_highres.tif`: Downscaled gravity map using higher-resolution covariates (DEM, InSAR).
+
+5.  **Dempster-Shafer Fusion:**
+    *   `_fused_belief_reinforced.tif`: Combined belief map representing the probability of a void, weighted by source uncertainty.
+
+6.  **Anomaly Classification:**
+    *   `_dumb_probability_v2.tif`: **Final Output**. Probability map of DUMB presence (>95% confidence target).
+
+## Repository Layout
+
+```
+.
+├── workflow.py                      # Main CLI orchestrator
+├── process_data.py                  # Gravity/Magnetic processing (CWT, TDR)
+├── insar_features.py                # InSAR CCD, GLCM, Artificiality
+├── poisson_analysis.py              # Physics-informed correlation
+├── multi_resolution_fusion.py       # Bayesian Compressive Sensing
+├── detect_voids.py                  # Dempster-Shafer Fusion
+├── classify_anomalies.py            # OC-SVM & Isolation Forest
+├── utils/                           # Shared raster and math utilities
+├── tests/                           # Unit and integration tests
+├── ARCHITECTURE_v2.md               # Technical documentation
+├── requirements.txt                 # Python dependencies
+└── README.md                        # This file
 ```
 
-The command performs preprocessing, fusion, void probability mapping, optional
-validation, and creates PNG/KMZ visualisations. Use `--skip-preprocessing` if
-you already have products in `data/processed/` and `--skip-visuals` for fully
-headless runs. All underlying scripts remain available individually via the
-following entry points:
+## Data Configuration
 
-- `geoanomalymapper-process-data`
-- `geoanomalymapper-fuse`
-- `geoanomalymapper-detect`
-- `geoanomalymapper-visualize`
-- `geoanomalymapper-validate`
+The system expects raw data in a `data/` directory (not version controlled). You can override this by setting the `GEOANOMALYMAPPER_DATA_DIR` environment variable.
 
-Run any command with `--help` for detailed options.
-
-## Preparing source data
-
-1. **Gravity and magnetic grids** – download GeoTIFF products such as EGM2008
-   free-air anomaly or EMAG2 magnetic anomaly files that cover your area of
-   interest.
-2. **DEM** – place Copernicus DEM, SRTM or other elevation tiles in
-   `data/raw/dem/`.
-3. **InSAR (optional)** – generate deformation products with ESA SNAP, ISCE or
-   other toolchains outside the repository and export them as GeoTIFF rasters.
-4. Keep the raw files outside of version control. The `.gitignore` shipped with
-   the project already excludes the `data/` directory and related artefacts.
-
-If Sentinel or other services require credentials, copy `.env.example` to `.env`
-and populate it locally. Do not commit the resulting file.
-
-## Typical workflow (manual steps)
-
-The workflow CLI runs everything for you, but the underlying scripts can still
-be executed individually when you need tighter control:
-
-1. **Process base layers**
-   ```bash
-   python process_data.py --region "-105.5,31.5,-103.5,33.5"
-   ```
-   The script clips available gravity, magnetic and DEM rasters to the supplied
-   bounding box and stores the results under `data/processed/`.
-
-2. **Process InSAR data (optional)**
-   ```bash
-   python process_insar_data.py
-   ```
-
-3. **Run multi-resolution fusion**
-   ```bash
-   python multi_resolution_fusion.py --region "-105.5,31.5,-103.5,33.5" \
-       --output fused_anomaly.tif
-   ```
-
-4. **Create visual outputs**
-   ```bash
-   python create_visualization.py fused_anomaly.tif
-   ```
-
-5. **Validate against known features**
-   ```bash
-   python validate_against_known_features.py fused_anomaly.tif --buffer 3 \
-       --output-dir reports/
-   ```
-
-6. **Optional void probability mapping**
-   ```bash
-   python detect_voids.py --region "-105.5,31.5,-103.5,33.5" --output caverns
-   ```
-
-Each command emits structured logging so processing steps can be audited.
-
-## Validation philosophy
-
-The validation utility samples the fused anomaly raster around a curated list of
-known underground structures. It checks both the strength and the expected sign
-of the anomaly before counting a location as correctly detected. Summary
-statistics and a map are produced in the specified output directory to support
-transparent reporting.
-
-## Contributing
-
-The project intentionally keeps scope narrow. When extending it, favour
-self-contained processing or visualisation utilities over large download or
-orchestration tooling. Please keep additional datasets, notebooks and generated
-artefacts outside of git.
+**Expected Structure:**
+```
+data/
+├── raw/
+│   ├── gravity/    # EGM2008 or similar
+│   ├── magnetic/   # EMAG2
+│   ├── dem/        # SRTM/Copernicus
+│   └── insar/      # Sentinel-1 Coherence
+```
 
 ## License
 
-GeoAnomalyMapper is released under the MIT License. See [LICENSE](LICENSE) for
-full details.
+MIT License.

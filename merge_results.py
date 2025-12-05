@@ -22,6 +22,16 @@ from rasterio.merge import merge
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+V2_LAYERS = [
+    "gravity_residual",
+    "gravity_tdr",
+    "structural_artificiality",
+    "poisson_correlation",
+    "gravity_prior_highres",
+    "fused_belief_reinforced",
+    "dumb_probability_v2"
+]
+
 def merge_using_rasterio(input_files: list[Path], output_path: Path):
     """
     Merge files using rasterio.merge (Pure Python).
@@ -99,25 +109,54 @@ def merge_using_gdal(input_files: list[Path], output_path: Path):
         merge_using_rasterio(input_files, output_path)
 
 def main():
-    parser = argparse.ArgumentParser(description="Merge tiled GeoTIFFs")
+    parser = argparse.ArgumentParser(description="Merge tiled GeoTIFFs (v1/v2 compatible)")
     parser.add_argument("--input-dir", required=True, help="Directory containing tile .tif files")
-    parser.add_argument("--output", required=True, help="Path for merged output")
-    parser.add_argument("--pattern", default="*_void_probability.tif", help="File pattern to match (e.g. *_void_probability.tif)")
+    parser.add_argument("--output-dir", help="Output directory for v2 multi-layer merge")
+    parser.add_argument("--output", help="Single output path for single pattern merge")
+    parser.add_argument("--pattern", default="*_dumb_probability_v2.tif", help="File pattern for single merge")
+    parser.add_argument("--v2", action="store_true", help="Perform v2 multi-layer merge")
     
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
-    input_files = list(input_dir.glob(args.pattern))
     
-    if not input_files:
-        logger.error(f"No files found in {input_dir} matching {args.pattern}")
-        sys.exit(1)
+    if args.v2:
+        if not args.output_dir:
+            logger.error("--output-dir is required with --v2")
+            sys.exit(1)
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
         
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Prefer GDAL for memory efficiency
-    merge_using_gdal(input_files, output_path)
+        merged_count = 0
+        for suffix in V2_LAYERS:
+            pattern = f"*{suffix}.tif"
+            input_files = sorted(input_dir.glob(pattern))
+            if input_files:
+                logger.info(f"Merging {len(input_files)} tiles for {suffix}")
+                output_path = output_dir / f"global_{suffix}.tif"
+                merge_using_gdal(input_files, output_path)
+                merged_count += 1
+            else:
+                logger.warning(f"No tiles found for {pattern}")
+        
+        logger.info(f"v2 merge complete: {merged_count} layers processed")
+    else:
+        # Legacy single pattern mode
+        pattern = args.pattern
+        input_files = sorted(input_dir.glob(pattern))
+        
+        if not input_files:
+            logger.error(f"No files found in {input_dir} matching '{pattern}'")
+            sys.exit(1)
+        
+        if not args.output:
+            logger.error("--output is required without --v2")
+            sys.exit(1)
+        
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        merge_using_gdal(input_files, output_path)
 
 if __name__ == "__main__":
     main()
