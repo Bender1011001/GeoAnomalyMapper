@@ -5,7 +5,7 @@ from rasterio.enums import Resampling
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -33,44 +33,48 @@ print(f"Running on: {torch.cuda.get_device_name(0) if torch.cuda.is_available() 
 # 2. The Physics Layer (Differentiable)
 # ==========================================
 class GravityPhysicsLayer(nn.Module):
-    """
-    Simulates gravity from a density map using FFT (Parker's Formula).
-    This allows the network to 'check' its answers against the laws of physics.
-    """
     def __init__(self, pixel_size_meters, mean_depth):
         super().__init__()
         self.pixel_size = pixel_size_meters
         self.depth = mean_depth
-        self.G = 6.674e-11  # Gravitational Constant
+        self.G = 6.674e-11
         self.SI_to_mGal = 1e5
+        self.earth_filter = None  # Cache placeholder
 
     def forward(self, density_map):
-        """
-        Input: Density Map (Batch, 1, H, W)
-        Output: Simulated Gravity (Batch, 1, H, W)
-        """
         B, C, H, W = density_map.shape
         
-        # 1. Create Frequency Grid (Wavenumbers)
-        # Optimized for PyTorch FFT standard
-        freq_y = torch.fft.fftfreq(H, d=self.pixel_size).to(density_map.device)
-        freq_x = torch.fft.fftfreq(W, d=self.pixel_size).to(density_map.device)
-        KY, KX = torch.meshgrid(freq_y, freq_x, indexing='ij')
-        K = torch.sqrt(KX**2 + KY**2)
-        
-        # Avoid division by zero at DC component (K=0)
-        K[0, 0] = 1e-10
+        # 1. Precompute Filter (Only once per shape)
+        # We check if filter exists and matches current input dimensions
+        if (self.earth_filter is None) or (self.earth_filter.shape[-2:] != (H, W)):
+            device = density_map.device
+            
+            # fftfreq returns cycles/meter (spatial frequency f)
+            freq_y = torch.fft.fftfreq(H, d=self.pixel_size).to(device)
+            freq_x = torch.fft.fftfreq(W, d=self.pixel_size).to(device)
+            
+            KY, KX = torch.meshgrid(freq_y, freq_x, indexing='ij')
+            
+            # Convert spatial frequency f to angular wavenumber k (k = 2 * pi * f)
+            # This was the missing step in Plan B
+            K_magnitude = torch.sqrt(KX**2 + KY**2)
+            k_angular = 2 * np.pi * K_magnitude
+            
+            # Avoid division by zero or weirdness at DC component (0 frequency)
+            k_angular[0, 0] = 1e-10
+            
+            # Parker's Formula: F[g] = 2*pi*G * exp(-|k|z) * F[rho]
+            # We cache this filter
+            filter_response = (2 * np.pi * self.G * torch.exp(-k_angular * self.depth))
+            self.earth_filter = filter_response.unsqueeze(0).unsqueeze(0)
 
-        # 2. Earth Filter (Bouguer Slab + Upward Continuation)
-        # Formula: G(k) = 2 * pi * G * exp(-|k| * z) * Density(k)
-        earth_filter = 2 * np.pi * self.G * torch.exp(-K * self.depth)
-        
-        # 3. FFT Convolution
+        # 2. FFT Convolution
+        # Real-to-Complex FFT (rfft2) is 2x faster and uses half the memory of fft2
+        # But for simplicity/compatibility, we stick to standard fft2 unless your data is strictly real
         d_fft = torch.fft.fft2(density_map)
-        g_fft = d_fft * earth_filter.unsqueeze(0).unsqueeze(0)
+        g_fft = d_fft * self.earth_filter
         gravity_pred = torch.real(torch.fft.ifft2(g_fft))
         
-        # Convert SI (m/s^2) to mGal
         return gravity_pred * self.SI_to_mGal
 
 # ==========================================
@@ -191,7 +195,7 @@ def invert_gravity(tif_path, output_path, lithology_path=None):
     optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['LR'])
     
     # AMP Scaler for 4060 Ti
-    scaler = GradScaler(enabled=CONFIG['USE_AMP'])
+    scaler = GradScaler('cuda', enabled=CONFIG['USE_AMP'])
     
     # --- Training ---
     print("Starting Inversion...")
@@ -201,7 +205,7 @@ def invert_gravity(tif_path, output_path, lithology_path=None):
     for epoch in loop:
         optimizer.zero_grad()
         
-        with autocast(enabled=CONFIG['USE_AMP']):
+        with autocast('cuda', enabled=CONFIG['USE_AMP']):
             # 1. Forward Pass (Predict Residual Density)
             # We pass the gravity map itself as input features
             pred_residual = model(inp_tensor)

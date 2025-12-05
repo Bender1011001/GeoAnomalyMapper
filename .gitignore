@@ -93,10 +93,11 @@ env/
 ENV/
 env.bak/
 venv.bak/
+geoanomaly-clean/
 
 # Conda
 .conda/
-conda/
+.conda_fresh/
 site-packages/
 .conda2/
 
@@ -119,6 +120,7 @@ Thumbs.db
 # Data directories (populate locally)
 data/
 output/
+outputs/
 results/
 temp/
 logs/

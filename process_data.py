@@ -212,7 +212,7 @@ def process_dem_data(region: Tuple[float, float, float, float], resolution: floa
 
 def process_insar_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
     logger.info("\n%s\nPROCESSING INSAR DATA\n%s", "=" * 70, "=" * 70)
-    insar_dir = RAW_DIR / "insar" / "sentinel1"
+    insar_dir = RAW_DIR / "insar"
     output_dir = PROCESSED_DIR / "insar"
     output_dir.mkdir(parents=True, exist_ok=True)
 
