@@ -98,6 +98,7 @@ venv.bak/
 .conda/
 conda/
 site-packages/
+.conda2/
 
 # IDEs
 .vscode/
