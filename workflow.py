@@ -38,6 +38,8 @@ from poisson_analysis import analyze_poisson_correlation
 from multi_resolution_fusion import bayesian_downscaling
 from detect_voids import dempster_shafer_fusion
 from classify_anomalies import classify_dumb_candidates
+from pinn_gravity_inversion import invert_gravity
+from fetch_lithology_density import fetch_and_rasterize
 
 
 logging.basicConfig(
@@ -171,6 +173,24 @@ def run_full_workflow(
     results["poisson"] = step3_success
     logger.info("Step 3 complete.")
 
+    # Step 3.5: Fetch Lithology Prior
+    logger.info("=" * 70)
+    logger.info("STEP 3.5: FETCH LITHOLOGY PRIOR")
+    logger.info("=" * 70)
+
+    lithology_path = f"{output_prefix}_lithology_density.tif"
+    step3_5_success = False
+
+    if step1_success and Path(gravity_residual_path).exists():
+        logger.info("Fetching and rasterizing lithology data...")
+        if fetch_and_rasterize(gravity_residual_path, lithology_path):
+            step3_5_success = True
+    else:
+        logger.warning("Skipping lithology fetch: missing gravity residual.")
+    
+    results["lithology"] = step3_5_success
+    logger.info("Step 3.5 complete.")
+
     # Step 4: Multi-resolution fusion (BCS downscaling)
     logger.info("=" * 70)
     logger.info("STEP 4: BAYESIAN COMPRESSIVE SENSING DOWNSCALING")
@@ -236,9 +256,34 @@ def run_full_workflow(
     results["void_detection"] = step5_success
     logger.info("Step 5 complete.")
 
-    # Step 6: Anomaly classification (OC-SVM + Isolation Forest)
+    # Step 6: PINN Inversion
     logger.info("=" * 70)
-    logger.info("STEP 6: ANOMALY CLASSIFICATION (DUMB Candidates)")
+    logger.info("STEP 6: PINN GRAVITY INVERSION")
+    logger.info("=" * 70)
+
+    density_output = f"{output_prefix}_density_model.tif"
+    step6_success = False
+
+    if step1_success and Path(gravity_residual_path).exists():
+        logger.info("Running PINN gravity inversion...")
+        # Pass lithology path if it exists (from Step 3.5), otherwise None
+        lith_input = lithology_path if step3_5_success else None
+        
+        try:
+            invert_gravity(gravity_residual_path, density_output, lith_input)
+            if Path(density_output).exists():
+                step6_success = True
+        except Exception as e:
+            logger.error(f"PINN Inversion failed: {e}")
+    else:
+        logger.warning("Skipping PINN inversion: missing gravity residual.")
+    
+    results["pinn_inversion"] = step6_success
+    logger.info("Step 6 complete.")
+
+    # Step 7: Anomaly classification (OC-SVM + Isolation Forest)
+    logger.info("=" * 70)
+    logger.info("STEP 7: ANOMALY CLASSIFICATION (DUMB Candidates)")
     logger.info("=" * 70)
 
     dumb_path = f"{output_prefix}_dumb_probability_v2.tif"
@@ -248,17 +293,19 @@ def run_full_workflow(
         poisson_path,
         art_path,
     ]
+    if step6_success:
+        feature_candidates.append(density_output)
     existing_features = [p for p in feature_candidates if Path(p).exists()]
 
-    step6_success = False
+    step7_success = False
     if len(existing_features) >= 1:
         logger.info("Classifying anomalies...")
         classify_dumb_candidates(existing_features, dumb_path)
-        step6_success = True
+        step7_success = True
     else:
         logger.warning("Skipping classification: no features available.")
-    results["classification"] = step6_success
-    logger.info("Step 6 complete.")
+    results["classification"] = step7_success
+    logger.info("Step 7 complete.")
 
     # Summary
     logger.info("=" * 70)
@@ -278,7 +325,7 @@ def run_full_workflow(
         "resolution_deg": resolution,
         "output_prefix": output_prefix,
         "results": results,
-        "final_output": dumb_path if step6_success else None,
+        "final_output": dumb_path if step7_success else None,
     }
     Path(log_path).write_text(json.dumps(summary, indent=2))
     logger.info("Log saved: %s", log_path)

@@ -159,51 +159,72 @@ def rasterize_lithology(
 # ==========================================
 # 4. Main Execution
 # ==========================================
+def fetch_and_rasterize(reference_tif_path: str, output_path: str) -> bool:
+    """
+    Fetch lithology data from Macrostrat and rasterize it to match the reference GeoTIFF.
+    
+    Args:
+        reference_tif_path: Path to the reference GeoTIFF (e.g., gravity residual).
+        output_path: Path where the output density map will be saved.
+        
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    ref_path = Path(reference_tif_path)
+    out_path = Path(output_path)
+    
+    if not ref_path.exists():
+        logger.error(f"Reference file not found: {ref_path}")
+        return False
+        
+    try:
+        # 1. Read Reference Grid Info
+        with rasterio.open(ref_path) as src:
+            bounds = src.bounds # (left, bottom, right, top)
+            profile = src.profile
+            # Macrostrat expects (min_lon, min_lat, max_lon, max_lat)
+            # Rasterio bounds are (left, bottom, right, top) -> Same order
+            query_bounds = (bounds.left, bounds.bottom, bounds.right, bounds.top)
+            
+        # 2. Fetch Vector Data
+        features = fetch_macrostrat_geojson(query_bounds)
+        
+        # 3. Rasterize to Density Map
+        density_map = rasterize_lithology(features, profile)
+        
+        # 4. Save Output
+        profile.update(
+            dtype=rasterio.float32,
+            count=1,
+            compress='deflate',
+            nodata=np.nan
+        )
+        
+        # Optional: Smooth boundaries slightly to avoid hard edges in gravity inversion
+        # density_map = gaussian_filter(density_map, sigma=1)
+        
+        with rasterio.open(out_path, 'w', **profile) as dst:
+            dst.write(density_map, 1)
+            dst.set_band_description(1, "Estimated Crustal Density (kg/m3)")
+            
+        logger.info(f"Success! Density map saved to: {out_path}")
+        logger.info(f"  - Resolution: {profile['width']}x{profile['height']}")
+        logger.info(f"  - Bounds: {query_bounds}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch and rasterize lithology: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description="Macrostrat Lithology to Density Map Fetcher")
     parser.add_argument("--reference", required=True, help="Path to reference GeoTIFF (gravity/dem) to match grid")
     parser.add_argument("--output", required=True, help="Output path for Density GeoTIFF")
     args = parser.parse_args()
     
-    ref_path = Path(args.reference)
-    out_path = Path(args.output)
-    
-    if not ref_path.exists():
-        logger.error(f"Reference file not found: {ref_path}")
+    success = fetch_and_rasterize(args.reference, args.output)
+    if not success:
         sys.exit(1)
-        
-    # 1. Read Reference Grid Info
-    with rasterio.open(ref_path) as src:
-        bounds = src.bounds # (left, bottom, right, top)
-        profile = src.profile
-        # Macrostrat expects (min_lon, min_lat, max_lon, max_lat)
-        # Rasterio bounds are (left, bottom, right, top) -> Same order
-        query_bounds = (bounds.left, bounds.bottom, bounds.right, bounds.top)
-        
-    # 2. Fetch Vector Data
-    features = fetch_macrostrat_geojson(query_bounds)
-    
-    # 3. Rasterize to Density Map
-    density_map = rasterize_lithology(features, profile)
-    
-    # 4. Save Output
-    profile.update(
-        dtype=rasterio.float32,
-        count=1,
-        compress='deflate',
-        nodata=np.nan
-    )
-    
-    # Optional: Smooth boundaries slightly to avoid hard edges in gravity inversion
-    # density_map = gaussian_filter(density_map, sigma=1) 
-    
-    with rasterio.open(out_path, 'w', **profile) as dst:
-        dst.write(density_map, 1)
-        dst.set_band_description(1, "Estimated Crustal Density (kg/m3)")
-        
-    logger.info(f"Success! Density map saved to: {out_path}")
-    logger.info(f"  - Resolution: {profile['width']}x{profile['height']}")
-    logger.info(f"  - Bounds: {query_bounds}")
 
 if __name__ == "__main__":
     main()
