@@ -10,7 +10,8 @@ without exhausting system RAM.
 Usage:
     python batch_processor.py --region "-125,25,-66,49" --tile-size 1.0
 """
-
+import os
+os.environ["CRYPTOGRAPHY_OPENSSL_NO_LEGACY"] = "1"
 import argparse
 import logging
 import subprocess
@@ -97,7 +98,7 @@ def process_tile(
     
     cmd = [
         sys.executable, "workflow.py",
-        "--region", region_str,
+        f"--region={region_str}",  # <--- FIXED: Connects value to flag
         "--resolution", str(resolution),
         "--output-name", str(output_name),
         "--skip-visuals",  # Save time/space, generate visuals only for merged result

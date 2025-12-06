@@ -6,232 +6,333 @@ Implements unsupervised anomaly detection using One-Class SVM (OC-SVM) to model
 "normal" geology manifold and Isolation Forest (IF) for outlier ranking. Combines
 scores into a 0-1 probability map where high values indicate DUMB candidates.
 
+Optimized for memory efficiency using windowed processing for prediction.
+
 Key Features:
 - Aligns multiple feature rasters to a common grid (first raster as reference).
 - Handles NaNs via mean imputation per feature.
 - Samples background pixels for training (default: 100k pixels).
 - Normalizes combined anomaly scores to [0,1] probability.
 - Outputs GeoTIFF with matching CRS/transform.
-
-Dependencies:
-- scikit-learn >=1.5.0
-- numpy
-- rasterio
-
-Example Usage:
-```python
-feature_paths = [
-    "data/processed/gravity_residual.tif",
-    "data/processed/fused_belief_reinforced.tif",
-    "data/processed/poisson_correlation.tif",
-    "data/processed/insar_artificiality.tif"
-]
-classify_dumb_candidates(feature_paths, "data/processed/dumb_probability_v2.tif")
-```
 """
 
+import os
+os.environ["CRYPTOGRAPHY_OPENSSL_NO_LEGACY"] = "1"
+
+import argparse
+import logging
+from pathlib import Path
 from typing import List, Tuple
+
 import numpy as np
 import rasterio
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
+from rasterio.windows import Window
 from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
 
+from project_paths import OUTPUTS_DIR, PROCESSED_DIR
 
-def prepare_feature_stack(
-    feature_paths: List[str]
-) -> Tuple[np.ndarray, int, int, rasterio.Affine, str]:
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def prepare_training_data(
+    feature_paths: List[str],
+    sample_size: int = 100000
+) -> Tuple[np.ndarray, SimpleImputer]:
     """
-    Load and align feature rasters to the grid of the first raster.
-    Stack into (N_pixels, N_features) array. Impute NaNs with feature-wise mean.
-
-    Aligns all rasters via reproject to ensure consistent shape/CRS/transform.
-    Uses bilinear resampling for continuous features.
-
-    Args:
-        feature_paths: List of paths to input feature rasters.
-
-    Returns:
-        Tuple of (X: stacked features (n_pixels, n_features),
-                  height, width, transform, crs)
-
-    Raises:
-        ValueError: If no feature paths provided or files not found.
-        RuntimeError: If reproject fails.
-
-    Examples
-    --------
-    >>> feature_paths = ["gravity.tif", "poisson.tif"]
-    >>> X, h, w, transform, crs = prepare_feature_stack(feature_paths)
-    >>> print(X.shape)  # e.g., (1000000, 2)
+    Load a subsample of data from all features for training.
     """
+    logger.info("Preparing training data...")
+    
     if not feature_paths:
         raise ValueError("At least one feature path required.")
 
-    # Load reference raster
-    with rasterio.open(feature_paths[0]) as src_ref:
-        profile_ref = src_ref.profile
-        height, width = profile_ref["height"], profile_ref["width"]
-        transform = src_ref.transform
-        crs = src_ref.crs
-        data_ref = src_ref.read(1, masked=True).filled(np.nan).astype(np.float32)
-
-    # Impute NaNs in reference
-    ref_mean = np.nanmean(data_ref)
-    if np.isnan(ref_mean):
-        ref_mean = 0.0
-    data_ref[np.isnan(data_ref)] = ref_mean
-    stack = [data_ref.flatten()]
-
-    # Load and align other features
-    for fpath in feature_paths[1:]:
-        dst_data = np.empty((height, width), dtype=np.float32)
+    # Load reference profile
+    with rasterio.open(feature_paths[0]) as src:
+        profile_ref = src.profile
+        height, width = src.height, src.width
+        
+    # We need to sample pixels. 
+    # Strategy: Pick random indices, read those pixels from all rasters.
+    # Reading random pixels from rasterio is slow if done one by one.
+    # Better: Read low-res versions or blocks, or just read the whole thing if it fits in memory?
+    # The user complained about memory. So we should avoid reading full rasters if possible.
+    # But for training we need a representative sample.
+    # Let's read a decimated version (e.g. every 10th pixel) to get a manageable array.
+    
+    decimation = 10 # Adjust based on image size. If 10000x10000, decimation 10 -> 1000x1000 = 1M pixels.
+    
+    X_list = []
+    
+    # We need to ensure all features are resampled to the SAME shape (the reference shape / decimation)
+    # The previous implementation relied on src.read(out_shape=...) but if aspect ratios differ slightly or rounding,
+    # it might fail. Better to use the reference shape explicitly.
+    
+    ref_height = int(height // decimation)
+    ref_width = int(width // decimation)
+    
+    for fpath in feature_paths:
+        logger.info(f"  - Loading feature for training: {Path(fpath).name}")
         with rasterio.open(fpath) as src:
-            reproject(
-                source=rasterio.band(src, 1),
-                destination=dst_data,
-                src_transform=src.transform,
-                src_crs=src.crs,
-                dst_transform=transform,
-                dst_crs=crs,
-                resampling=Resampling.bilinear,
-                src_nodata=src.nodata,
-                dst_nodata=np.nan,
-            )
-        # Impute NaNs
-        feat_mean = np.nanmean(dst_data)
-        if np.isnan(feat_mean):
-            feat_mean = 0.0
-        dst_data[np.isnan(dst_data)] = feat_mean
-        stack.append(dst_data.flatten())
-
-    X = np.column_stack(stack)
-    return X, height, width, transform, crs
-
+            # Read decimated and reproject/resample to match reference grid exactly
+            # Even if they are different projections or extents, we want them aligned.
+            # Ideally we should use reproject() to be safe, like in prediction.
+            
+            dst_shape = (ref_height, ref_width)
+            dst_data = np.zeros(dst_shape, dtype=np.float32)
+            
+            # We need to construct the transform for the decimated grid
+            # The decimated transform scales pixel size by decimation factor
+            dst_transform = src.transform * src.transform.scale(decimation, decimation)
+            
+            # Wait, if we just want to align to the first image's decimated grid:
+            # We should use the first image's profile (decimated) as target.
+            
+            if fpath == feature_paths[0]:
+                # This is the reference, just read it
+                out_shape = (src.count, ref_height, ref_width)
+                data = src.read(
+                    out_shape=out_shape,
+                    resampling=Resampling.bilinear
+                )
+                dst_data = data[0]
+                
+                # Store reference transform/crs for others
+                ref_transform = src.transform * src.transform.scale(decimation, decimation)
+                ref_crs = src.crs
+            else:
+                # Reproject to match reference
+                reproject(
+                    source=rasterio.band(src, 1),
+                    destination=dst_data,
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=ref_transform,
+                    dst_crs=ref_crs,
+                    resampling=Resampling.bilinear,
+                    dst_nodata=np.nan
+                )
+            
+            # Flatten
+            X_list.append(dst_data.flatten())
+            
+    X_flat = np.column_stack(X_list)
+    
+    # Filter NaNs
+    # We want to train on valid data
+    valid_mask = ~np.any(np.isnan(X_flat), axis=1)
+    X_train = X_flat[valid_mask]
+    
+    logger.info(f"Total valid pixels available for training: {len(X_train)}")
+    
+    if len(X_train) > sample_size:
+        logger.info(f"Subsampling to {sample_size} pixels")
+        idx = np.random.choice(len(X_train), sample_size, replace=False)
+        X_train = X_train[idx]
+        
+    # Imputer
+    imputer = SimpleImputer(strategy='mean')
+    X_train_imputed = imputer.fit_transform(X_train)
+    
+    return X_train_imputed, imputer
 
 def train_models(
-    X: np.ndarray, sample_size: int = 100000
+    X_train: np.ndarray
 ) -> Tuple[StandardScaler, OneClassSVM, IsolationForest]:
     """
-    Train OC-SVM and Isolation Forest on subsampled "background" data.
-
-    Samples randomly for training to model normal geology (assumes anomalies rare).
-    Uses StandardScaler for feature normalization.
-
-    Args:
-        X: Feature stack (n_pixels, n_features).
-        sample_size: Max pixels to sample for training (default: 100k).
-
-    Returns:
-        Tuple of (scaler, ocsvm_model, iforest_model)
-
-    Examples
-    --------
-    >>> scaler, ocsvm, iforest = train_models(X)
+    Train OC-SVM and Isolation Forest.
     """
-    n_samples = min(sample_size, X.shape[0])
-    train_idx = np.random.choice(X.shape[0], n_samples, replace=False)
-    X_train = X[train_idx]
-
+    logger.info("Training models...")
+    
     scaler = StandardScaler().fit(X_train)
     X_train_scaled = scaler.transform(X_train)
 
+    logger.info("  - Training OneClassSVM...")
     ocsvm = OneClassSVM(
         nu=0.05, kernel="rbf", gamma="scale"
     ).fit(X_train_scaled)
 
+    logger.info("  - Training IsolationForest...")
     iforest = IsolationForest(
-        contamination=0.05, random_state=42, n_estimators=100
+        contamination=0.05, random_state=42, n_estimators=100, n_jobs=-1
     ).fit(X_train_scaled)
 
     return scaler, ocsvm, iforest
 
-
-def compute_anomaly_scores(
-    X: np.ndarray,
+def predict_and_save_windowed(
+    feature_paths: List[str],
+    output_path: str,
     scaler: StandardScaler,
     ocsvm: OneClassSVM,
     iforest: IsolationForest,
-) -> np.ndarray:
-    """
-    Compute combined anomaly probability (0-1, high = DUMB candidate).
-
-    - OC-SVM: -decision_function (high = outlier from normal manifold)
-    - IF: -score_samples (high = isolated/anomalous)
-    - Average + min-max normalization to [0,1]
-
-    Args:
-        X: Feature stack.
-        scaler: Fitted scaler.
-        ocsvm: Fitted OC-SVM.
-        iforest: Fitted Isolation Forest.
-
-    Returns:
-        prob: Anomaly probabilities (n_pixels,)
-
-    Examples
-    --------
-    >>> prob = compute_anomaly_scores(X, scaler, ocsvm, iforest)
-    >>> print(np.max(prob))  # Should be ~1.0
-    """
-    X_scaled = scaler.transform(X)
-
-    oc_scores = -ocsvm.decision_function(X_scaled)
-    iso_scores = -iforest.score_samples(X_scaled)
-
-    combined = (oc_scores + iso_scores) / 2.0
-
-    p_min = np.min(combined)
-    p_max = np.max(combined)
-    prob = (combined - p_min) / (p_max - p_min + 1e-12)
-
-    return np.clip(prob, 0.0, 1.0)
-
-
-def classify_dumb_candidates(
-    feature_paths_list: List[str],
-    output_path: str,
+    imputer: SimpleImputer,
+    block_size: int = 2048
 ):
     """
-    Main entrypoint: Classify DUMB candidates from feature stack.
-
-    Full pipeline: prepare -> train -> score -> save GeoTIFF.
-
-    Args:
-        feature_paths_list: List of feature raster paths.
-        output_path: Output path for 'dumb_probability_v2.tif'.
-
-    Examples
-    --------
-    >>> classify_dumb_candidates(
-    ...     ["gravity_residual.tif", "fused_belief_reinforced.tif"], "output.tif"
-    ... )
-    Phase 5 output: output.tif
+    Predict anomaly scores in windows and save to disk.
     """
-    X, height, width, transform, crs = prepare_feature_stack(feature_paths_list)
+    logger.info(f"Starting prediction. Output: {output_path}")
+    
+    # Use first feature as master grid
+    with rasterio.open(feature_paths[0]) as src_ref:
+        profile = src_ref.profile.copy()
+        height, width = src_ref.height, src_ref.width
+        transform = src_ref.transform
+        crs = src_ref.crs
+        
+    profile.update({
+        'dtype': 'float32',
+        'count': 1,
+        'nodata': np.nan,
+        'compress': 'lzw',
+        'tiled': True,
+        'blockxsize': 256,
+        'blockysize': 256,
+        'bigtiff': 'YES'
+    })
+    
+    # We need to normalize scores globally.
+    # Problem: We don't know min/max of scores without predicting everything.
+    # Solution: Predict everything, store raw scores in a temporary file (or two bands), 
+    # find min/max, then normalize? Or just output raw scores and normalize later?
+    # Or estimate min/max from training data?
+    # Estimating from training data is risky if anomalies are outliers not in training.
+    # Let's output raw combined score first, then we can normalize if needed, 
+    # OR just use the raw scores (higher is more anomalous).
+    # The prompt asks for "dumb_probability_v2.tif" which implies 0-1.
+    # Let's do a two-pass approach or just load the raw result to normalize if it fits?
+    # No, memory constraint.
+    # Let's estimate min/max from a subset of predictions (e.g. the training set predictions).
+    
+    # Estimate normalization params from training set (which we have in memory? No we didn't return it)
+    # Let's just use the models to predict on a random subset again to get stats.
+    # Actually, let's just output the raw "anomaly score" which is usually what's needed.
+    # But to stick to the requested "probability", we can use a sigmoid or just min-max based on theoretical bounds?
+    # IF scores are [-1, 1] (roughly). OCSVM decision function is unbounded but usually small.
+    # Let's compute scores on a small sample to get a range.
+    
+    logger.info("Estimating score range for normalization...")
+    # Quick sample
+    X_sample, _ = prepare_training_data(feature_paths, sample_size=10000)
+    X_sample_scaled = scaler.transform(X_sample)
+    oc_scores_samp = -ocsvm.decision_function(X_sample_scaled)
+    iso_scores_samp = -iforest.score_samples(X_sample_scaled)
+    combined_samp = (oc_scores_samp + iso_scores_samp) / 2.0
+    
+    p_min = np.percentile(combined_samp, 1) # Use percentiles to be robust
+    p_max = np.percentile(combined_samp, 99)
+    logger.info(f"Score range estimate: {p_min:.4f} to {p_max:.4f}")
+    
+    with rasterio.open(output_path, 'w', **profile) as dst:
+        for row_off in range(0, height, block_size):
+            for col_off in range(0, width, block_size):
+                window_width = min(block_size, width - col_off)
+                window_height = min(block_size, height - row_off)
+                window = Window(col_off, row_off, window_width, window_height)
+                
+                # Read all features for this window
+                X_window_list = []
+                
+                for fpath in feature_paths:
+                    with rasterio.open(fpath) as src:
+                        # Reproject window if needed, but assuming aligned inputs for now
+                        # If inputs are not aligned, we must reproject.
+                        # The previous script did reproject. We should too.
+                        
+                        win_transform = rasterio.windows.transform(window, transform)
+                        dst_arr = np.zeros((window_height, window_width), dtype=np.float32)
+                        
+                        reproject(
+                            source=rasterio.band(src, 1),
+                            destination=dst_arr,
+                            src_transform=src.transform,
+                            src_crs=src.crs,
+                            dst_transform=win_transform,
+                            dst_crs=crs,
+                            resampling=Resampling.bilinear,
+                            dst_nodata=np.nan
+                        )
+                        X_window_list.append(dst_arr.flatten())
+                
+                X_window_flat = np.column_stack(X_window_list)
+                
+                # Impute
+                X_window_imputed = imputer.transform(X_window_flat)
+                
+                # Scale
+                X_window_scaled = scaler.transform(X_window_imputed)
+                
+                # Predict
+                oc_scores = -ocsvm.decision_function(X_window_scaled)
+                iso_scores = -iforest.score_samples(X_window_scaled)
+                combined = (oc_scores + iso_scores) / 2.0
+                
+                # Normalize
+                prob = (combined - p_min) / (p_max - p_min + 1e-12)
+                prob = np.clip(prob, 0.0, 1.0)
+                
+                # Mask NaNs
+                all_nan = np.all(np.isnan(X_window_flat), axis=1)
+                prob[all_nan] = np.nan
+                
+                # Write
+                dst.write(prob.reshape(window_height, window_width), 1, window=window)
+                
+    logger.info("Classification complete.")
 
-    scaler, ocsvm, iforest = train_models(X)
+def main():
+    parser = argparse.ArgumentParser(description="Phase 5: Anomaly Classification")
+    parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "dumb_probability_v2.tif"), help="Output path")
+    args = parser.parse_args()
 
-    prob_flat = compute_anomaly_scores(X, scaler, ocsvm, iforest)
+    # Define inputs based on previous phases
+    # 1. Gravity Residual (Phase 1)
+    gravity_residual = OUTPUTS_DIR / "gravity_residual.tif"
+    if not gravity_residual.exists():
+         gravity_residual = PROCESSED_DIR / "gravity" / "gravity_residual.tif"
+    if not gravity_residual.exists():
+        gravity_residual = OUTPUTS_DIR / "gravity" / "xgm2019e_gravdist_box_mgal.tif"
 
-    prob_image = prob_flat.reshape(height, width).astype(np.float32)
+    # 2. Fused Belief (Phase 4)
+    fused_belief = OUTPUTS_DIR / "fusion" / "fused_belief.tif"
+    
+    # 3. Poisson Correlation (Phase 3)
+    poisson_corr = OUTPUTS_DIR / "poisson_correlation.tif"
+    
+    # 4. InSAR Mosaic (Phase 2) - using Winter Coherence as a feature
+    insar_mosaic = PROCESSED_DIR / "insar" / "mosaics" / "usa_winter_vv_COH12.vrt"
 
-    profile = {
-        "driver": "GTiff",
-        "height": height,
-        "width": width,
-        "count": 1,
-        "dtype": "float32",
-        "crs": crs,
-        "transform": transform,
-        "compress": "DEFLATE",
-        "BIGTIFF": "YES",
-        "nodata": np.nan,
-    }
+    feature_paths = [
+        gravity_residual,
+        fused_belief,
+        poisson_corr,
+        insar_mosaic
+    ]
+    
+    # Filter existing
+    valid_paths = [str(p) for p in feature_paths if p.exists()]
+    
+    if len(valid_paths) < len(feature_paths):
+        print("Warning: Some input files are missing:")
+        for p in feature_paths:
+            if not p.exists():
+                print(f"  - {p}")
+        if len(valid_paths) == 0:
+            print("Error: No input files found.")
+            return
 
-    with rasterio.open(output_path, "w", **profile) as dst:
-        dst.write(prob_image, 1)
+    print(f"Classifying using {len(valid_paths)} features: {valid_paths}")
+    
+    # Train
+    X_train, imputer = prepare_training_data(valid_paths)
+    scaler, ocsvm, iforest = train_models(X_train)
+    
+    # Predict
+    predict_and_save_windowed(valid_paths, args.output, scaler, ocsvm, iforest, imputer)
 
-    print(f"Phase 5 output: {output_path}")
+if __name__ == "__main__":
+    main()

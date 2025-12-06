@@ -14,7 +14,8 @@ Robust skipping of optional data sources (InSAR, DEM).
 """
 
 from __future__ import annotations
-
+import os
+os.environ["CRYPTOGRAPHY_OPENSSL_NO_LEGACY"] = "1"
 import argparse
 import json
 import logging
@@ -25,7 +26,7 @@ from typing import List, Tuple
 import numpy as np
 import rasterio
 import project_paths
-from utils.raster_utils import clip_and_reproject_raster
+from utils.raster_utils import clip_and_reproject_raster, mosaic_and_clip_seasonal
 
 # Phase-specific imports
 from process_data import wavelet_decompose_gravity, compute_tilt_derivative
@@ -109,46 +110,75 @@ def run_full_workflow(
     results["gravity"] = step1_success
     logger.info("Step 1 complete.")
 
-    # Step 2: InSAR features (CCD + GLCM + Artificiality)
+    # Step 2: InSAR features (Seasonal Stability Analysis)
     logger.info("=" * 70)
-    logger.info("STEP 2: INSAR FEATURES EXTRACTION")
+    logger.info("STEP 2: INSAR SEASONAL STABILITY EXTRACTION")
     logger.info("=" * 70)
 
-    insar_dir = project_paths.RAW_DIR / "insar" / "sentinel1"
-    coh_raw_paths = sorted(insar_dir.glob("*.tif"))
+    # Path to the VRTs we just created
+    vrt_dir = project_paths.PROCESSED_DIR / "insar" / "mosaics"
+    seasons = ["winter", "spring", "summer", "fall"]
+    
+    # Output filenames
     art_path = f"{output_prefix}_structural_artificiality.tif"
     ccd_path = f"{output_prefix}_coherence_change.tif"
     homog_path = f"{output_prefix}_texture_homogeneity.tif"
-    entropy_path = f"{output_prefix}_texture_entropy.tif"  # Unused downstream
+    entropy_path = f"{output_prefix}_texture_entropy.tif"
     coh_mean_path = f"{output_prefix}_coh_mean.tif"
 
+    seasonal_clips = []
     step2_success = False
-    if len(coh_raw_paths) >= 2:
-        logger.info(f"Clipping {len(coh_raw_paths)} coherence rasters...")
-        coh_clipped_paths: List[str] = []
-        for i, coh_path in enumerate(coh_raw_paths):
-            coh_clip_path = f"{output_prefix}_coh_{i+1:03d}.tif"
-            if clip_and_reproject_raster(coh_path, Path(coh_clip_path), region, resolution):
-                coh_clipped_paths.append(coh_clip_path)
-        if len(coh_clipped_paths) >= 2:
-            # Compute mean coherence
-            with rasterio.open(coh_clipped_paths[0]) as src:
-                profile = src.profile
-            coh_stack = [rasterio.open(p).read(1, masked=True).filled(np.nan) for p in coh_clipped_paths]
-            coh_mean_data = np.nanmean(coh_stack, axis=0)
-            with rasterio.open(coh_mean_path, "w", **profile) as dst:
-                dst.write(coh_mean_data.astype(np.float32), 1)
 
-            # Features
-            logger.info("Computing coherence change detection...")
-            compute_coherence_change_detection(coh_clipped_paths, ccd_path)
-            logger.info("Computing GLCM texture...")
-            compute_glcm_texture(coh_mean_path, homog_path, entropy_path)
-            logger.info("Computing structural artificiality...")
-            compute_structural_artificiality(ccd_path, homog_path, art_path)
-            step2_success = Path(art_path).exists()
+    # 1. Clip each season to the current ROI
+    logger.info("Clipping seasonal coherence maps...")
+    for season in seasons:
+        # Assumes VRTs are named like: usa_winter_vv_COH12.vrt
+        vrt_path = vrt_dir / f"usa_{season}_vv_COH12.vrt"
+        output_clip = f"{output_prefix}_{season}_coh.tif"
+        
+        if vrt_path.exists():
+            if clip_and_reproject_raster(vrt_path, Path(output_clip), region, resolution):
+                seasonal_clips.append(output_clip)
+        else:
+            logger.warning(f"Missing VRT for {season}: {vrt_path}")
+
+    if len(seasonal_clips) == 4:
+        # 2. Compute Mean Coherence (Average of 4 seasons)
+        logger.info("Computing mean seasonal coherence...")
+        with rasterio.open(seasonal_clips[0]) as src:
+            profile = src.profile
+            shape = src.shape
+            
+        # Stack and Average
+        stack_data = np.zeros((4, shape[0], shape[1]), dtype=np.float32)
+        for i, p in enumerate(seasonal_clips):
+            with rasterio.open(p) as src:
+                stack_data[i] = src.read(1, masked=False) # Fill NaNs later
+        
+        # Handle nodata (0)
+        stack_data[stack_data == 0] = np.nan
+        coh_mean_data = np.nanmean(stack_data, axis=0)
+        
+        # Save Mean
+        with rasterio.open(coh_mean_path, "w", **profile) as dst:
+            dst.write(coh_mean_data.astype(np.float32), 1)
+
+        # 3. Compute Features
+        # Pass the 4 seasonal clips as the "time series" for stability analysis
+        logger.info("Computing seasonal stability (CCD)...")
+        compute_coherence_change_detection(seasonal_clips, ccd_path)
+        
+        logger.info("Computing GLCM texture...")
+        compute_glcm_texture(coh_mean_path, homog_path, entropy_path)
+        
+        logger.info("Computing structural artificiality...")
+        compute_structural_artificiality(ccd_path, homog_path, art_path)
+        
+        step2_success = Path(art_path).exists()
     else:
-        logger.warning("Insufficient InSAR files (<2) in %s", insar_dir)
+        logger.warning(f"Insufficient seasonal data. Found {len(seasonal_clips)}/4 seasons.")
+        logger.warning("Ensure you ran 'build_usa_mosaics.py' first.")
+
     results["insar"] = step2_success
     logger.info("Step 2 complete.")
 
