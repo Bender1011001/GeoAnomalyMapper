@@ -1,0 +1,36 @@
+# config_production.yaml - GeoAnomalyMapper Phase 8 Configuration (Production Mode)
+# Goal: Highest quality, smoothest map.
+# Focus: High epochs, small stride (maximum overlap), potentially smaller chip size for detail.
+
+version: 1.0
+
+data:
+  inputs:
+    gravity: "outputs/gravity_residual.tif"
+    belief: "outputs/fusion/fused_belief.tif"
+    insar: "processed/insar/mosaics/usa_winter_vv_COH12.vrt"
+  normalization: "minmax"
+
+model:
+  architecture: "conv_autoencoder_v1"
+  chip_size: 64
+  stride: 16  # High overlap (75%) for smoothness
+  batch_size: 64
+  epochs: 50  # High epochs for better convergence
+  learning_rate: 0.0005 # Lower LR for fine-tuning
+  optimizer: "adam"
+  loss: "mse"
+
+training:
+  device: "auto"
+  validation_split: 0.1
+
+output:
+  anomaly_map: "spatial_anomaly_production.tif"
+  threshold: null
+
+visualization:
+  enabled: true
+  formats: ["html", "png", "kmz"]
+  colormap: "plasma"
+  opacity: 0.7

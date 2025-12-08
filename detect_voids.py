@@ -149,9 +149,10 @@ def dempster_shafer_fusion(
     mass_artif_theta: float = 0.3,
     mass_poisson_r: float = 0.8,
     mass_poisson_theta: float = 0.2,
+    target_mode: str = 'void',
 ) -> None:
     
-    logger.info("Starting Dempster-Shafer Fusion...")
+    logger.info(f"Starting Dempster-Shafer Fusion (Mode: {target_mode.upper()})...")
 
     # --- Load Data ---
     if not tdr_path.exists():
@@ -197,38 +198,72 @@ def dempster_shafer_fusion(
     # Create masks
     # Note: We mask NaN comparisons to False to avoid runtime warnings
     with np.errstate(invalid='ignore'):
-        tdr_high = (tdr_abs > tdr_threshold) & mask
-        # Treat NaNs in secondary rasters as "False" (Low evidence)
-        artif_high = (artif > artif_threshold) & mask & ~np.isnan(artif)
-        poisson_low = (poisson < poisson_threshold) & mask & ~np.isnan(poisson)
+        if target_mode == 'mineral':
+            # Mineral Mode:
+            # TDR > 0 (Positive Mass)
+            # Poisson > Threshold (Positive Correlation)
+            # Artificiality: Usually Low (Natural), but we keep it neutral or use it to filter mines
+            
+            # We use the raw TDR sign for minerals
+            tdr_signal = (tdr > tdr_threshold) & mask
+            
+            # Poisson: We expect positive correlation (already handled by upstream inversion if mode=mineral)
+            # But if upstream passed raw correlation, we check for > threshold
+            poisson_signal = (poisson > 0.3) & mask & ~np.isnan(poisson)
+            
+        else:
+            # Void Mode:
+            # TDR: Magnitude matters (edges), usually negative mass but TDR is edge detector
+            tdr_signal = (tdr_abs > tdr_threshold) & mask
+            
+            # Poisson: We expect negative correlation (or inverted positive from upstream)
+            # Upstream 'void' mode returns -corr, so we look for > 0.3
+            poisson_signal = (poisson > 0.3) & mask & ~np.isnan(poisson)
+
+        # Artificiality is same for now
+        artif_signal = (artif > artif_threshold) & mask & ~np.isnan(artif)
 
     bel_lookup = np.zeros(8, dtype=np.float32)
 
     # Iterate through all 8 truth combinations of the 3 evidence layers
     for idx in range(8):
-        t = (idx >> 2) & 1  # TDR high?
-        a = (idx >> 1) & 1  # Artificiality high?
-        p = idx & 1         # Poisson low?
+        t = (idx >> 2) & 1  # TDR signal?
+        a = (idx >> 1) & 1  # Artificiality signal?
+        p = idx & 1         # Poisson signal?
 
-        # 1. Gravity TDR: Supports {Void, Reinforced} or Theta
+        # 1. Gravity TDR
         if t:
-            m1 = LiteMassFunction({
-                frozenset(['Void', 'Reinforced']): mass_tdr_vr,
-                theta: mass_tdr_theta,
-            })
+            if target_mode == 'mineral':
+                # Supports {Mineral}
+                m1 = LiteMassFunction({
+                    frozenset(['Reinforced']): mass_tdr_vr, # Re-using 'Reinforced' label for 'Mineral' to save refactoring
+                    theta: mass_tdr_theta,
+                })
+            else:
+                # Supports {Void, Reinforced}
+                m1 = LiteMassFunction({
+                    frozenset(['Void', 'Reinforced']): mass_tdr_vr,
+                    theta: mass_tdr_theta,
+                })
         else:
             m1 = LiteMassFunction({theta: 1.0})
 
         # 2. InSAR: Supports {Reinforced, Solid} or Theta
-        if a:
-            m2 = LiteMassFunction({
-                frozenset(['Reinforced', 'Solid']): mass_artif_rs,
-                theta: mass_artif_theta,
-            })
-        else:
-            m2 = LiteMassFunction({theta: 1.0})
+        # MINERAL-PRO MODE: Neutralize artificiality bias.
+        # We force this belief to be neutral (Theta) regardless of the input 'a'.
+        # This allows natural voids (which lack artificial surface features) to be detected.
+        # Original logic:
+        # if a:
+        #     m2 = LiteMassFunction({
+        #         frozenset(['Reinforced', 'Solid']): mass_artif_rs,
+        #         theta: mass_artif_theta,
+        #     })
+        # else:
+        #     m2 = LiteMassFunction({theta: 1.0})
+        
+        m2 = LiteMassFunction({theta: 1.0})
 
-        # 3. Poisson: Supports {Reinforced} or Theta
+        # 3. Poisson: Supports {Reinforced/Mineral} or Theta
         if p:
             m3 = LiteMassFunction({
                 frozenset(['Reinforced']): mass_poisson_r,
@@ -251,9 +286,9 @@ def dempster_shafer_fusion(
     
     # Create index raster: (Bit 2: TDR) + (Bit 1: Artif) + (Bit 0: Poisson)
     # We cast to uint8 to save memory
-    idx_raster = (tdr_high.astype(np.uint8) << 2) | \
-                 (artif_high.astype(np.uint8) << 1) | \
-                 (poisson_low.astype(np.uint8))
+    idx_raster = (tdr_signal.astype(np.uint8) << 2) | \
+                 (artif_signal.astype(np.uint8) << 1) | \
+                 (poisson_signal.astype(np.uint8))
 
     bel_reinforced = bel_lookup[idx_raster]
     
@@ -282,6 +317,7 @@ def main():
     parser.add_argument("--tdr-thresh", type=float, default=0.5, help="TDR absolute threshold")
     parser.add_argument("--artif-thresh", type=float, default=0.7, help="Artificiality threshold")
     parser.add_argument("--poisson-thresh", type=float, default=-0.3, help="Poisson threshold (low)")
+    parser.add_argument("--mode", type=str, default="void", help="Target mode: 'void' or 'mineral'")
     args = parser.parse_args()
 
     # Input paths
@@ -299,6 +335,7 @@ def main():
         tdr_threshold=args.tdr_thresh,
         artif_threshold=args.artif_thresh,
         poisson_threshold=args.poisson_thresh,
+        target_mode=args.mode,
     )
 
 if __name__ == "__main__":

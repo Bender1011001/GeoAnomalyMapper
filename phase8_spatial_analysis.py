@@ -133,9 +133,20 @@ def prepare_data(config):
             # We resize on the fly if needed (brute force alignment for the script).
             arr = src.read(1, out_shape=ref_shape)
             
-            # Normalize to 0-1
-            arr_min, arr_max = np.nanmin(arr), np.nanmax(arr)
-            arr_norm = (arr - arr_min) / (arr_max - arr_min + 1e-6)
+            # Normalize
+            norm_method = config['data'].get('normalization', 'minmax')
+            
+            if norm_method == 'zscore':
+                # Z-Score: (x - mean) / std
+                mean = np.nanmean(arr)
+                std = np.nanstd(arr)
+                if std == 0: std = 1  # Prevent divide by zero
+                arr_norm = (arr - mean) / std
+            else:
+                # Default MinMax (0-1)
+                arr_min, arr_max = np.nanmin(arr), np.nanmax(arr)
+                arr_norm = (arr - arr_min) / (arr_max - arr_min + 1e-6)
+                
             loaded_layers.append(arr_norm)
             
     # Stack into (Channels, Height, Width) -> (3, H, W)

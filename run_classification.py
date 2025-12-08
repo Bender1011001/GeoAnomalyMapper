@@ -1,4 +1,4 @@
-from classify_anomalies import classify_dumb_candidates
+from classify_anomalies import classify_anomaly_candidates
 import os
 
 # Define the paths to your processed layers
@@ -24,12 +24,12 @@ if not existing_paths:
     print("Error: No input files found. Cannot proceed with classification.")
     exit(1)
 
-output_path = "data/outputs/final_dumb_probability.tif"
+output_path = "data/outputs/final_spatial_anomaly.tif"
 
 # Ensure output directory exists
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
 # Generate the final probability map
 print("Starting classification...")
-classify_dumb_candidates(existing_paths, output_path)
+classify_anomaly_candidates(existing_paths, output_path)
 print(f"Classification complete. Output saved to {output_path}")

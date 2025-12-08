@@ -128,7 +128,7 @@ class TestPipelineV2(unittest.TestCase):
             "_poisson_correlation.tif",
             "_gravity_prior_highres.tif",
             "_fused_belief_reinforced.tif",
-            "_dumb_probability_v2.tif",
+            "_spatial_anomaly_v2.tif",
         ]
         for suffix in expected_suffixes:
             out_path = Path(f"{output_prefix}{suffix}")

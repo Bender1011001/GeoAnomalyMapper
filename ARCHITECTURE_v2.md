@@ -5,7 +5,7 @@
 ### Key Functions and Data Flows
 - **`process_data.py`**: Ingests raw gravity (XGM2019e), magnetic (EMAG2), DEM, InSAR data from `data/raw/`. Clips/reprojects to common grid (~100m) outputting to `data/processed/`. **Limitations**: Basic resampling (bilinear); no spectral/wavelet separation; regional trends not removed (matches roadmap failure: high σ variance from Moho).
 - **`multi_resolution_fusion.py`**: Adaptive resampling + uncertainty-weighted z-score averaging + spectral fusion (high-pass InSAR + low-pass gravity). Outputs `fused_anomaly.tif`. **Limitations**: Gaussian filters cause leakage; simple averaging dilutes signals; resolution mismatch artifacts (roadmap: "signal dilution").
-- **`detect_voids.py`**: Scores layers (gravity/magnetic negative anomalies, InSAR subsidence); weighted average probability (calibrated via logistic regression fallback to equal weights). Thresholds hotspots. **Limitations**: Subsidence bias (penalizes stable DUMBs like SPR); insufficient labels (roadmap: 21-35% accuracy).
+- **`detect_voids.py`**: Scores layers (gravity/magnetic negative anomalies, InSAR subsidence); weighted average probability (calibrated via logistic regression fallback to equal weights). Thresholds hotspots. **Limitations**: Subsidence bias (penalizes stable anomalies like SPR); insufficient labels (roadmap: 21-35% accuracy).
 - **`utils/raster_utils.py`**: Core clip/reproject with bilinear/nearest.
 - **`utils/snap_templates.py`**: SNAP GPT graph templating for InSAR (TOPSAR-Split, Back-Geocoding, etc.). **Limitations**: No CCD/GLCM/PSI.
 - **`workflow.py`**: Orchestrates phases; auto-res adjustment for memory.
@@ -138,7 +138,7 @@ def ds_fusion(bpas):  # List of dicts: {'{Void,Reinforced}':0.6, Theta:0.4}
 ## Phase 5: Anomaly Classification
 **High-level Design**: `phase5_ml_anomaly.py`. OC-SVM on features; rank w/ Isolation Forest; PINN optional.
 
-**Data Flow**: Feature stack → Train OC-SVM (nu=0.05) on background → Score outliers → IF rank → `dumb_probability_v2.tif`.
+**Data Flow**: Feature stack → Train OC-SVM (nu=0.05) on background → Score outliers → IF rank → `mineral_void_probability.tif`.
 
 **Key Algorithms**:
 - **OC-SVM**: `OneClassSVM(nu=0.05, kernel='rbf').fit(background_pixels)`.
@@ -153,7 +153,7 @@ def oc_svm_anomaly(features):  # (n_pixels, n_features)
     return -scores  # High = anomaly
 ```
 
-**I/O**: Input: Fusion beliefs; Output: `dumb_probability_v2.tif`.
+**I/O**: Input: Fusion beliefs; Output: `mineral_void_probability.tif`.
 **Libs**: `scikit-learn==1.5.0`, `torch>=2.0` (PINNs).
 
 ## Dependencies
@@ -179,13 +179,13 @@ graph TD
     G --> H[Phase4: BCS+D-S]
     H --> I[belief_reinforced.tif]
     I --> J[Phase5: OC-SVM+IF]
-    J --> K[dumb_probability_v2.tif]
+    J --> K[mineral_void_probability.tif]
     K --> L[Validate v2]
 ```
 
 ## Testing Plan
 Extend `validate_against_known_features.py`:
-- Sample `dumb_probability_v2.tif` at known DUMBs (2km buffer).
+- Sample `mineral_void_probability.tif` at known Target Voids (2km buffer).
 - Metrics: Precision@95%Recall, F1>0.95 target.
 - Cross-validate OC-SVM on held-out regions.
 - Unit tests: CWT scales, D-S combination, Poisson corr.

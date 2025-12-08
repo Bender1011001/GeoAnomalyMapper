@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 geod = Geod(ellps='WGS84')
 
 
-DETECTION_THRESHOLD_SIGMA = 0.5  # DUMB probability threshold (>=0.5 = high confidence void)
+DETECTION_THRESHOLD_SIGMA = 0.5  # Anomaly probability threshold (>=0.5 = high confidence void)
 MIN_VALID_PIXELS = 25            # Ignore samples with insufficient coverage
 
 
@@ -149,6 +149,169 @@ KNOWN_FEATURES = [
         'type': 'impact_crater',
         'expected': 'positive',
         'description': 'Meteorite impact with dense minerals',
+        'verified': True
+    },
+    # --- Major US Mineral Deposits (Expanded for Mining Mode) ---
+    {
+        'name': 'Morenci Mine, AZ',
+        'lon': -109.371,
+        'lat': 33.083,
+        'type': 'copper_porphyry',
+        'expected': 'positive',
+        'description': 'Largest copper producer in North America',
+        'verified': True
+    },
+    {
+        'name': 'Carlin Trend, NV',
+        'lon': -116.28,
+        'lat': 40.95,
+        'type': 'gold_deposit',
+        'expected': 'positive',
+        'description': 'Major gold mining district (Carlin-type)',
+        'verified': True
+    },
+    {
+        'name': 'Mountain Pass Mine, CA',
+        'lon': -115.53,
+        'lat': 35.47,
+        'type': 'rare_earth',
+        'expected': 'positive',
+        'description': 'Carbonatite-hosted rare earth elements',
+        'verified': True
+    },
+    {
+        'name': 'Red Dog Mine, AK',
+        'lon': -162.85,
+        'lat': 68.07,
+        'type': 'zinc_lead',
+        'expected': 'positive',
+        'description': 'World\'s largest zinc mine (SEDEX)',
+        'verified': True
+    },
+    {
+        'name': 'Stillwater Complex, MT',
+        'lon': -109.93,
+        'lat': 45.38,
+        'type': 'pgm_deposit',
+        'expected': 'positive',
+        'description': 'Layered intrusion, only US platinum/palladium mine',
+        'verified': True
+    },
+    {
+        'name': 'Climax Mine, CO',
+        'lon': -106.18,
+        'lat': 39.36,
+        'type': 'molybdenum',
+        'expected': 'positive',
+        'description': 'Major molybdenum porphyry deposit',
+        'verified': True
+    },
+    {
+        'name': 'Resolution Copper, AZ',
+        'lon': -111.10,
+        'lat': 33.30,
+        'type': 'copper_porphyry',
+        'expected': 'positive',
+        'description': 'Deep, high-grade copper deposit (undeveloped)',
+        'verified': True
+    },
+    {
+        'name': 'Pebble Deposit, AK',
+        'lon': -155.30,
+        'lat': 59.80,
+        'type': 'copper_gold',
+        'expected': 'positive',
+        'description': 'Massive undeveloped porphyry system',
+        'verified': True
+    },
+    {
+        'name': 'Eagle Mine, MI',
+        'lon': -87.88,
+        'lat': 46.75,
+        'type': 'nickel_copper',
+        'expected': 'positive',
+        'description': 'High-grade magmatic sulfide deposit',
+        'verified': True
+    },
+    {
+        'name': 'Thacker Pass, NV',
+        'lon': -118.06,
+        'lat': 41.71,
+        'type': 'lithium_clay',
+        'expected': 'positive', # Clay density > brine, but subtle
+        'description': 'Largest known lithium resource in US',
+        'verified': True
+    },
+    {
+        'name': 'Round Mountain, NV',
+        'lon': -117.07,
+        'lat': 38.70,
+        'type': 'gold_deposit',
+        'expected': 'positive',
+        'description': 'Large epithermal gold mine',
+        'verified': True
+    },
+    {
+        'name': 'Bagdad Mine, AZ',
+        'lon': -113.21,
+        'lat': 34.58,
+        'type': 'copper_porphyry',
+        'expected': 'positive',
+        'description': 'Open-pit copper/molybdenum mine',
+        'verified': True
+    },
+    {
+        'name': 'Ray Mine, AZ',
+        'lon': -110.99,
+        'lat': 33.15,
+        'type': 'copper_porphyry',
+        'expected': 'positive',
+        'description': 'Large copper mine',
+        'verified': True
+    },
+    {
+        'name': 'Sierrita Mine, AZ',
+        'lon': -111.13,
+        'lat': 31.87,
+        'type': 'copper_moly',
+        'expected': 'positive',
+        'description': 'Porphyry copper-molybdenum',
+        'verified': True
+    },
+    {
+        'name': 'Crippled Creek, CO',
+        'lon': -105.17,
+        'lat': 38.73,
+        'type': 'gold_telluride',
+        'expected': 'positive',
+        'description': 'Historic gold district in volcanic pipe',
+        'verified': True
+    },
+    {
+        'name': 'Homestake Mine (Lead), SD',
+        'lon': -103.76,
+        'lat': 44.35,
+        'type': 'gold_deposit',
+        'expected': 'positive',
+        'description': 'Deepest mine in western hemisphere (closed)',
+        'verified': True
+    },
+    {
+        'name': 'Greens Creek, AK',
+        'lon': -134.76,
+        'lat': 58.08,
+        'type': 'silver_zinc',
+        'expected': 'positive',
+        'description': 'VMS deposit, major silver producer',
+        'verified': True
+    },
+    {
+        'name': 'Pogo Mine, AK',
+        'lon': -144.93,
+        'lat': 64.45,
+        'type': 'gold_deposit',
+        'expected': 'positive',
+        'description': 'High-grade underground gold',
         'verified': True
     },
     
@@ -301,14 +464,29 @@ def validate_features(raster_path: Path, features: List[Dict],
             expected_sign = feature.get('expected', 'any').lower()
             threshold = DETECTION_THRESHOLD_SIGMA
     
-            if expected_sign == 'negative':  # voids/DUMBs expect high prob
+            if expected_sign == 'negative':  # voids/Target Voids expect high prob
                 meets_expectation = mean_value >= threshold
                 requirement = f"≥ {threshold:.2f}"
-                expectation_desc = 'high probability'
-            elif expected_sign == 'positive':  # dense expect low prob
-                meets_expectation = mean_value <= (1.0 - threshold)
-                requirement = f"≤ {1.0-threshold:.2f}"
-                expectation_desc = 'low probability'
+                expectation_desc = 'high probability (void)'
+            elif expected_sign == 'positive':  # dense/mineral expect high prob (in mineral mode)
+                # NOTE: In 'Mineral Mode', the output probability represents 'Mineral Likelihood'.
+                # So a positive anomaly should have HIGH probability.
+                # In 'Void Mode', positive anomalies (dense) would have LOW probability.
+                # We assume the input raster matches the intent (e.g. mineral_potential.tif).
+                
+                # If we are validating against a "Void Probability Map", dense things should be ~0.
+                # If we are validating against a "Mineral Potential Map", dense things should be ~1.
+                
+                # Heuristic: If the raster name contains "mineral" or "potential", assume High=Good.
+                if "mineral" in raster_path.name or "potential" in raster_path.name:
+                     meets_expectation = mean_value >= threshold
+                     requirement = f"≥ {threshold:.2f}"
+                     expectation_desc = 'high probability (mineral)'
+                else:
+                    # Legacy behavior for void maps
+                    meets_expectation = mean_value <= (1.0 - threshold)
+                    requirement = f"≤ {1.0-threshold:.2f}"
+                    expectation_desc = 'low probability (not void)'
             else:
                 meets_expectation = mean_value >= threshold
                 requirement = f"≥ {threshold:.2f}"
@@ -567,12 +745,12 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Validate v2 DUMB probability against known underground features"
+        description="Validate v2 Target Void probability against known underground features"
     )
     parser.add_argument(
         'raster',
         type=str,
-        help='Path to dumb_probability_v2.tif (global or tile mosaic)'
+        help='Path to mineral_void_probability.tif (global or tile mosaic)'
     )
     parser.add_argument(
         '--buffer',

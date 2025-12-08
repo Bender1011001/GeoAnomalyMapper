@@ -14,7 +14,7 @@ This session focused on transforming your raw geophysical data (Gravity, InSAR, 
       * Wrote and executed `phase5_classification.py`.
       * The script trained on a 100k pixel subsample to learn "normal" geology.
       * It processed the full continent using a memory-safe windowed approach.
-  * **Result:** Successfully generated `dumb_probability_v2.tif`.
+  * **Result:** Successfully generated `spatial_anomaly_v2.tif`.
       * **Stats:** The model found a strong signal range from **-23.6** (Normal) to **+8.9** (Anomalous), confirming high-confidence targets exist in your data.
 
 ### **2. Phase 6: Visualization (Completed)**
@@ -58,7 +58,7 @@ You should have these files in your project folder now:
 
 | File Name | Description | Status |
 | :--- | :--- | :--- |
-| `dumb_probability_v2.tif` | The raw anomaly probability map (Phase 5 output). | **Created** |
+| `mineral_void_probability.tif` | The raw anomaly probability map (Phase 5 output). | **Created** |
 | `anomaly_map.html` | Interactive web map for quick viewing. | **Created** |
 | `phase6_visualization.py` | Script to regenerate the HTML map. | **Saved** |
 | `phase7_extraction.py` | Script to extract GPS coordinates from the TIFF. | **Ready to Run** |

@@ -29,7 +29,7 @@ V2_LAYERS = [
     "poisson_correlation",
     "gravity_prior_highres",
     "fused_belief_reinforced",
-    "dumb_probability_v2"
+    "spatial_anomaly_v2"
 ]
 
 def merge_using_rasterio(input_files: list[Path], output_path: Path):
@@ -113,7 +113,7 @@ def main():
     parser.add_argument("--input-dir", required=True, help="Directory containing tile .tif files")
     parser.add_argument("--output-dir", help="Output directory for v2 multi-layer merge")
     parser.add_argument("--output", help="Single output path for single pattern merge")
-    parser.add_argument("--pattern", default="*_dumb_probability_v2.tif", help="File pattern for single merge")
+    parser.add_argument("--pattern", default="*_mineral_void_probability.tif", help="File pattern for single merge")
     parser.add_argument("--v2", action="store_true", help="Perform v2 multi-layer merge")
     
     args = parser.parse_args()

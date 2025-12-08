@@ -2,7 +2,7 @@
 
 **Advanced Geophysical Anomaly Detection & Multi-Scale Fusion Pipeline**
 
-GeoAnomalyMapper v2.0 is a complete rebuild of the anomaly detection system, designed to achieve >95% accuracy in detecting Deep Underground Military Bunkers (DUMB) and other subterranean anomalies. It addresses previous limitations through a sophisticated multi-stage pipeline integrating signal processing, physics-informed analysis, and machine learning.
+GeoAnomalyMapper v2.0 is a complete rebuild of the anomaly detection system, designed to achieve >95% accuracy in detecting Subsurface Voids / Geological Anomalies and other subterranean features. It addresses previous limitations through a sophisticated multi-stage pipeline integrating signal processing, physics-informed analysis, and machine learning.
 
 ## Key Features (v2.0)
 
@@ -80,7 +80,7 @@ The workflow executes in 6 sequential steps. All outputs are GeoTIFFs prefixed w
     *   `_fused_belief_reinforced.tif`: Combined belief map representing the probability of a void, weighted by source uncertainty.
 
 6.  **Anomaly Classification:**
-    *   `_dumb_probability_v2.tif`: **Final Output**. Probability map of DUMB presence (>95% confidence target).
+    *   `_mineral_void_probability.tif`: **Final Output**. Probability map of Target Void presence (>95% confidence target).
 
 ## Repository Layout
 

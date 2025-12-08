@@ -4,7 +4,7 @@ Phase 5: Anomaly Classification for GeoAnomalyMapper v2.0.
 
 Implements unsupervised anomaly detection using One-Class SVM (OC-SVM) to model
 "normal" geology manifold and Isolation Forest (IF) for outlier ranking. Combines
-scores into a 0-1 probability map where high values indicate DUMB candidates.
+scores into a 0-1 probability map where high values indicate subsurface anomaly candidates.
 
 Optimized for memory efficiency using windowed processing for prediction.
 
@@ -163,7 +163,7 @@ def train_models(
 
     return scaler, ocsvm, iforest
 
-def predict_and_save_windowed(
+def classify_anomaly_candidates(
     feature_paths: List[str],
     output_path: str,
     scaler: StandardScaler,
@@ -203,7 +203,7 @@ def predict_and_save_windowed(
     # Estimating from training data is risky if anomalies are outliers not in training.
     # Let's output raw combined score first, then we can normalize if needed, 
     # OR just use the raw scores (higher is more anomalous).
-    # The prompt asks for "dumb_probability_v2.tif" which implies 0-1.
+    # The prompt asks for "mineral_void_probability.tif" which implies 0-1.
     # Let's do a two-pass approach or just load the raw result to normalize if it fits?
     # No, memory constraint.
     # Let's estimate min/max from a subset of predictions (e.g. the training set predictions).
@@ -274,6 +274,12 @@ def predict_and_save_windowed(
                 # Normalize
                 prob = (combined - p_min) / (p_max - p_min + 1e-12)
                 prob = np.clip(prob, 0.0, 1.0)
+
+                # MINERAL-PRO MODE: Relax classification threshold.
+                # Apply a power transform < 1.0 to boost lower probabilities,
+                # allowing more natural voids (which might have weaker signals) to pass through.
+                # Original was linear (power=1.0 implicitly).
+                prob = np.power(prob, 0.65)
                 
                 # Mask NaNs
                 all_nan = np.all(np.isnan(X_window_flat), axis=1)
@@ -286,7 +292,7 @@ def predict_and_save_windowed(
 
 def main():
     parser = argparse.ArgumentParser(description="Phase 5: Anomaly Classification")
-    parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "dumb_probability_v2.tif"), help="Output path")
+    parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "mineral_void_probability.tif"), help="Output path")
     args = parser.parse_args()
 
     # Define inputs based on previous phases
@@ -332,7 +338,7 @@ def main():
     scaler, ocsvm, iforest = train_models(X_train)
     
     # Predict
-    predict_and_save_windowed(valid_paths, args.output, scaler, ocsvm, iforest, imputer)
+    classify_anomaly_candidates(valid_paths, args.output, scaler, ocsvm, iforest, imputer)
 
 if __name__ == "__main__":
     main()

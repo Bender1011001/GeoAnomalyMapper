@@ -36,9 +36,9 @@ from insar_features import (
     compute_structural_artificiality,
 )
 from poisson_analysis import analyze_poisson_correlation
-from multi_resolution_fusion import bayesian_downscaling
+from multi_resolution_fusion import bayesian_downscaling, train_model
 from detect_voids import dempster_shafer_fusion
-from classify_anomalies import classify_dumb_candidates
+from classify_anomalies import classify_anomaly_candidates
 from pinn_gravity_inversion import invert_gravity
 from fetch_lithology_density import fetch_and_rasterize
 
@@ -246,10 +246,18 @@ def run_full_workflow(
     step4_success = False
     if step1_success and covariates_paths:
         logger.info("Performing BCS downscaling...")
+        # Train model first
+        model, imputer = train_model(Path(gravity_tdr_path), [Path(p) for p in covariates_paths])
+        
+        # Use first covariate as master grid (usually highest res)
+        master_grid = Path(covariates_paths[0])
+        
         bayesian_downscaling(
-            Path(gravity_tdr_path),
+            model,
+            imputer,
             [Path(p) for p in covariates_paths],
             Path(prior_path),
+            master_grid
         )
         step4_success = True
     else:
@@ -313,10 +321,10 @@ def run_full_workflow(
 
     # Step 7: Anomaly classification (OC-SVM + Isolation Forest)
     logger.info("=" * 70)
-    logger.info("STEP 7: ANOMALY CLASSIFICATION (DUMB Candidates)")
+    logger.info("STEP 7: ANOMALY CLASSIFICATION (Target Void Candidates)")
     logger.info("=" * 70)
 
-    dumb_path = f"{output_prefix}_dumb_probability_v2.tif"
+    dumb_path = f"{output_prefix}_mineral_void_probability.tif"
     feature_candidates = [
         gravity_residual_path,
         belief_path,
@@ -330,7 +338,7 @@ def run_full_workflow(
     step7_success = False
     if len(existing_features) >= 1:
         logger.info("Classifying anomalies...")
-        classify_dumb_candidates(existing_features, dumb_path)
+        classify_anomaly_candidates(existing_features, dumb_path)
         step7_success = True
     else:
         logger.warning("Skipping classification: no features available.")
@@ -371,7 +379,7 @@ def main(argv: list[str] | None = None) -> dict:
     parser = argparse.ArgumentParser(
         description="GeoAnomalyMapper v2.0 Full Pipeline",
         epilog="""Example: python workflow.py --region "-105,32,-104,33" --resolution 0.001 --output-name "outputs/test_tile"
-        Outputs: test_tile_gravity_residual.tif, test_tile_structural_artificiality.tif, ..., test_tile_dumb_probability_v2.tif""",
+        Outputs: test_tile_gravity_residual.tif, test_tile_structural_artificiality.tif, ..., test_tile_mineral_void_probability.tif""",
     )
     parser.add_argument(
         "--region",

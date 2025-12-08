@@ -132,7 +132,7 @@ def train_model(
     
     return rf, imputer
 
-def predict_and_save(
+def bayesian_downscaling(
     model: RandomForestRegressor,
     imputer: SimpleImputer,
     covariate_paths: List[Path],
@@ -314,7 +314,7 @@ def main():
         sys.exit(1)
 
     try:
-        predict_and_save(model, imputer, covariates, output_path, master_grid_path)
+        bayesian_downscaling(model, imputer, covariates, output_path, master_grid_path)
     except Exception as e:
         logger.error(f"Prediction failed: {e}")
         sys.exit(1)

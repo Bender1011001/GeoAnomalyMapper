@@ -1,0 +1,36 @@
+# config_fast.yaml - GeoAnomalyMapper Phase 8 Configuration (Fast Mode)
+# Goal: Run in under 2 minutes for quick checks.
+# Focus: Reduce epochs, increase stride (less overlap).
+
+version: 1.0
+
+data:
+  inputs:
+    gravity: "outputs/gravity_residual.tif"
+    belief: "outputs/fusion/fused_belief.tif"
+    insar: "processed/insar/mosaics/usa_winter_vv_COH12.vrt"
+  normalization: "minmax"
+
+model:
+  architecture: "conv_autoencoder_v1"
+  chip_size: 64
+  stride: 64  # No overlap for speed
+  batch_size: 512 # Larger batch size for faster training
+  epochs: 3   # Minimal epochs for quick check
+  learning_rate: 0.005 # Higher LR for faster convergence
+  optimizer: "adam"
+  loss: "mse"
+
+training:
+  device: "auto"
+  validation_split: 0.1
+
+output:
+  anomaly_map: "spatial_anomaly_fast.tif"
+  threshold: null
+
+visualization:
+  enabled: true
+  formats: ["html", "png", "kmz"]
+  colormap: "plasma"
+  opacity: 0.7

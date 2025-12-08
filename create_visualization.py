@@ -267,7 +267,7 @@ def create_v2_visualizations_suite(global_dir: Path, output_dir: Path) -> Dict[s
         'poisson_correlation': global_dir / 'global_poisson_correlation.tif',
         'gravity_prior_highres': global_dir / 'global_gravity_prior_highres.tif',
         'fused_belief_reinforced': global_dir / 'global_fused_belief_reinforced.tif',
-        'dumb_probability_v2': global_dir / 'global_dumb_probability_v2.tif',
+        'spatial_anomaly_v2': global_dir / 'global_spatial_anomaly_v2.tif',
     }
     
     outputs = {}

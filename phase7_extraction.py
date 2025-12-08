@@ -2,10 +2,10 @@
 """
 Phase 7: High-Precision Candidate Extraction.
 
-1. Reads the full-resolution 'dumb_probability_v2.tif'.
+1. Reads the full-resolution 'spatial_anomaly_v2.tif'.
 2. Applies a high-confidence threshold (e.g., Score > 3.0).
    (Note: Raw scores ranged from -23 to 8.9. A score of 3.0 is very high confidence).
-3. Clusters adjacent anomalous pixels into "Blobs" (DUMB candidates).
+3. Clusters adjacent anomalous pixels into "Blobs" (Anomaly candidates).
 4. Calculates the precise Centroid (Lat/Lon) of each blob.
 5. Filters out tiny noise (artifacts smaller than 2 pixels).
 6. Exports 'targets.csv' and 'targets.geojson' for inspection.
@@ -140,7 +140,7 @@ def save_geojson(candidates, output_path):
 def main():
     parser = argparse.ArgumentParser(description="Phase 7: Precision Extraction")
     # Note: We are using the RAW PROBABILITY file from Phase 5
-    parser.add_argument("--input", type=str, default=str(OUTPUTS_DIR / "dumb_probability_v2.tif"))
+    parser.add_argument("--input", type=str, default=str(OUTPUTS_DIR / "mineral_void_probability.tif"))
     parser.add_argument("--threshold", type=float, default=2.0, help="Anomaly Score Threshold (Higher = Stricter)")
     args = parser.parse_args()
 

@@ -22,7 +22,8 @@ CONFIG = {
     "DEPTH_ESTIMATE": 200,   # Estimated depth of anomalies (meters)
     "MAX_DENSITY": 500.0,    # Cap density contrast (kg/m^3)
     "PHYSICS_WEIGHT": 0.1,   # Weight of physics loss vs sparsity
-    "USE_AMP": True          # Automatic Mixed Precision for 4060 Ti
+    "USE_AMP": True,         # Automatic Mixed Precision for 4060 Ti
+    "TARGET_MODE": "mineral" # 'void', 'mineral', or 'general'
 }
 
 # Set device
@@ -141,7 +142,11 @@ class DensityUNet(nn.Module):
 # ==========================================
 # 4. Training Loop (Mixed Precision)
 # ==========================================
-def invert_gravity(tif_path, output_path, lithology_path=None):
+def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None):
+    # Override config if mode provided
+    mode = target_mode if target_mode else CONFIG['TARGET_MODE']
+    print(f"Inversion Mode: {mode.upper()}")
+
     # --- Load Data ---
     with rasterio.open(tif_path) as src:
         data = src.read(1)
@@ -195,7 +200,9 @@ def invert_gravity(tif_path, output_path, lithology_path=None):
     optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['LR'])
     
     # AMP Scaler for 4060 Ti
-    scaler = GradScaler('cuda', enabled=CONFIG['USE_AMP'])
+    # Check if CUDA is available for AMP
+    use_amp = CONFIG['USE_AMP'] and torch.cuda.is_available()
+    scaler = GradScaler('cuda', enabled=use_amp)
     
     # --- Training ---
     print("Starting Inversion...")
@@ -205,7 +212,10 @@ def invert_gravity(tif_path, output_path, lithology_path=None):
     for epoch in loop:
         optimizer.zero_grad()
         
-        with autocast('cuda', enabled=CONFIG['USE_AMP']):
+        # Use 'cpu' for autocast if CUDA is not available, or disable it
+        device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        with autocast(device_type, enabled=use_amp):
             # 1. Forward Pass (Predict Residual Density)
             # We pass the gravity map itself as input features
             pred_residual = model(inp_tensor)
@@ -217,25 +227,45 @@ def invert_gravity(tif_path, output_path, lithology_path=None):
                 sim_gravity = physics(total_contrast)
                 
                 # Regularization: We want the residual to be sparse (trust the prior)
-                # We still penalize positive mass in the residual if we are looking for voids
                 loss_sparsity = torch.mean(torch.abs(pred_residual))
-                loss_void_bias = torch.mean(F.relu(pred_residual))
+                
+                # Mode-specific bias
+                if mode == 'void':
+                    # Penalize positive mass (we want negative anomalies)
+                    loss_bias = torch.mean(F.relu(pred_residual))
+                elif mode == 'mineral':
+                    # Penalize negative mass (we want positive anomalies/ore bodies)
+                    loss_bias = torch.mean(F.relu(-pred_residual))
+                else:
+                    # General mode: no sign bias, just find density contrast
+                    loss_bias = 0.0
+
             else:
                 # No prior: Model predicts total contrast directly
                 sim_gravity = physics(pred_residual)
                 loss_sparsity = torch.mean(torch.abs(pred_residual))
-                loss_void_bias = torch.mean(F.relu(pred_residual))
+                
+                if mode == 'void':
+                    loss_bias = torch.mean(F.relu(pred_residual))
+                elif mode == 'mineral':
+                    loss_bias = torch.mean(F.relu(-pred_residual))
+                else:
+                    loss_bias = 0.0
             
             # 3. Loss Calculation
             # A. Data Fidelity: Does simulated gravity match observed gravity?
             loss_data = F.mse_loss(sim_gravity[target_mask], target_gravity[target_mask])
             
-            loss = loss_data + (0.1 * loss_sparsity) + (0.1 * loss_void_bias)
+            loss = loss_data + (0.1 * loss_sparsity) + (0.1 * loss_bias)
 
         # 4. Backward (Scaled)
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
         
         loop.set_postfix(loss=loss.item(), data_loss=loss_data.item())
 

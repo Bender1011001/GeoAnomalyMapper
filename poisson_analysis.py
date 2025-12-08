@@ -247,7 +247,8 @@ def analyze_poisson_correlation(
     output_path: str = 'poisson_correlation.tif',
     inc: float = 60.0,
     dec: float = 0.0,
-    window_size: int = 5
+    window_size: int = 5,
+    target_mode: str = 'void'
 ) -> None:
     """
     Main Phase 3 workflow: Poisson correlation analysis.
@@ -262,6 +263,7 @@ def analyze_poisson_correlation(
         inc: Inclination (degrees).
         dec: Declination (degrees).
         window_size: Correlation window (pixels).
+        target_mode: 'void' (negative corr) or 'mineral' (positive corr).
 
     Raises:
         ValueError: Mismatched shapes.
@@ -271,6 +273,8 @@ def analyze_poisson_correlation(
         >>> analyze_poisson_correlation('gravity_residual.tif', 'magnetic.tif')
         Phase 3 output: poisson_correlation.tif
     """
+    print(f"Poisson Analysis Mode: {target_mode.upper()}")
+    
     # Load gravity + profile
     with rasterio.open(gravity_residual_path) as src:
         grav_data = src.read(1).astype(np.float64)
@@ -289,6 +293,23 @@ def analyze_poisson_correlation(
     pseudo_data = compute_pseudo_gravity(mag_data, inc_deg=inc, dec_deg=dec, dx=4000.0, dy=4000.0)
     corr_data = compute_poisson_ratio(grav_data, pseudo_data, window_size=window_size)
 
+    # In 'mineral' mode, we want positive correlation (High Density + High Mag).
+    # In 'void' mode, we want negative correlation (Low Density + High Mag).
+    # The raw correlation is [-1, 1].
+    # If target_mode is 'mineral', we keep it as is (1 = Strong Mineral Evidence).
+    # If target_mode is 'void', we might want to invert it or just interpret it downstream.
+    # However, the downstream fusion expects "Higher Value = Stronger Evidence".
+    
+    if target_mode == 'void':
+        # Original behavior: Negative correlation is the signal.
+        # We invert so that +1 means "Strong Negative Correlation" (Void Evidence)
+        # and -1 means "Strong Positive Correlation" (Mineral Evidence)
+        final_data = -corr_data
+    else:
+        # Mineral behavior: Positive correlation is the signal.
+        # +1 means "Strong Positive Correlation" (Mineral Evidence)
+        final_data = corr_data
+
     # Save
-    save_raster(output_path, corr_data, profile)
+    save_raster(output_path, final_data, profile)
     print(f"Phase 3 output: {output_path}")

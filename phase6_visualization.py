@@ -110,7 +110,7 @@ def get_overlay_image(tiff_path, max_dim=2048, colormap='plasma'):
 
 def main():
     parser = argparse.ArgumentParser(description="Phase 6: Interactive Visualization")
-    parser.add_argument("--input", type=str, default=str(OUTPUTS_DIR / "dumb_probability_v2.tif"), help="Input anomaly TIFF")
+    parser.add_argument("--input", type=str, default=str(OUTPUTS_DIR / "spatial_anomaly_v2.tif"), help="Input anomaly TIFF")
     parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "anomaly_map.html"), help="Output HTML path")
     args = parser.parse_args()
 
@@ -156,7 +156,7 @@ def main():
     folium.raster_layers.ImageOverlay(
         image=image_b64,
         bounds=bounds,
-        name='Anomaly Probability (DUMB)',
+        name='Anomaly Probability (Target Void)',
         opacity=0.7,
         interactive=True,
         cross_origin=False,

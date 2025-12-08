@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.append(os.getcwd())
 
 try:
-    from classify_anomalies import classify_dumb_candidates
+    from classify_anomalies import classify_anomaly_candidates
 except ImportError as e:
     print(f"ImportError: {e}")
     sys.exit(1)
@@ -27,11 +27,11 @@ def main():
         print("Error: No feature files found for classification.")
         sys.exit(1)
         
-    output_path = "data/processed/dumb_probability_v2.tif"
+    output_path = "data/processed/spatial_anomaly_v2.tif"
     
     print(f"Running classification with features: {existing_features}")
     try:
-        classify_dumb_candidates(existing_features, output_path)
+        classify_anomaly_candidates(existing_features, output_path)
         print(f"Successfully created {output_path}")
     except Exception as e:
         print(f"Error running classification: {e}")
