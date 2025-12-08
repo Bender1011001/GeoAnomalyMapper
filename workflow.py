@@ -38,7 +38,11 @@ from insar_features import (
 from poisson_analysis import analyze_poisson_correlation
 from multi_resolution_fusion import bayesian_downscaling, train_model
 from detect_voids import dempster_shafer_fusion
-from classify_anomalies import classify_anomaly_candidates
+from classify_anomalies import (
+    classify_anomaly_candidates,
+    prepare_training_data,
+    train_models,
+)
 from pinn_gravity_inversion import invert_gravity
 from fetch_lithology_density import fetch_and_rasterize
 
@@ -67,6 +71,7 @@ def run_full_workflow(
     resolution: float,
     output_prefix: str,
     skip_visuals: bool = True,
+    target_mode: str = 'void',
 ) -> dict:
     """
     Execute the complete v2 pipeline.
@@ -187,16 +192,28 @@ def run_full_workflow(
     logger.info("STEP 3: POISSON CORRELATION ANALYSIS")
     logger.info("=" * 70)
 
-    mag_raw_path = project_paths.RAW_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff.tif"
+    mag_raw_path = project_paths.RAW_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff_Float.tif"
     mag_path = f"{output_prefix}_magnetic.tif"
     poisson_path = f"{output_prefix}_poisson_correlation.tif"
 
     step3_success = False
     if step1_success and mag_raw_path.exists():
-        logger.info("Clipping magnetic data...")
-        if clip_and_reproject_raster(mag_raw_path, Path(mag_path), region, resolution):
+        # Check for uncalibrated data (0-255 range)
+        with rasterio.open(mag_raw_path) as src:
+            mag_data = src.read(1)
+            if np.nanmax(mag_data) <= 255 and np.nanmin(mag_data) >= 0:
+                logger.warning("WARNING: Magnetic data appears to be uncalibrated image data (0-255). Using as qualitative proxy only.")
+
+        if Path(mag_path).exists():
+             logger.info(f"Magnetic data exists ({mag_path}). Skipping clip.")
+             clip_success = True
+        else:
+             logger.info("Clipping magnetic data...")
+             clip_success = clip_and_reproject_raster(mag_raw_path, Path(mag_path), region, resolution)
+
+        if clip_success:
             logger.info("Computing Poisson correlation...")
-            analyze_poisson_correlation(gravity_residual_path, mag_path, poisson_path)
+            analyze_poisson_correlation(gravity_residual_path, mag_path, poisson_path, target_mode=target_mode)
             step3_success = True
     else:
         logger.warning("Skipping Poisson: missing gravity or magnetic.")
@@ -287,6 +304,7 @@ def run_full_workflow(
             Path(art_path),
             Path(poisson_path),
             Path(belief_path),
+            target_mode=target_mode,
         )
         step5_success = True
     else:
@@ -303,16 +321,20 @@ def run_full_workflow(
     step6_success = False
 
     if step1_success and Path(gravity_residual_path).exists():
-        logger.info("Running PINN gravity inversion...")
-        # Pass lithology path if it exists (from Step 3.5), otherwise None
-        lith_input = lithology_path if step3_5_success else None
-        
-        try:
-            invert_gravity(gravity_residual_path, density_output, lith_input)
-            if Path(density_output).exists():
-                step6_success = True
-        except Exception as e:
-            logger.error(f"PINN Inversion failed: {e}")
+        if Path(density_output).exists():
+            logger.info(f"PINN output exists ({density_output}). Skipping inversion.")
+            step6_success = True
+        else:
+            logger.info("Running PINN gravity inversion...")
+            # Pass lithology path if it exists (from Step 3.5), otherwise None
+            lith_input = lithology_path if step3_5_success else None
+            
+            try:
+                invert_gravity(gravity_residual_path, density_output, lith_input, target_mode=target_mode)
+                if Path(density_output).exists():
+                    step6_success = True
+            except Exception as e:
+                logger.error(f"PINN Inversion failed: {e}")
     else:
         logger.warning("Skipping PINN inversion: missing gravity residual.")
     
@@ -338,8 +360,23 @@ def run_full_workflow(
     step7_success = False
     if len(existing_features) >= 1:
         logger.info("Classifying anomalies...")
-        classify_anomaly_candidates(existing_features, dumb_path)
-        step7_success = True
+        try:
+            # Train models first
+            X_train, imputer = prepare_training_data(existing_features)
+            scaler, ocsvm, iforest = train_models(X_train)
+            
+            # Predict
+            classify_anomaly_candidates(
+                existing_features,
+                dumb_path,
+                scaler,
+                ocsvm,
+                iforest,
+                imputer
+            )
+            step7_success = True
+        except Exception as e:
+            logger.error(f"Classification failed: {e}")
     else:
         logger.warning("Skipping classification: no features available.")
     results["classification"] = step7_success
@@ -384,6 +421,7 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument(
         "--region",
         required=True,
+        nargs=1,
         help="Bounding box: 'lon_min,lat_min,lon_max,lat_max'",
     )
     parser.add_argument(
@@ -402,10 +440,18 @@ def main(argv: list[str] | None = None) -> dict:
         action="store_true",
         help="Skip visualization generation (default for batch)",
     )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="void",
+        choices=["void", "mineral"],
+        help="Target anomaly mode: 'void' (mass deficit) or 'mineral' (mass excess). Default: 'void'",
+    )
     args = parser.parse_args(argv)
 
     try:
-        region = parse_region(args.region)
+        # args.region is a list due to nargs=1
+        region = parse_region(args.region[0])
     except ValueError as e:
         logger.error("Invalid region: %s", e)
         sys.exit(1)
@@ -415,6 +461,7 @@ def main(argv: list[str] | None = None) -> dict:
         resolution=args.resolution,
         output_prefix=args.output_name,
         skip_visuals=args.skip_visuals,
+        target_mode=args.mode,
     )
 
 

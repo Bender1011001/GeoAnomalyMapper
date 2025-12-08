@@ -196,29 +196,30 @@ def dempster_shafer_fusion(
     theta = frame
 
     # Create masks
-    # Note: We mask NaN comparisons to False to avoid runtime warnings
+    # Determine the required sign for the gravity anomaly (TDR/Poisson)
+    # Void: Mass Deficit (Negative anomaly/correlation)
+    # Mineral: Mass Excess (Positive anomaly/correlation)
+    
+    # Use absolute value of poisson_threshold for comparison magnitude
+    abs_poisson_thresh = abs(poisson_threshold)
+    
     with np.errstate(invalid='ignore'):
         if target_mode == 'mineral':
-            # Mineral Mode:
-            # TDR > 0 (Positive Mass)
-            # Poisson > Threshold (Positive Correlation)
-            # Artificiality: Usually Low (Natural), but we keep it neutral or use it to filter mines
-            
-            # We use the raw TDR sign for minerals
+            # Mineral Mode: Look for positive mass/correlation
+            # TDR: We assume positive TDR indicates mass excess
             tdr_signal = (tdr > tdr_threshold) & mask
             
-            # Poisson: We expect positive correlation (already handled by upstream inversion if mode=mineral)
-            # But if upstream passed raw correlation, we check for > threshold
-            poisson_signal = (poisson > 0.3) & mask & ~np.isnan(poisson)
+            # Poisson: Look for positive correlation above magnitude threshold
+            poisson_signal = (poisson > abs_poisson_thresh) & mask & ~np.isnan(poisson)
             
         else:
-            # Void Mode:
-            # TDR: Magnitude matters (edges), usually negative mass but TDR is edge detector
+            # Void Mode: Look for mass deficit/negative correlation
+            # TDR: We use magnitude for edge detection, assuming TDR is an edge filter
             tdr_signal = (tdr_abs > tdr_threshold) & mask
             
-            # Poisson: We expect negative correlation (or inverted positive from upstream)
-            # Upstream 'void' mode returns -corr, so we look for > 0.3
-            poisson_signal = (poisson > 0.3) & mask & ~np.isnan(poisson)
+            # Poisson: Look for negative correlation below negative threshold
+            # Note: poisson_threshold is typically negative (e.g., -0.3)
+            poisson_signal = (poisson < poisson_threshold) & mask & ~np.isnan(poisson)
 
         # Artificiality is same for now
         artif_signal = (artif > artif_threshold) & mask & ~np.isnan(artif)

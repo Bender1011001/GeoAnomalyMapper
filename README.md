@@ -11,8 +11,19 @@ GeoAnomalyMapper v2.0 is a complete rebuild of the anomaly detection system, des
 *   **Physics-Informed Analysis:** Utilizes Poisson's relation between gravity and magnetic fields to validate density contrasts against magnetic susceptibility, reducing false positives from geological features.
 *   **Advanced Signal Processing:** Implements Continuous Wavelet Transform (CWT) for multi-scale decomposition and Tilt Derivative (TDR) for precise edge detection of potential voids.
 *   **ML Classification:** Deploys One-Class SVM (OC-SVM) and Isolation Forest models trained on fused belief maps to probabilistically classify anomalies.
+*   **Mineral Exploration Mode:** A specialized mode that "flips the physics" to detect mass excess (ore bodies) instead of mass deficits (voids).
 
 See [`ARCHITECTURE_v2.md`](ARCHITECTURE_v2.md) for the full technical specification.
+
+## Mineral Exploration Mode
+
+New in v2.1, this mode allows you to target dense mineral deposits (e.g., Rare Earths, Copper Porphyries) using the same advanced physics engine.
+
+*   **Target:** Mass Excess (Positive Gravity, High Density).
+*   **Physics:** Inverted density penalties, positive Poisson correlation.
+*   **Data:** Requires specific Gravity, Magnetic, and Lithology datasets.
+
+👉 **[Read the Mineral Exploration Guide](MINERAL_EXPLORATION_GUIDE.md)** for setup and usage instructions.
 
 ## Installation
 
@@ -56,6 +67,7 @@ python workflow.py --region "-105.5,31.5,-103.5,33.5" --resolution 0.001 --outpu
 *   `--region`: Bounding box in WGS84 coordinates (min_lon, min_lat, max_lon, max_lat).
 *   `--resolution`: Output grid resolution in degrees (default: 0.001, approx 100m).
 *   `--output-name`: Prefix for all generated output files (includes directory path).
+*   `--mode`: Target mode. Options: `void` (default) or `mineral`.
 *   `--skip-visuals`: Flag to skip generation of PNG/KMZ visualizations (useful for batch processing).
 
 ## Pipeline Phases & Outputs
