@@ -26,9 +26,17 @@ CONFIG = {
     "TARGET_MODE": "mineral" # 'void', 'mineral', or 'general'
 }
 
-# Set device
-device = torch.device(f"cuda:{CONFIG['GPU_ID']}" if torch.cuda.is_available() else "cpu")
-print(f"Running on: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+# Set device - Force CPU for batch processing to avoid multiprocessing CUDA context issues
+# or use a specific GPU if managed carefully. For stability in batch mode, CPU is safer
+# unless we use 'spawn' start method which is slower.
+# Given the hanging issue, let's default to CPU or check an env var.
+if os.environ.get("FORCE_CPU_INVERSION", "0") == "1":
+    device = torch.device("cpu")
+    CONFIG['USE_AMP'] = False # AMP not supported on CPU usually
+else:
+    device = torch.device(f"cuda:{CONFIG['GPU_ID']}" if torch.cuda.is_available() else "cpu")
+
+print(f"Running on: {device}")
 
 # ==========================================
 # 2. The Physics Layer (Differentiable)

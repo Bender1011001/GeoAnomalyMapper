@@ -84,7 +84,7 @@ def fetch_macrostrat_geojson(bounds: Tuple[float, float, float, float]) -> Dict:
             features = data["features"]
             count = len(features)
             
-        logger.info(f"✓ Retrieved {count} geological features.")
+        logger.info(f"Retrieved {count} geological features.")
         return features
     except Exception as e:
         logger.error(f"Failed to fetch data: {e}")
@@ -216,7 +216,44 @@ def fetch_and_rasterize(reference_tif_path: str, output_path: str) -> bool:
         logger.error(f"Failed to fetch and rasterize lithology: {e}")
         return False
 
-def main():
+def main(region=None, resolution=None, output_dir=None):
+    if region is not None and resolution is not None and output_dir is not None:
+        # Workflow mode
+        output_path = Path(output_dir) / "processed/lithology_density.tif"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create a dummy profile from region/resolution
+        min_lon, min_lat, max_lon, max_lat = region
+        width = int((max_lon - min_lon) / resolution)
+        height = int((max_lat - min_lat) / resolution)
+        transform = from_bounds(min_lon, min_lat, max_lon, max_lat, width, height)
+        
+        profile = {
+            'driver': 'GTiff',
+            'dtype': 'float32',
+            'nodata': np.nan,
+            'width': width,
+            'height': height,
+            'count': 1,
+            'crs': 'EPSG:4326',
+            'transform': transform,
+            'compress': 'deflate'
+        }
+        
+        # Fetch Vector Data
+        features = fetch_macrostrat_geojson(region)
+        
+        # Rasterize to Density Map
+        density_map = rasterize_lithology(features, profile)
+        
+        # Save Output
+        with rasterio.open(output_path, 'w', **profile) as dst:
+            dst.write(density_map, 1)
+            dst.set_band_description(1, "Estimated Crustal Density (kg/m3)")
+            
+        logger.info(f"Success! Density map saved to: {output_path}")
+        return
+
     parser = argparse.ArgumentParser(description="Macrostrat Lithology to Density Map Fetcher")
     parser.add_argument("--reference", required=True, help="Path to reference GeoTIFF (gravity/dem) to match grid")
     parser.add_argument("--output", required=True, help="Output path for Density GeoTIFF")

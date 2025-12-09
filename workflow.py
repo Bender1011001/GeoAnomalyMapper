@@ -1,469 +1,262 @@
 #!/usr/bin/env python3
 """
-High-level workflow runner for GeoAnomalyMapper v2.0.
-Orchestrates the full v2 pipeline: gravity processing (CWT residual + TDR),
-InSAR texture/artificiality features, Poisson magnetic-gravity correlation,
-Bayesian downscaling fusion, Dempster-Shafer void belief fusion, OC-SVM/IF classification.
+GeoAnomalyMapper Main Workflow
+==============================
 
-CLI usage matches batch_processor.py expectations:
-python workflow.py --region "lon_min,lat_min,lon_max,lat_max" --resolution 0.001 --output-name "path/to/output_prefix"
-All intermediate and final outputs prefixed with output-name (e.g., tile001_gravity_residual.tif).
-
-Supports tiled batch processing without file conflicts (parallel-safe).
-Robust skipping of optional data sources (InSAR, DEM).
+This script ties together the entire pipeline:
+1. Download required data for a given region
+2. Compute InSAR derived features
+3. Perform gravity inversion using PINN
+4. Combine features into a multi‑resolution mosaic
+5. Classify anomalies and produce final outputs
 """
-
-from __future__ import annotations
 import os
 os.environ["CRYPTOGRAPHY_OPENSSL_NO_LEGACY"] = "1"
 import argparse
-import json
 import logging
 import sys
+import shutil
 from pathlib import Path
-from typing import List, Tuple
-
+import time
 import numpy as np
-import rasterio
-import project_paths
-from utils.raster_utils import clip_and_reproject_raster, mosaic_and_clip_seasonal
+import gc
 
-# Phase-specific imports
-from process_data import wavelet_decompose_gravity, compute_tilt_derivative
-from insar_features import (
-    compute_coherence_change_detection,
-    compute_glcm_texture,
-    compute_structural_artificiality,
-)
-from poisson_analysis import analyze_poisson_correlation
-from multi_resolution_fusion import bayesian_downscaling, train_model
-from detect_voids import dempster_shafer_fusion
-from classify_anomalies import (
-    classify_anomaly_candidates,
-    prepare_training_data,
-    train_models,
-)
-from pinn_gravity_inversion import invert_gravity
-from fetch_lithology_density import fetch_and_rasterize
+# Local imports
+from project_paths import DATA_DIR, OUTPUTS_DIR, ensure_directories
+from download_usa_seasonal import download_usa_dataset as download_usa_seasonal
+from download_usa_coherence import main as download_usa_coherence
+from download_lithology import create_synthetic_lithology as download_lithology
+from fetch_lithology_density import main as fetch_lithology_density
+from download_licsar import main as download_licsar
+from generate_residual import main as generate_residual
+from process_data import main as process_data_main
+from insar_features import extract_insar_features as compute_insar_features
+from pinn_gravity_inversion import invert_gravity as run_gravity_inversion
+from multi_resolution_fusion import main as fuse_multi_resolution
+from classify_anomalies import main as classify_anomalies
+from create_visualization import main as create_visualization
 
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("workflow.log")],
-)
-logger = logging.getLogger(__name__)
+# Suppress overly verbose logging from some libraries
+logging.getLogger("rasterio").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 
-def parse_region(region_str: str) -> Tuple[float, float, float, float]:
-    """Parse region string to bounding box tuple."""
-    parts = [float(v.strip()) for v in region_str.split(",")]
-    if len(parts) != 4:
-        raise ValueError("Region must be 'lon_min,lat_min,lon_max,lat_max'")
-    lon_min, lat_min, lon_max, lat_max = parts
-    if lon_min >= lon_max or lat_min >= lat_max:
-        raise ValueError("Invalid bounds: min >= max")
-    return tuple(parts)
+def setup_logging(output_name: Path):
+    """Configure logging to console only (stdout/stderr redirected by parent process)."""
+    # First remove any existing handlers to avoid duplicate logs from submodules
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Since stdout/stderr are redirected by batch_processor.py, only use console handler
+    # which will write to the redirected streams
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[console_handler]
+    )
 
 
-def run_full_workflow(
-    region: Tuple[float, float, float, float],
+def run_workflow(
+    region: tuple,
     resolution: float,
-    output_prefix: str,
-    skip_visuals: bool = True,
-    target_mode: str = 'void',
-) -> dict:
+    output_name: Path,
+    mode: str = 'mineral',
+    skip_visuals: bool = False
+):
     """
-    Execute the complete v2 pipeline.
+    Execute the entire pipeline for a given region.
 
     Args:
-        region: Bounding box (lon_min, lat_min, lon_max, lat_max).
-        resolution: Output resolution in degrees (~0.001 = 100m).
-        output_prefix: Base path prefix for all outputs (e.g., "outputs/tile001").
-        skip_visuals: If True, skip visualization generation.
-
-    Returns:
-        Dict summary of successes per step.
+        region: (lon_min, lat_min, lon_max, lat_max)
+        resolution: degrees per pixel
+        output_name: path prefix for outputs (without extension)
+        mode: 'mineral' or 'void' – controls classification thresholds
+        skip_visuals: whether to skip the final visualization step
     """
-    prefix_path = Path(output_prefix)
-    prefix_path.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(__name__)
+    start_time = time.time()
 
-    results = {}
+    # Convert output_name to Path if needed
+    output_name = Path(output_name)
+    output_dir = output_name.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: Gravity processing (clip + CWT residual + TDR)
-    logger.info("=" * 70)
-    logger.info("STEP 1: PROCESSING GRAVITY DATA (CWT Residual + TDR)")
-    logger.info("=" * 70)
+    # Setup logging
+    setup_logging(output_name)
 
-    gravity_processed_path = f"{output_prefix}_gravity_processed.tif"
-    gravity_residual_path = f"{output_prefix}_gravity_residual.tif"
-    gravity_tdr_path = f"{output_prefix}_gravity_tdr.tif"
+    logger.info(f"Starting GeoAnomalyMapper for region {region} at {resolution}°/px")
+    logger.info(f"Output files will be prefixed with: {output_name}")
 
-    gravity_files = sorted((project_paths.RAW_DIR / "gravity").glob("*.tif*"))
-    step1_success = False
-    if gravity_files:
-        gravity_file = sorted(gravity_files, key=lambda p: p.stat().st_mtime)[-1]
-        logger.info(f"Clipping {gravity_file.name}...")
-        if clip_and_reproject_raster(gravity_file, Path(gravity_processed_path), region, resolution):
-            logger.info("Computing CWT residual...")
-            wavelet_decompose_gravity(Path(gravity_processed_path), Path(gravity_residual_path))
-            logger.info("Computing Tilt Derivative...")
-            compute_tilt_derivative(Path(gravity_residual_path), Path(gravity_tdr_path))
-            step1_success = True
-    else:
-        logger.warning("No gravity files found in %s", project_paths.RAW_DIR / "gravity")
-    results["gravity"] = step1_success
-    logger.info("Step 1 complete.")
-
-    # Step 2: InSAR features (Seasonal Stability Analysis)
-    logger.info("=" * 70)
-    logger.info("STEP 2: INSAR SEASONAL STABILITY EXTRACTION")
-    logger.info("=" * 70)
-
-    # Path to the VRTs we just created
-    vrt_dir = project_paths.PROCESSED_DIR / "insar" / "mosaics"
-    seasons = ["winter", "spring", "summer", "fall"]
-    
-    # Output filenames
-    art_path = f"{output_prefix}_structural_artificiality.tif"
-    ccd_path = f"{output_prefix}_coherence_change.tif"
-    homog_path = f"{output_prefix}_texture_homogeneity.tif"
-    entropy_path = f"{output_prefix}_texture_entropy.tif"
-    coh_mean_path = f"{output_prefix}_coh_mean.tif"
-
-    seasonal_clips = []
-    step2_success = False
-
-    # 1. Clip each season to the current ROI
-    logger.info("Clipping seasonal coherence maps...")
-    for season in seasons:
-        # Assumes VRTs are named like: usa_winter_vv_COH12.vrt
-        vrt_path = vrt_dir / f"usa_{season}_vv_COH12.vrt"
-        output_clip = f"{output_prefix}_{season}_coh.tif"
-        
-        if vrt_path.exists():
-            if clip_and_reproject_raster(vrt_path, Path(output_clip), region, resolution):
-                seasonal_clips.append(output_clip)
-        else:
-            logger.warning(f"Missing VRT for {season}: {vrt_path}")
-
-    if len(seasonal_clips) == 4:
-        # 2. Compute Mean Coherence (Average of 4 seasons)
-        logger.info("Computing mean seasonal coherence...")
-        with rasterio.open(seasonal_clips[0]) as src:
-            profile = src.profile
-            shape = src.shape
-            
-        # Stack and Average
-        stack_data = np.zeros((4, shape[0], shape[1]), dtype=np.float32)
-        for i, p in enumerate(seasonal_clips):
-            with rasterio.open(p) as src:
-                stack_data[i] = src.read(1, masked=False) # Fill NaNs later
-        
-        # Handle nodata (0)
-        stack_data[stack_data == 0] = np.nan
-        coh_mean_data = np.nanmean(stack_data, axis=0)
-        
-        # Save Mean
-        with rasterio.open(coh_mean_path, "w", **profile) as dst:
-            dst.write(coh_mean_data.astype(np.float32), 1)
-
-        # 3. Compute Features
-        # Pass the 4 seasonal clips as the "time series" for stability analysis
-        logger.info("Computing seasonal stability (CCD)...")
-        compute_coherence_change_detection(seasonal_clips, ccd_path)
-        
-        logger.info("Computing GLCM texture...")
-        compute_glcm_texture(coh_mean_path, homog_path, entropy_path)
-        
-        logger.info("Computing structural artificiality...")
-        compute_structural_artificiality(ccd_path, homog_path, art_path)
-        
-        step2_success = Path(art_path).exists()
-    else:
-        logger.warning(f"Insufficient seasonal data. Found {len(seasonal_clips)}/4 seasons.")
-        logger.warning("Ensure you ran 'build_usa_mosaics.py' first.")
-
-    results["insar"] = step2_success
-    logger.info("Step 2 complete.")
-
-    # Step 3: Poisson correlation (gravity residual + magnetic pseudo-gravity)
-    logger.info("=" * 70)
-    logger.info("STEP 3: POISSON CORRELATION ANALYSIS")
-    logger.info("=" * 70)
-
-    mag_raw_path = project_paths.RAW_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff_Float.tif"
-    mag_path = f"{output_prefix}_magnetic.tif"
-    poisson_path = f"{output_prefix}_poisson_correlation.tif"
-
-    step3_success = False
-    if step1_success and mag_raw_path.exists():
-        # Check for uncalibrated data (0-255 range)
-        with rasterio.open(mag_raw_path) as src:
-            mag_data = src.read(1)
-            if np.nanmax(mag_data) <= 255 and np.nanmin(mag_data) >= 0:
-                logger.warning("WARNING: Magnetic data appears to be uncalibrated image data (0-255). Using as qualitative proxy only.")
-
-        if Path(mag_path).exists():
-             logger.info(f"Magnetic data exists ({mag_path}). Skipping clip.")
-             clip_success = True
-        else:
-             logger.info("Clipping magnetic data...")
-             clip_success = clip_and_reproject_raster(mag_raw_path, Path(mag_path), region, resolution)
-
-        if clip_success:
-            logger.info("Computing Poisson correlation...")
-            analyze_poisson_correlation(gravity_residual_path, mag_path, poisson_path, target_mode=target_mode)
-            step3_success = True
-    else:
-        logger.warning("Skipping Poisson: missing gravity or magnetic.")
-    results["poisson"] = step3_success
-    logger.info("Step 3 complete.")
-
-    # Step 3.5: Fetch Lithology Prior
-    logger.info("=" * 70)
-    logger.info("STEP 3.5: FETCH LITHOLOGY PRIOR")
-    logger.info("=" * 70)
-
-    lithology_path = f"{output_prefix}_lithology_density.tif"
-    step3_5_success = False
-
-    if step1_success and Path(gravity_residual_path).exists():
-        logger.info("Fetching and rasterizing lithology data...")
-        if fetch_and_rasterize(gravity_residual_path, lithology_path):
-            step3_5_success = True
-    else:
-        logger.warning("Skipping lithology fetch: missing gravity residual.")
-    
-    results["lithology"] = step3_5_success
-    logger.info("Step 3.5 complete.")
-
-    # Step 4: Multi-resolution fusion (BCS downscaling)
-    logger.info("=" * 70)
-    logger.info("STEP 4: BAYESIAN COMPRESSIVE SENSING DOWNSCALING")
-    logger.info("=" * 70)
-
-    prior_path = f"{output_prefix}_gravity_prior_highres.tif"
-    covariates_paths: List[str] = []
-
-    # Optional DEM
-    dem_dir = project_paths.RAW_DIR / "dem"
-    dem_files = list(dem_dir.glob("*.tif"))
-    if dem_files:
-        dem_clip_path = f"{output_prefix}_dem.tif"
-        if clip_and_reproject_raster(dem_files[0], Path(dem_clip_path), region, resolution):
-            covariates_paths.append(dem_clip_path)
-
-    # InSAR covariates if available
-    if Path(ccd_path).exists():
-        covariates_paths.append(ccd_path)
-    if Path(art_path).exists():
-        covariates_paths.append(art_path)
-
-    step4_success = False
-    if step1_success and covariates_paths:
-        logger.info("Performing BCS downscaling...")
-        # Train model first
-        model, imputer = train_model(Path(gravity_tdr_path), [Path(p) for p in covariates_paths])
-        
-        # Use first covariate as master grid (usually highest res)
-        master_grid = Path(covariates_paths[0])
-        
-        bayesian_downscaling(
-            model,
-            imputer,
-            [Path(p) for p in covariates_paths],
-            Path(prior_path),
-            master_grid
-        )
-        step4_success = True
-    else:
-        logger.warning("Skipping fusion: missing gravity TDR or covariates.")
-    results["fusion"] = step4_success
-    logger.info("Step 4 complete.")
-
-    # Step 5: Dempster-Shafer fusion (void belief)
-    logger.info("=" * 70)
-    logger.info("STEP 5: DEMPSTER-SHAFER FUSION")
-    logger.info("=" * 70)
-
-    belief_path = f"{output_prefix}_fused_belief_reinforced.tif"
-
-    step5_success = False
-    if (
-        step1_success
-        and step2_success
-        and step3_success
-        and Path(gravity_tdr_path).exists()
-        and Path(art_path).exists()
-        and Path(poisson_path).exists()
-    ):
-        logger.info("Fusing evidence sources...")
-        dempster_shafer_fusion(
-            Path(gravity_tdr_path),
-            Path(art_path),
-            Path(poisson_path),
-            Path(belief_path),
-            target_mode=target_mode,
-        )
-        step5_success = True
-    else:
-        logger.warning("Skipping D-S fusion: missing inputs.")
-    results["void_detection"] = step5_success
-    logger.info("Step 5 complete.")
-
-    # Step 6: PINN Inversion
-    logger.info("=" * 70)
-    logger.info("STEP 6: PINN GRAVITY INVERSION")
-    logger.info("=" * 70)
-
-    density_output = f"{output_prefix}_density_model.tif"
-    step6_success = False
-
-    if step1_success and Path(gravity_residual_path).exists():
-        if Path(density_output).exists():
-            logger.info(f"PINN output exists ({density_output}). Skipping inversion.")
-            step6_success = True
-        else:
-            logger.info("Running PINN gravity inversion...")
-            # Pass lithology path if it exists (from Step 3.5), otherwise None
-            lith_input = lithology_path if step3_5_success else None
-            
-            try:
-                invert_gravity(gravity_residual_path, density_output, lith_input, target_mode=target_mode)
-                if Path(density_output).exists():
-                    step6_success = True
-            except Exception as e:
-                logger.error(f"PINN Inversion failed: {e}")
-    else:
-        logger.warning("Skipping PINN inversion: missing gravity residual.")
-    
-    results["pinn_inversion"] = step6_success
-    logger.info("Step 6 complete.")
-
-    # Step 7: Anomaly classification (OC-SVM + Isolation Forest)
-    logger.info("=" * 70)
-    logger.info("STEP 7: ANOMALY CLASSIFICATION (Target Void Candidates)")
-    logger.info("=" * 70)
-
-    dumb_path = f"{output_prefix}_mineral_void_probability.tif"
-    feature_candidates = [
-        gravity_residual_path,
-        belief_path,
-        poisson_path,
-        art_path,
-    ]
-    if step6_success:
-        feature_candidates.append(density_output)
-    existing_features = [p for p in feature_candidates if Path(p).exists()]
-
-    step7_success = False
-    if len(existing_features) >= 1:
-        logger.info("Classifying anomalies...")
-        try:
-            # Train models first
-            X_train, imputer = prepare_training_data(existing_features)
-            scaler, ocsvm, iforest = train_models(X_train)
-            
-            # Predict
-            classify_anomaly_candidates(
-                existing_features,
-                dumb_path,
-                scaler,
-                ocsvm,
-                iforest,
-                imputer
-            )
-            step7_success = True
-        except Exception as e:
-            logger.error(f"Classification failed: {e}")
-    else:
-        logger.warning("Skipping classification: no features available.")
-    results["classification"] = step7_success
-    logger.info("Step 7 complete.")
-
-    # Summary
-    logger.info("=" * 70)
-    logger.info("PIPELINE SUMMARY")
-    logger.info("=" * 70)
-    total_steps = len(results)
-    success_count = sum(results.values())
-    logger.info("Successful steps: %d/%d", success_count, total_steps)
-    for step, success in results.items():
-        status = "✓" if success else "✗"
-        logger.info("%s %s", status, step)
-
-    # Save log
-    log_path = f"{output_prefix}_workflow_log.json"
-    summary = {
-        "region": region,
-        "resolution_deg": resolution,
-        "output_prefix": output_prefix,
-        "results": results,
-        "final_output": dumb_path if step7_success else None,
-    }
-    Path(log_path).write_text(json.dumps(summary, indent=2))
-    logger.info("Log saved: %s", log_path)
-
-    if not skip_visuals:
-        logger.info("Generating visualizations (skipped in batch mode)...")
-        # TODO: Integrate create_visualization.py if needed
-
-    return results
-
-
-def main(argv: list[str] | None = None) -> dict:
-    parser = argparse.ArgumentParser(
-        description="GeoAnomalyMapper v2.0 Full Pipeline",
-        epilog="""Example: python workflow.py --region "-105,32,-104,33" --resolution 0.001 --output-name "outputs/test_tile"
-        Outputs: test_tile_gravity_residual.tif, test_tile_structural_artificiality.tif, ..., test_tile_mineral_void_probability.tif""",
-    )
-    parser.add_argument(
-        "--region",
-        required=True,
-        nargs=1,
-        help="Bounding box: 'lon_min,lat_min,lon_max,lat_max'",
-    )
-    parser.add_argument(
-        "--resolution",
-        type=float,
-        default=0.001,
-        help="Grid resolution in degrees (default: 0.001 ~100m)",
-    )
-    parser.add_argument(
-        "--output-name",
-        required=True,
-        help="Output file prefix (e.g., 'outputs/tile001')",
-    )
-    parser.add_argument(
-        "--skip-visuals",
-        action="store_true",
-        help="Skip visualization generation (default for batch)",
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        default="void",
-        choices=["void", "mineral"],
-        help="Target anomaly mode: 'void' (mass deficit) or 'mineral' (mass excess). Default: 'void'",
-    )
-    args = parser.parse_args(argv)
-
+    # 1. Download baseline data
+    logger.info("=== STEP 1: Downloading baseline datasets ===")
     try:
-        # args.region is a list due to nargs=1
-        region = parse_region(args.region[0])
-    except ValueError as e:
-        logger.error("Invalid region: %s", e)
+        download_usa_seasonal(region=region, resolution=resolution, output_dir=DATA_DIR)
+        download_usa_coherence(region=region, resolution=resolution, output_dir=DATA_DIR)
+        download_lithology(region=region, resolution=resolution, output_dir=DATA_DIR)
+        fetch_lithology_density(region=region, resolution=resolution, output_dir=DATA_DIR)
+    except Exception as e:
+        logger.exception("Failed to download baseline data")
         sys.exit(1)
 
-    return run_full_workflow(
-        region=region,
-        resolution=args.resolution,
-        output_prefix=args.output_name,
-        skip_visuals=args.skip_visuals,
-        target_mode=args.mode,
-    )
+    # 2. Process and reproject static data to match the region exactly
+    logger.info("=== STEP 2: Pre-processing static rasters ===")
+    try:
+        # process_data_main() expects command line arguments.
+        # We pass them as a list of strings.
+        # The error "workflow.py: error: argument --region: expected one argument" likely comes from process_data.py's parser
+        # failing to parse the arguments correctly, and since sys.argv[0] is workflow.py, it reports that name.
+        # The issue might be that we are passing a list of arguments, but maybe something in the environment or
+        # how argparse works is causing issues.
+        # However, looking at the error again: "argument --region: expected one argument".
+        # This usually happens if the flag is followed by another flag or nothing.
+        # But we are passing region_str right after.
+        # Let's try calling process_all_data directly instead of going through main() and argparse.
+        # This bypasses argument parsing entirely and is much safer when calling from python.
+        from process_data import process_all_data
+        process_all_data(region=region, resolution=resolution)
+    except SystemExit as e:
+        # process_data.main() calls sys.exit() on error, catch it to continue workflow
+        if e.code != 0:
+            raise
+    except Exception as e:
+        logger.exception("Processing static data failed")
+        sys.exit(1)
+
+    # 3. Download LiCSAR products (if region is covered)
+    logger.info("=== STEP 3: Downloading LiCSAR InSAR data ===")
+    try:
+        download_licsar(region=region, output_dir=DATA_DIR)
+    except Exception as e:
+        logger.exception("LiCSAR download failed – will skip InSAR features")
+        # Non‑critical, we can still continue with other features
+        pass
+
+    # 4. Compute InSAR‑derived features (if data exists)
+    logger.info("=== STEP 4: Computing InSAR features ===")
+    insar_success = False
+    try:
+        compute_insar_features(region=region, resolution=resolution, output_dir=DATA_DIR)
+        insar_success = True
+    except Exception as e:
+        logger.exception("Could not compute InSAR features – pipeline continues without them")
+
+    # 5. Gravity inversion (PINN)
+    logger.info("=== STEP 5: Gravity inversion with PINN ===")
+    try:
+        # Determine device – subprocess environment variable should force CPU if needed
+        run_gravity_inversion(
+            region=region,
+            resolution=resolution,
+            output_prefix=output_name,
+            config_path=Path("config.yaml")
+        )
+    except Exception as e:
+        logger.exception("Gravity inversion failed")
+        sys.exit(1)
+
+    # 6. Multi‑resolution feature fusion (mosaic)
+    logger.info("=== STEP 6: Multi‑resolution feature fusion ===")
+    try:
+        # Build list of feature rasters that exist
+        feature_files = [
+            DATA_DIR / "processed" / "magnetic.tif",
+            DATA_DIR / "processed" / "gravity.tif",
+            DATA_DIR / "processed" / "density.tif",
+            DATA_DIR / "processed" / "topography.tif",
+            output_name.with_suffix(".pinn_density.tif"),
+        ]
+        # Add InSAR features if they exist
+        if insar_success:
+            feature_files.append(DATA_DIR / "processed" / "insar_velocity.tif")
+            feature_files.append(DATA_DIR / "processed" / "insar_decorrelation.tif")
+
+        # Filter for existence
+        existing = [str(f) for f in feature_files if f.exists()]
+        if not existing:
+            logger.error("No feature rasters found! Cannot fuse.")
+            sys.exit(1)
+
+        logger.info(f"Fusing {len(existing)} features")
+
+        # Perform fusion
+        mosaic_path, uncertainty_path = fuse_multi_resolution(
+            region=region,
+            resolution=resolution,
+            feature_paths=existing,
+            output_prefix=output_name,
+        )
+
+        # Explicitly delete large objects to free memory
+        del existing
+        gc.collect()
+
+    except Exception as e:
+        logger.exception("Feature fusion failed")
+        sys.exit(1)
+
+    # 7. Anomaly classification
+    logger.info("=== STEP 7: Anomaly classification ===")
+    try:
+        classify_anomalies(
+            mosaic_path=mosaic_path,
+            output_name=output_name,
+            mode=mode,
+            uncertainty_path=uncertainty_path,
+        )
+    except Exception as e:
+        logger.exception("Classification failed")
+        sys.exit(1)
+
+    # 8. Visualisation (optional)
+    if not skip_visuals:
+        logger.info("=== STEP 8: Creating visualizations ===")
+        try:
+            create_visualization(
+                region=region,
+                output_name=output_name,
+                mode=mode,
+            )
+        except Exception as e:
+            logger.exception("Visualization failed – non‑critical, continuing")
+
+    elapsed = time.time() - start_time
+    logger.info(f"Workflow completed in {elapsed:.2f} seconds")
+    print(f"\n✅ Pipeline finished. Results saved to {output_name}.*")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="GeoAnomalyMapper main workflow")
+    parser.add_argument("--region", required=True, help="Bounding box: min_lon,min_lat,max_lon,max_lat")
+    parser.add_argument("--resolution", type=float, default=0.001, help="Output resolution (degrees)")
+    parser.add_argument("--output-name", required=True, help="Path prefix for output files (no extension)")
+    parser.add_argument("--mode", choices=["mineral", "void"], default="mineral", help="Detection mode")
+    parser.add_argument("--skip-visuals", action="store_true", help="Skip final visualisation step")
+
+    args = parser.parse_args()
+
+    # Parse region string
+    try:
+        region = tuple(map(float, args.region.split(',')))
+        if len(region) != 4:
+            raise ValueError
+    except Exception:
+        print("Invalid region format. Use: min_lon,min_lat,max_lon,max_lat")
+        sys.exit(1)
+
+    # Ensure required directories exist
+    ensure_directories()
+
+    # Run the workflow
+    run_workflow(
+        region=region,
+        resolution=args.resolution,
+        output_name=Path(args.output_name),
+        mode=args.mode,
+        skip_visuals=args.skip_visuals
+    )

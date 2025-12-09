@@ -82,17 +82,20 @@ def wavelet_decompose_gravity(
         # Limit level to avoid over-smoothing, usually 3-4 is sufficient for regional/residual separation
         level = min(level, 4)
 
-    # 2D Multilevel decomposition
-    coeffs = pywt.wavedec2(grav, wavelet, level=level)
+    # 2D Multilevel decomposition using symmetric padding to reduce edge artifacts
+    coeffs = pywt.wavedec2(grav, wavelet, level=level, mode='symmetric')
     
     # coeffs[0] is the approximation (cA) at the coarsest level (deep sources)
     # coeffs[1:] are tuples of details (cH, cV, cD) at finer scales
     
     # To get the residual (shallow sources), we set the approximation to zero
-    coeffs[0] = np.zeros_like(coeffs[0])
+    # Handle list structure of coeffs
+    coeffs_residual = [np.zeros_like(c) if i == 0 else c for i, c in enumerate(coeffs)]
+    if isinstance(coeffs[0], np.ndarray):
+        coeffs_residual[0] = np.zeros_like(coeffs[0])
     
     # Reconstruct
-    residual = pywt.waverec2(coeffs, wavelet)
+    residual = pywt.waverec2(coeffs_residual, wavelet, mode='symmetric')
     
     # Crop to original shape if reconstruction is slightly larger due to padding
     residual = residual[:grav.shape[0], :grav.shape[1]]
@@ -122,26 +125,39 @@ def compute_tilt_derivative(
 
     Returns:
         None. Writes output file.
-
-    Example:
-        res = np.array([[0.,1.],[2.,0.]])
-        dy ≈ [[1., -1.], [1., -1.]], dx ≈ [[0.5, -0.5], [0.5, -0.5]]
-        vdr=dy, thg≈1.12, tdr≈arctan2(1,1.12)≈0.72 rad (varies by exact gradient).
     """
     with rasterio.open(residual_path) as src:
-        res = src.read(1).astype(np.float32)
+        res = src.read(1).astype(np.float64)  # Use float64 for accuracy
         profile = src.profile.copy()
+        transform = src.transform
 
-    res = np.nan_to_num(res, nan=0.0)
-    vdr = np.gradient(res, axis=0)
-    grad_y, grad_x = np.gradient(res)
-    thg = np.sqrt(grad_x**2 + grad_y**2)
-    tdr = np.arctan2(vdr, thg)
+    # Replace NaN with 0 only for gradient calculation
+    res_filled = np.nan_to_num(res, nan=0.0)
+
+    # Compute gradients properly using pixel spacing
+    dy, dx = np.gradient(res_filled)  # dy = north-south, dx = east-west
+    pixel_size_y = transform.a  # Actually x resolution
+    pixel_size_x = abs(transform.e)  # y resolution (usually negative)
+
+    # Horizontal gradient magnitude
+    hg = np.sqrt((dx / pixel_size_x)**2 + (dy / pixel_size_y)**2)
+
+    # Vertical derivative approximation: often use Laplacian or first vertical
+    # But most common TDR uses the *vertical* first derivative ≈ -northward gradient
+    vdr = -dy / pixel_size_y  # Negative northward gradient ≈ upward first vertical derivative
+
+    # Avoid division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        tdr = np.arctan2(vdr, hg)
+        tdr = np.where(hg == 0, np.sign(vdr) * np.pi/2, tdr)
+
+    # Restore original nodata
+    tdr = np.where(np.isnan(res), np.nan, tdr)
 
     profile.update(dtype="float32", nodata=np.nan)
     output_tdr_path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(output_tdr_path, "w", **profile) as dst:
-        dst.write(tdr, 1)
+        dst.write(tdr.astype(np.float32), 1)
     logger.info("Phase 1: Saved gravity TDR: %s", output_tdr_path)
 
 
@@ -185,13 +201,47 @@ def process_gravity_data(region: Tuple[float, float, float, float], resolution: 
         logger.info(f"Using gravity file: {gravity_files[0].name}")
     
     output_file = output_dir / "gravity_processed.tif"
-    return clip_and_reproject_raster(gravity_files[0], output_file, region, resolution)
+    success = clip_and_reproject_raster(gravity_files[0], output_file, region, resolution)
+    
+    if success:
+        # Automatically run wavelet + TDR after gravity clipping
+        residual_path = output_dir / "gravity_residual_wavelet.tif"
+        tdr_path = output_dir / "gravity_tdr.tif"
+        
+        try:
+            wavelet_decompose_gravity(output_file, residual_path)
+            compute_tilt_derivative(residual_path, tdr_path)
+        except Exception as e:
+            logger.error(f"Failed to compute gravity derivatives: {e}")
+            # Don't fail the whole step, just log error
+            
+    return success
 
 
 def process_magnetic_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
     logger.info("\n%s\nPROCESSING MAGNETIC DATA\n%s", "=" * 70, "=" * 70)
-    magnetic_file = RAW_DIR / "emag2" / "EMAG2_V3_SeaLevel_DataTiff.tif"
+    magnetic_dir = RAW_DIR / "magnetic"
+    magnetic_files = sorted(magnetic_dir.glob("EMAG2*.tif*")) + sorted(magnetic_dir.glob("*.tif"))
+    
+    if not magnetic_files:
+        instructions = f"""MAGNETIC DATA MISSING
+================================
+Download the global EMAG2 or WDMAM model:
+- EMAG2 v3: https://www.ngdc.noaa.gov/geomag/emag2.html
+- Or regional high-res data from Geoscience Australia / USGS
+Place the GeoTIFF in data/raw/magnetic/
+"""
+        (PROCESSED_DIR / "magnetic").mkdir(parents=True, exist_ok=True)
+        _write_text_file(PROCESSED_DIR / "magnetic" / "MAGNETIC_INSTRUCTIONS.txt", instructions)
+        logger.warning("No magnetic data found in %s", magnetic_dir)
+        return False
+
+    # Use most recent
+    magnetic_file = sorted(magnetic_files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+    logger.info("Using magnetic file: %s", magnetic_file.name)
+    
     output_file = PROCESSED_DIR / "magnetic" / "magnetic_processed.tif"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     return clip_and_reproject_raster(magnetic_file, output_file, region, resolution)
 
 

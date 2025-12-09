@@ -158,7 +158,7 @@ def train_models(
 
     logger.info("  - Training IsolationForest...")
     iforest = IsolationForest(
-        contamination=0.05, random_state=42, n_estimators=100, n_jobs=-1
+        contamination=0.05, random_state=42, n_estimators=100, n_jobs=1
     ).fit(X_train_scaled)
 
     return scaler, ocsvm, iforest

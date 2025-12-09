@@ -17,7 +17,6 @@ import logging
 import subprocess
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Tuple
 
@@ -85,46 +84,6 @@ def generate_tiles(
         
     return tiles
 
-def process_tile(
-    tile_id: str,
-    region_str: str,
-    resolution: float,
-    output_dir: Path
-) -> bool:
-    """
-    Run workflow.py for a single tile in a subprocess.
-    """
-    output_name = output_dir / tile_id
-    
-    cmd = [
-        sys.executable, "workflow.py",
-        f"--region={region_str}",  # <--- FIXED: Connects value to flag
-        "--resolution", str(resolution),
-        "--output-name", str(output_name),
-        "--skip-visuals",  # Save time/space, generate visuals only for merged result
-        # "--validate"     # Skip validation per tile to speed up processing
-    ]
-    
-    logger.info(f"[{tile_id}] Starting process: {region_str}")
-    start_time = time.time()
-    
-    try:
-        # Run workflow.py as a separate process to guarantee memory release
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        duration = time.time() - start_time
-        logger.info(f"[{tile_id}] Completed in {duration:.1f}s")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        logger.error(f"[{tile_id}] FAILED with return code {e.returncode}")
-        logger.error(f"[{tile_id}] STDERR:\n{e.stderr}")
-        return False
-
 def main():
     parser = argparse.ArgumentParser(description="Batch process large regions by tiling.")
     parser.add_argument("--region", required=True, help="Region 'lon_min,lat_min,lon_max,lat_max'")
@@ -152,23 +111,94 @@ def main():
     logger.info(f"Generated {len(tiles)} tiles for region {args.region}")
     logger.info(f"Output directory: {batch_dir}")
     
-    # Execute in parallel
+    # Execute in parallel using direct subprocess management
+    # This avoids pickling issues and provides better control over process lifecycle on Windows
     failed_tiles = []
-    with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_tile = {
-            executor.submit(process_tile, t_id, reg, args.resolution, batch_dir): t_id 
-            for t_id, reg in tiles
-        }
-        
-        for future in as_completed(future_to_tile):
-            tile_id = future_to_tile[future]
+    active_procs = []
+    pending_tiles = tiles.copy()
+    
+    # Environment for subprocesses
+    env = os.environ.copy()
+    env["FORCE_CPU_INVERSION"] = "1"
+    
+    # Timeout configuration (e.g., 30 minutes per tile)
+    TILE_TIMEOUT_SECONDS = 1800
+
+    while pending_tiles or active_procs:
+        # Start new processes if slots available
+        while len(active_procs) < args.workers and pending_tiles:
+            tile_id, region_str = pending_tiles.pop(0)
+            output_name = batch_dir / tile_id
+            log_file = batch_dir / f"{tile_id}.log"
+            
+            cmd = [
+                sys.executable, "workflow.py",
+                f"--region={region_str}",
+                "--resolution", str(args.resolution),
+                "--output-name", str(output_name),
+                "--skip-visuals",
+                "--mode", "mineral"
+            ]
+            
+            logger.info(f"[{tile_id}] Starting process: {region_str}")
+            
             try:
-                success = future.result()
-                if not success:
-                    failed_tiles.append(tile_id)
+                # Open log file for writing
+                f = open(log_file, "w")
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=f,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=env
+                )
+                active_procs.append({
+                    'id': tile_id,
+                    'proc': proc,
+                    'file': f,
+                    'start_time': time.time()
+                })
             except Exception as e:
-                logger.error(f"[{tile_id}] Exception: {e}")
+                logger.error(f"[{tile_id}] Failed to start: {e}")
                 failed_tiles.append(tile_id)
+
+        # Check active processes
+        for p_info in active_procs[:]:
+            ret = p_info['proc'].poll()
+            
+            # Check for timeout
+            elapsed = time.time() - p_info['start_time']
+            if ret is None and elapsed > TILE_TIMEOUT_SECONDS:
+                logger.error(f"[{p_info['id']}] TIMEOUT after {elapsed:.1f}s. Killing process.")
+                p_info['proc'].kill()
+                # Wait for kill to take effect
+                try:
+                    p_info['proc'].wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p_info['proc'].terminate() # Force terminate if kill fails
+                
+                ret = -999 # Custom code for timeout
+            
+            if ret is not None:
+                # Process finished
+                duration = time.time() - p_info['start_time']
+                p_info['file'].close()
+                
+                if ret == 0:
+                    logger.info(f"[{p_info['id']}] Completed in {duration:.1f}s")
+                else:
+                    if ret == -999:
+                        logger.error(f"[{p_info['id']}] FAILED (Timeout)")
+                    else:
+                        logger.error(f"[{p_info['id']}] FAILED with return code {ret}")
+                    logger.error(f"[{p_info['id']}] Check log for details: {batch_dir / f'{p_info['id']}.log'}")
+                    failed_tiles.append(p_info['id'])
+                
+                active_procs.remove(p_info)
+        
+        # Avoid busy loop
+        if active_procs:
+            time.sleep(0.5)
 
     if failed_tiles:
         logger.error(f"Batch processing completed with {len(failed_tiles)} failures: {failed_tiles}")

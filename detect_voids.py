@@ -304,12 +304,12 @@ def dempster_shafer_fusion(
         dst.set_band_description(1, "Belief(Reinforced)")
 
     # Legacy Output: Thresholded Probability
-    void_prob_path = OUTPUT_DIR / "void_probability.tif"
+    #void_prob_path = OUTPUT_DIR / "void_probability.tif"
     # Logic: If belief > 0.5, keep value, else 0
-    void_prob = np.where(bel_reinforced > 0.5, bel_reinforced, 0.0)
+    #void_prob = np.where(bel_reinforced > 0.5, bel_reinforced, 0.0)
     
-    with rasterio.open(void_prob_path, 'w', **profile) as dst:
-        dst.write(void_prob.astype(np.float32), 1)
+    #with rasterio.open(void_prob_path, 'w', **profile) as dst:
+        #dst.write(void_prob.astype(np.float32), 1)
 
     logger.info("D-S Fusion complete.")
 

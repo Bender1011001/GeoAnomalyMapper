@@ -108,7 +108,7 @@ def train_model(
         raise ValueError("No valid training data found (no spatial overlap between gravity and covariates).")
 
     # Subsample if too large to speed up RF training
-    MAX_SAMPLES = 150000
+    MAX_SAMPLES = 1000000
     if len(y_train) > MAX_SAMPLES:
         logger.info(f"Subsampling to {MAX_SAMPLES} points for efficiency...")
         idx = np.random.choice(len(y_train), MAX_SAMPLES, replace=False)
@@ -123,7 +123,7 @@ def train_model(
     rf = RandomForestRegressor(
         n_estimators=60,    
         max_depth=20,       # Slight increase in depth for better high-freq capture
-        n_jobs=-1,          
+        n_jobs=1,          
         random_state=42,
         min_samples_split=5 # Prevent overfitting on noise
     )

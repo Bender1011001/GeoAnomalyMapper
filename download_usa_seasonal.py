@@ -35,19 +35,39 @@ def get_tile_id(lat, lon):
     ew = 'E' if lon >= 0 else 'W'
     return f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}"
 
-def download_usa_dataset():
+def download_usa_dataset(region=None, resolution=None, output_dir=None):
     # Configure anonymous S3 access (No credentials needed)
     s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
     
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if output_dir:
+        out_dir = Path(output_dir) / "raw/insar/seasonal_usa"
+    else:
+        out_dir = OUTPUT_DIR
+
+    out_dir.mkdir(parents=True, exist_ok=True)
     
-    print(f"Generating tile list for USA ({LAT_MIN}N-{LAT_MAX}N, {LON_MIN}W-{LON_MAX}W)...")
+    lat_min, lat_max = LAT_MIN, LAT_MAX
+    lon_min, lon_max = LON_MIN, LON_MAX
+
+    if region:
+        # region is (lon_min, lat_min, lon_max, lat_max)
+        # We need to find integer bounds that cover this region
+        import math
+        lon_min_req, lat_min_req, lon_max_req, lat_max_req = region
+        
+        # Floor min, Ceil max to ensure coverage
+        lat_min = max(LAT_MIN, int(math.floor(lat_min_req)))
+        lat_max = min(LAT_MAX, int(math.ceil(lat_max_req)))
+        lon_min = max(LON_MIN, int(math.floor(lon_min_req)))
+        lon_max = min(LON_MAX, int(math.ceil(lon_max_req)))
+
+    print(f"Generating tile list for region ({lat_min}N-{lat_max}N, {lon_min}W-{lon_max}W)...")
     
     tasks = []
     # Loop through Lat/Lon grid (1-degree steps)
     # Range ends are exclusive, so we add +1 to max
-    for lat in range(LAT_MAX, LAT_MIN, -1): # Top-down
-        for lon in range(LON_MIN, LON_MAX):  # Left-right
+    for lat in range(lat_max, lat_min, -1): # Top-down
+        for lon in range(lon_min, lon_max):  # Left-right
             tile_id = get_tile_id(lat, lon)
             
             # Construct S3 Key for each season/metric
@@ -56,7 +76,7 @@ def download_usa_dataset():
                     # File format: N48W090_winter_vv_COH12.tif
                     filename = f"{tile_id}_{season}_{POLARIZATION}_{metric}.tif"
                     key = f"{PREFIX}/{tile_id}/{filename}"
-                    local_path = OUTPUT_DIR / tile_id / filename
+                    local_path = out_dir / tile_id / filename
                     tasks.append((key, local_path))
 
     print(f"Found {len(tasks)} potential files to download.")
@@ -87,7 +107,7 @@ def download_usa_dataset():
     print(f"Downloaded: {success_count}")
     print(f"Skipped (Exists): {skip_count}")
     print(f"Failed/Missing (Ocean): {fail_count}")
-    print(f"Data saved to: {OUTPUT_DIR.resolve()}")
+    print(f"Data saved to: {out_dir.resolve()}")
 
 if __name__ == "__main__":
     download_usa_dataset()
