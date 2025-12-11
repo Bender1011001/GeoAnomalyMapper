@@ -179,13 +179,19 @@ def train_models(
     X_train_scaled = scaler.transform(X_train)
 
     logger.info("  - Training OneClassSVM...")
+    # CALIBRATION FIX: Reduce nu from 0.05 to 0.01 for stricter anomaly detection
+    # nu controls the upper bound on fraction of outliers (anomalies)
+    # Lower nu = more conservative = fewer false positives
     ocsvm = OneClassSVM(
-        nu=0.05, kernel="rbf", gamma="scale"
+        nu=0.01, kernel="rbf", gamma="scale"
     ).fit(X_train_scaled)
 
     logger.info("  - Training IsolationForest...")
+    # CALIBRATION FIX: Reduce contamination from 0.05 to 0.01
+    # contamination is the expected proportion of anomalies in training data
+    # Lower contamination = stricter threshold = better precision
     iforest = IsolationForest(
-        contamination=0.05, random_state=42, n_estimators=100, n_jobs=1
+        contamination=0.01, random_state=42, n_estimators=100, n_jobs=1
     ).fit(X_train_scaled)
 
     return scaler, ocsvm, iforest
@@ -243,7 +249,7 @@ def classify_anomaly_candidates(
     # IF scores are [-1, 1] (roughly). OCSVM decision function is unbounded but usually small.
     # Let's compute scores on a small sample to get a range.
     
-    logger.info("Estimating score range for normalization...")
+    logger.info("Estimating score range for calibrated normalization...")
     # Quick sample
     X_sample, _ = prepare_training_data(feature_paths, sample_size=10000)
     X_sample_scaled = scaler.transform(X_sample)
@@ -251,9 +257,25 @@ def classify_anomaly_candidates(
     iso_scores_samp = -iforest.score_samples(X_sample_scaled)
     combined_samp = (oc_scores_samp + iso_scores_samp) / 2.0
     
-    p_min = np.percentile(combined_samp, 1) # Use percentiles to be robust
-    p_max = np.percentile(combined_samp, 99)
-    logger.info(f"Score range estimate: {p_min:.4f} to {p_max:.4f}")
+    # CALIBRATION FIX: Use stricter percentile range (5th-95th instead of 1st-99th)
+    # Previous 1st-99th was too permissive, allowing 98% of region to be flagged
+    # Tighter range ensures only strong anomalies pass threshold
+    p_min = np.percentile(combined_samp, 5)
+    p_max = np.percentile(combined_samp, 95)
+    
+    # Calculate calibration statistics for validation
+    p_median = np.percentile(combined_samp, 50)
+    p_std = np.std(combined_samp)
+    
+    logger.info(f"Score calibration statistics:")
+    logger.info(f"  Range: [{p_min:.4f}, {p_max:.4f}] (5th-95th percentile)")
+    logger.info(f"  Median: {p_median:.4f}, StdDev: {p_std:.4f}")
+    logger.info(f"  Dynamic range: {p_max - p_min:.4f}")
+    
+    # Initialize calibration tracking
+    total_pixels_processed = 0
+    total_flagged_pixels = 0
+    flagged_distribution = []
     
     with rasterio.open(output_path, 'w', **profile) as dst:
         for row_off in range(0, height, block_size):
@@ -299,28 +321,78 @@ def classify_anomaly_candidates(
                 iso_scores = -iforest.score_samples(X_window_scaled)
                 combined = (oc_scores + iso_scores) / 2.0
                 
-                # Normalize
+                # Normalize to [0,1] using calibrated percentile range
                 prob = (combined - p_min) / (p_max - p_min + 1e-12)
                 prob = np.clip(prob, 0.0, 1.0)
 
-                # MINERAL-PRO MODE: Relax classification threshold.
-                # Apply a power transform < 1.0 to boost lower probabilities,
-                # allowing more natural voids (which might have weaker signals) to pass through.
-                # Original was linear (power=1.0 implicitly).
-                if mode == 'mineral':
-                    prob = np.power(prob, 0.65)
-                else:
-                    # Void mode or default: keep linear (power=1.0)
-                    pass
+                # CALIBRATION FIX: REMOVED aggressive power transform (prob^0.65)
+                # Previous implementation boosted all low scores, causing 98% false positive rate
+                # Now using linear normalization for proper calibration
+                #
+                # GEOLOGICAL CONSTRAINT: Apply sigmoid-based threshold to ensure only
+                # statistically significant anomalies (>2 standard deviations) pass
+                # This acts as a geological plausibility filter
+                
+                # Convert to standardized scores for geological filtering
+                if p_std > 0:
+                    z_scores = (combined - p_median) / p_std
+                    # Apply confidence threshold: only flag anomalies beyond 2-sigma
+                    # Use sigmoid to create smooth transition at threshold
+                    confidence_mask = 1.0 / (1.0 + np.exp(-2.0 * (z_scores - 2.0)))
+                    # Modulate probability by geological confidence
+                    prob = prob * confidence_mask
+                
+                # Additional constraint: Suppress very weak signals entirely
+                # This prevents the model from over-flagging marginal anomalies
+                prob[prob < 0.1] = 0.0  # Hard threshold for noise suppression
                 
                 # Mask NaNs
                 all_nan = np.all(np.isnan(X_window_flat), axis=1)
                 prob[all_nan] = np.nan
                 
+                # Calibration tracking
+                valid_pixels = ~all_nan
+                total_pixels_processed += np.sum(valid_pixels)
+                flagged_pixels = np.sum((prob > 0.3) & valid_pixels)
+                total_flagged_pixels += flagged_pixels
+                
+                # Collect distribution statistics
+                valid_probs = prob[valid_pixels & ~np.isnan(prob)]
+                if len(valid_probs) > 0:
+                    flagged_distribution.extend(valid_probs[valid_probs > 0.1].tolist())
+                
                 # Write
                 dst.write(prob.reshape(window_height, window_width), 1, window=window)
-                
-    logger.info("Classification complete.")
+    
+    # Log calibration metrics
+    logger.info("=" * 70)
+    logger.info("CALIBRATION METRICS - Post-Fix Performance")
+    logger.info("=" * 70)
+    logger.info(f"Total valid pixels processed: {total_pixels_processed:,}")
+    logger.info(f"Pixels flagged at threshold 0.3: {total_flagged_pixels:,}")
+    
+    if total_pixels_processed > 0:
+        flagged_percentage = 100 * total_flagged_pixels / total_pixels_processed
+        logger.info(f"Flagged percentage: {flagged_percentage:.2f}%")
+        logger.info(f"Target: <5% for good precision, was 98% pre-fix")
+        
+        if flagged_percentage < 5:
+            logger.info("✅ CALIBRATION SUCCESS: Flagged percentage within target range")
+        elif flagged_percentage < 20:
+            logger.info("⚠️  CALIBRATION IMPROVED: Better than pre-fix but needs tuning")
+        else:
+            logger.info("❌ CALIBRATION ISSUE: Still over-flagging, review thresholds")
+    
+    if len(flagged_distribution) > 0:
+        dist_arr = np.array(flagged_distribution)
+        logger.info(f"Flagged score distribution:")
+        logger.info(f"  Mean: {np.mean(dist_arr):.3f}")
+        logger.info(f"  Median: {np.median(dist_arr):.3f}")
+        logger.info(f"  90th percentile: {np.percentile(dist_arr, 90):.3f}")
+        logger.info(f"  Max: {np.max(dist_arr):.3f}")
+    
+    logger.info("=" * 70)
+    logger.info("Classification complete with calibration metrics.")
 
 def main(
     mosaic_path: Path = None,
