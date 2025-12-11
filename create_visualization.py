@@ -388,7 +388,37 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> Dict[str, Path]:
+def main(
+    region: Tuple[float, float, float, float] = None,
+    output_name: Path = None,
+    mode: str = 'mineral',
+    argv: Optional[list[str]] = None
+) -> Dict[str, Path]:
+    
+    # If called from workflow with arguments
+    if output_name is not None:
+        # We want to visualize the final probability map
+        input_path = output_name.with_suffix(".probability.tif")
+        if not input_path.exists():
+            logger.error("Input file not found: %s", input_path)
+            return {}
+            
+        output_dir = input_path.parent
+        outputs = generate_visualization_bundle(input_path, output_dir)
+        
+        # Also visualize the fused belief if it exists
+        fused_path = output_name.with_suffix(".fused.tif")
+        if fused_path.exists():
+            generate_visualization_bundle(fused_path, output_dir)
+            
+        # And the density model
+        density_path = output_dir / f"{output_name.name}_density_model.tif"
+        if density_path.exists():
+            generate_visualization_bundle(density_path, output_dir)
+
+        return outputs
+
+    # Standalone execution
     parser = _build_parser()
     args = parser.parse_args(argv)
 

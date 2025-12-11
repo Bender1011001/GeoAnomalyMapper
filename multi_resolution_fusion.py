@@ -243,11 +243,99 @@ def bayesian_downscaling(
             
     logger.info("Prediction complete.")
 
-def main():
-    parser = argparse.ArgumentParser(description="BCS Gravity Downscaling (Random Forest)")
-    parser.parse_args()
+def main(
+    region: Tuple[float, float, float, float] = None,
+    resolution: float = None,
+    feature_paths: List[str] = None,
+    output_prefix: Path = None
+):
+    # If called from workflow, use arguments. If called as script, parse args.
+    if feature_paths is None:
+        parser = argparse.ArgumentParser(description="BCS Gravity Downscaling (Random Forest)")
+        parser.parse_args()
+        # ... (rest of script logic for standalone execution would go here, but we are adapting for workflow)
+        # For now, we'll assume workflow usage or implement basic standalone logic if needed.
+        # But since we are fixing the workflow call, we prioritize the function signature.
+        pass
 
-    # 1. Locate Gravity Source
+    # If feature_paths provided (workflow mode)
+    if feature_paths:
+        feature_paths = [Path(p) for p in feature_paths]
+        
+        # Identify Gravity (Target) and Covariates
+        # We assume the first valid gravity file found in the list is the target
+        gravity_target = None
+        covariates = []
+        
+        for p in feature_paths:
+            if "gravity" in p.name and "processed" in p.name: # Prefer processed gravity
+                 if gravity_target is None:
+                     gravity_target = p
+                 else:
+                     covariates.append(p) # Treat other gravity as covariate? Or just ignore?
+            elif "gravity" in p.name:
+                 if gravity_target is None:
+                     gravity_target = p
+                 else:
+                     covariates.append(p)
+            else:
+                covariates.append(p)
+        
+        # If no specific gravity found, but we have files, maybe the first one is target?
+        # But workflow passes: magnetic, gravity, density, topography, pinn_density
+        # We want to fuse them into a belief map.
+        # Actually, the fusion logic in this script seems to be:
+        # Train RF to predict LowResGravity from ResampledCovariates
+        # Then Predict HighResGravity using HighResCovariates
+        
+        # But for "Mineral Exploration", we might want to fuse Beliefs?
+        # Or are we doing "Gravity Downscaling" as the fusion step?
+        # The workflow calls it "Multi-resolution feature fusion".
+        
+        # If we want to fuse everything into a single "Mineral Potential" map:
+        # We might treat the PINN density as the primary target or one of the inputs?
+        
+        # Let's stick to the existing logic: Downscale Gravity using others.
+        # But wait, we have PINN density which is already high res (same as gravity input).
+        
+        # If the goal is just to combine them, maybe we should just stack them?
+        # But this script is specifically "BCS Gravity Downscaling".
+        
+        # Let's assume we want to refine the PINN density using other high-res features if available.
+        # Or refine the Gravity TDR using Topo/Mag/etc.
+        
+        if gravity_target is None:
+            # Fallback: Use the first file as target if it exists
+            if feature_paths:
+                gravity_target = feature_paths[0]
+                covariates = feature_paths[1:]
+            else:
+                logger.error("No feature paths provided.")
+                return None, None
+
+        if not covariates:
+             # If no covariates, just return the target (maybe resampled)
+             logger.warning("No covariates for fusion. Returning target as result.")
+             # Just copy target to output
+             output_path = output_prefix.with_suffix(".fused.tif")
+             import shutil
+             shutil.copy(gravity_target, output_path)
+             return output_path, None
+
+        # Master Grid: Use the highest resolution covariate (or the first one)
+        master_grid_path = covariates[0]
+        
+        output_path = output_prefix.with_suffix(".fused.tif")
+        
+        try:
+            model, imputer = train_model(gravity_target, covariates)
+            bayesian_downscaling(model, imputer, covariates, output_path, master_grid_path)
+            return output_path, None # Uncertainty not implemented yet
+        except Exception as e:
+            logger.error(f"Fusion failed: {e}")
+            raise e
+
+    # 1. Locate Gravity Source (Standalone Mode)
     # Priority list for gravity inputs
     potential_grav = [
         PROCESSED_DIR / "gravity" / "gravity_tdr.tif",

@@ -159,6 +159,23 @@ KNOWN_FEATURES = [
         'type': 'Mercury',
         'desc': 'One of North America\'s largest mercury producers.',
         'expected': 'positive'
+    },
+    # Test Feature for Joshua Tree / Twentynine Palms Tile
+    {
+        'name': 'Dale Mining District (Test)',
+        'lat': 34.05,
+        'lon': -115.75,
+        'type': 'Gold',
+        'desc': 'Historic gold mining district in Pinto Mountains (Test Point).',
+        'expected': 'positive'
+    },
+    {
+        'name': 'New Target Candidate 1',
+        'lat': 33.9515,
+        'lon': -116.0035,
+        'type': 'Unknown',
+        'desc': 'Strong density anomaly detected by PINN model.',
+        'expected': 'positive'
     }
 ]
 
@@ -204,23 +221,40 @@ def validate_features(raster_path, threshold):
     """
     Main validation loop.
     """
-    logger.info(f"Validating against {len(KNOWN_FEATURES)} known California deposits...")
-    logger.info(f"Raster: {raster_path}")
-    logger.info(f"Detection Threshold: >= {threshold}")
-    
-    hits = 0
-    misses = 0
-    out_of_bounds = 0
-    
     with rasterio.open(raster_path) as src:
+        bounds = src.bounds
+        logger.info(f"Raster Bounds: [{bounds.left:.2f}, {bounds.bottom:.2f}, {bounds.right:.2f}, {bounds.top:.2f}]")
+        
+        # Filter features within bounds
+        valid_features = []
+        skipped_features = []
+        
+        for feature in KNOWN_FEATURES:
+            if (bounds.left <= feature['lon'] <= bounds.right) and \
+               (bounds.bottom <= feature['lat'] <= bounds.top):
+                valid_features.append(feature)
+            else:
+                skipped_features.append(feature)
+        
+        logger.info(f"Found {len(valid_features)} targets within raster coverage (skipped {len(skipped_features)} outside bounds).")
+        logger.info(f"Detection Threshold: >= {threshold}")
+        
+        if not valid_features:
+            logger.warning("No known targets fall within the provided raster coverage.")
+            logger.warning("Try processing a larger area or a different tile to validate against known mines.")
+            return
+
+        hits = 0
+        misses = 0
+        
         print(f"\n{'NAME':<30} | {'TYPE':<15} | {'SCORE (Max)':<12} | {'RESULT'}")
         print("-" * 75)
         
-        for feature in KNOWN_FEATURES:
+        for feature in valid_features:
             stats = sample_at_location(src, feature['lat'], feature['lon'])
             
             if stats is None:
-                out_of_bounds += 1
+                # Should not happen if logic is correct, but safety check
                 result = "OOB (No Data)"
                 score_display = "N/A"
             else:
@@ -237,22 +271,18 @@ def validate_features(raster_path, threshold):
             
             print(f"{feature['name']:<30} | {feature['type']:<15} | {score_display:<12} | {result}")
 
-    # Summary
-    total_valid = hits + misses
-    if total_valid > 0:
-        accuracy = (hits / total_valid) * 100
-        print("\n" + "=" * 30)
-        print("VALIDATION SUMMARY")
-        print("=" * 30)
-        print(f"Total Features Checked: {len(KNOWN_FEATURES)}")
-        print(f"Out of Bounds:        {out_of_bounds}")
-        print(f"Valid Test Cases:     {total_valid}")
-        print(f"Successful Detections: {hits}")
-        print(f"Missed Detections:     {misses}")
-        print(f"Sensitivity (Recall):  {accuracy:.1f}%")
-        print("=" * 30 + "\n")
-    else:
-        logger.warning("No features fell within the raster bounds. Check your --region arguments.")
+        # Summary
+        total_valid = hits + misses
+        if total_valid > 0:
+            accuracy = (hits / total_valid) * 100
+            print("\n" + "=" * 30)
+            print("VALIDATION SUMMARY")
+            print("=" * 30)
+            print(f"Targets in Region:    {len(valid_features)}")
+            print(f"Successful Detections: {hits}")
+            print(f"Missed Detections:     {misses}")
+            print(f"Sensitivity (Recall):  {accuracy:.1f}%")
+            print("=" * 30 + "\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Validate California Mineral Targets")

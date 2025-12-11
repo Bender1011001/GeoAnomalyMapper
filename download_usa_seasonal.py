@@ -100,8 +100,12 @@ def download_usa_dataset(region=None, resolution=None, output_dir=None):
             # 404 is common over ocean tiles or edges
             fail_count += 1
             # Optional: delete empty parents if failed
-            if local_path.parent.exists() and not any(local_path.parent.iterdir()):
-                local_path.parent.rmdir()
+            try:
+                if local_path.parent.exists() and not any(local_path.parent.iterdir()):
+                    local_path.parent.rmdir()
+            except OSError:
+                # Ignore errors during cleanup (e.g. race conditions, file in use)
+                pass
 
     print("\n--- Download Complete ---")
     print(f"Downloaded: {success_count}")

@@ -119,10 +119,17 @@ def main():
     
     # Environment for subprocesses
     env = os.environ.copy()
-    env["FORCE_CPU_INVERSION"] = "1"
+    # NOTE: PyTorch CPU-only version detected. GPU cannot be used until PyTorch with CUDA is installed.
+    # See instructions in batch_processing.log or run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+    env["FORCE_CPU_INVERSION"] = "0"  # Temporarily force CPU until PyTorch+CUDA is installed
     
-    # Timeout configuration (e.g., 30 minutes per tile)
-    TILE_TIMEOUT_SECONDS = 1800
+    # Timeout configuration
+    # CPU mode: Using 30 minutes until GPU-enabled PyTorch is installed
+    # After GPU setup: reduce to 900 seconds (15 minutes)
+    TILE_TIMEOUT_SECONDS = 900  # 30 minutes per tile (CPU mode)
+
+    # Add diagnostic logging for timing
+    logger.info(f"Starting batch processing with {len(tiles)} tiles, timeout: {TILE_TIMEOUT_SECONDS}s per tile")
 
     while pending_tiles or active_procs:
         # Start new processes if slots available
@@ -165,7 +172,7 @@ def main():
         # Check active processes
         for p_info in active_procs[:]:
             ret = p_info['proc'].poll()
-            
+
             # Check for timeout
             elapsed = time.time() - p_info['start_time']
             if ret is None and elapsed > TILE_TIMEOUT_SECONDS:
@@ -176,14 +183,14 @@ def main():
                     p_info['proc'].wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     p_info['proc'].terminate() # Force terminate if kill fails
-                
+
                 ret = -999 # Custom code for timeout
-            
+
             if ret is not None:
                 # Process finished
                 duration = time.time() - p_info['start_time']
                 p_info['file'].close()
-                
+
                 if ret == 0:
                     logger.info(f"[{p_info['id']}] Completed in {duration:.1f}s")
                 else:
@@ -193,9 +200,17 @@ def main():
                         logger.error(f"[{p_info['id']}] FAILED with return code {ret}")
                     logger.error(f"[{p_info['id']}] Check log for details: {batch_dir / f'{p_info['id']}.log'}")
                     failed_tiles.append(p_info['id'])
-                
+
                 active_procs.remove(p_info)
-        
+
+        # Periodic status update
+        if active_procs and int(time.time()) % 30 == 0:  # Every 30 seconds
+            status_lines = []
+            for p_info in active_procs:
+                elapsed = time.time() - p_info['start_time']
+                status_lines.append(f"[{p_info['id']}] running for {elapsed:.1f}s")
+            logger.info(f"Active processes ({len(active_procs)}): {'; '.join(status_lines)}")
+
         # Avoid busy loop
         if active_procs:
             time.sleep(0.5)

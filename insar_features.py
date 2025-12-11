@@ -8,7 +8,8 @@ def load_raster(path: str) -> tuple[np.ndarray, dict]:
     """
     Load a single-band raster as numpy array and its profile.
 
-    Handles nodata as NaN.
+    Handles nodata as NaN with robust dtype conversion for integer rasters.
+    Critical fix: Converts uint8/uint16 coherence maps to float32 before NaN filling.
 
     :param path: Path to the raster file.
     :return: (data: np.ndarray, profile: dict)
@@ -17,7 +18,14 @@ def load_raster(path: str) -> tuple[np.ndarray, dict]:
         >>> data, profile = load_raster('coh_mean.tif')
     """
     with rasterio.open(path) as src:
-        data = src.read(1, masked=True).filled(np.nan)
+        data = src.read(1, masked=True)
+        
+        # Convert integer types to float32 before filling with NaN
+        # This prevents "Cannot convert fill_value nan to dtype uint8" errors
+        if np.issubdtype(data.dtype, np.integer):
+            data = data.astype(np.float32, copy=False)
+        
+        data = data.filled(np.nan)
         return data, src.profile
 
 

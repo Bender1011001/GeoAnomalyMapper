@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 import numpy as np
 import rasterio
@@ -11,6 +11,8 @@ from rasterio.features import rasterize
 from rasterio.transform import from_bounds
 import requests
 from shapely.geometry import shape, box
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ==========================================
 # 1. Expert Configuration
@@ -25,15 +27,31 @@ LITHOLOGY_DENSITY_MAP = {
     "shale": 2400,
     "dolomite": 2700,
     "conglomerate": 2400,
-    "alluvium": 1900,  # Loose soil, often covers voids
+    "alluvium": 1900,
+    "clay": 2200,
+    "silt": 2100,
+    "gravel": 2000,
+    "mudstone": 2300,
+    "evaporite": 2100,
+    "gypsum": 2300,
+    "salt": 2100,
+    "coal": 1300,
     
-    # Igneous
+    # Igneous - Volcanic
     "igneous": 2800,
     "basalt": 2900,
-    "granite": 2650,
     "andesite": 2600,
     "rhyolite": 2500,
+    "tuff": 2000,
+    "obsidian": 2400,
+    "pumice": 800, # Often floats
+    
+    # Igneous - Plutonic
+    "granite": 2650,
     "gabbro": 3000,
+    "diorite": 2800,
+    "peridotite": 3200, # Mantle rock
+    "kimberlite": 2900, # Diamond bearing
     
     # Metamorphic
     "metamorphic": 2700,
@@ -41,6 +59,19 @@ LITHOLOGY_DENSITY_MAP = {
     "schist": 2650,
     "slate": 2750,
     "quartzite": 2650,
+    "marble": 2700,
+    "amphibolite": 2900,
+    "serpentinite": 2600,
+    
+    # Ores & Minerals (High Density Targets)
+    "iron": 5000,
+    "magnetite": 5200,
+    "hematite": 5100,
+    "sulfide": 4000,
+    "pyrite": 5000,
+    "chalcopyrite": 4200,
+    "galena": 7500,
+    "gold": 19300, 
     
     # Defaults
     "water": 1000,
@@ -54,7 +85,26 @@ logger = logging.getLogger(__name__)
 # ==========================================
 # 2. The Fetcher Engine
 # ==========================================
-def fetch_macrostrat_geojson(bounds: Tuple[float, float, float, float]) -> Dict:
+def get_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    status_forcelist=(500, 502, 504),
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+def fetch_macrostrat_geojson(bounds: Tuple[float, float, float, float]) -> List[Dict]:
     """
     Query Macrostrat API v2 for geologic units within a bounding box.
     """
@@ -72,7 +122,8 @@ def fetch_macrostrat_geojson(bounds: Tuple[float, float, float, float]) -> Dict:
     logger.info(f"Querying Macrostrat for region: {params['envelope']}...")
     
     try:
-        response = requests.get(url, params=params, timeout=30)
+        session = get_retry_session()
+        response = session.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         
@@ -88,7 +139,8 @@ def fetch_macrostrat_geojson(bounds: Tuple[float, float, float, float]) -> Dict:
         return features
     except Exception as e:
         logger.error(f"Failed to fetch data: {e}")
-        sys.exit(1)
+        # Return empty list instead of exiting, allowing pipeline to proceed with defaults
+        return []
 
 def parse_density_from_lithology(props: Dict) -> int:
     """
@@ -133,9 +185,13 @@ def rasterize_lithology(
     # Prepare (geometry, value) pairs
     shapes = []
     for feat in features:
-        geom = shape(feat['geometry'])
-        density = parse_density_from_lithology(feat['properties'])
-        shapes.append((geom, density))
+        try:
+            geom = shape(feat['geometry'])
+            density = parse_density_from_lithology(feat['properties'])
+            shapes.append((geom, density))
+        except Exception as e:
+            logger.warning(f"Skipping invalid feature: {e}")
+            continue
         
     if not shapes:
         logger.warning("No shapes to rasterize. Returning constant density map.")
@@ -200,8 +256,8 @@ def fetch_and_rasterize(reference_tif_path: str, output_path: str) -> bool:
             nodata=np.nan
         )
         
-        # Optional: Smooth boundaries slightly to avoid hard edges in gravity inversion
-        # density_map = gaussian_filter(density_map, sigma=1)
+        # Ensure output directory exists
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         
         with rasterio.open(out_path, 'w', **profile) as dst:
             dst.write(density_map, 1)

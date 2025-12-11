@@ -34,17 +34,26 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 
-from project_paths import OUTPUTS_DIR, PROCESSED_DIR
+from project_paths import OUTPUTS_DIR, PROCESSED_DIR, DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def prepare_training_data(
     feature_paths: List[str],
-    sample_size: int = 100000
+    sample_size: int = 100000,
+    min_samples: int = 10000
 ) -> Tuple[np.ndarray, SimpleImputer]:
     """
     Load a subsample of data from all features for training.
+    
+    Critical fix: Adaptive decimation with validation to ensure sufficient samples.
+    
+    :param feature_paths: List of aligned raster files containing features
+    :param sample_size: Target number of training samples
+    :param min_samples: Minimum required valid samples (raises error if not met)
+    :return: (X_train_imputed, imputer)
+    :raises ValueError: If insufficient valid pixels after NaN filtering
     """
     logger.info("Preparing training data...")
     
@@ -56,15 +65,21 @@ def prepare_training_data(
         profile_ref = src.profile
         height, width = src.height, src.width
         
-    # We need to sample pixels. 
-    # Strategy: Pick random indices, read those pixels from all rasters.
-    # Reading random pixels from rasterio is slow if done one by one.
-    # Better: Read low-res versions or blocks, or just read the whole thing if it fits in memory?
-    # The user complained about memory. So we should avoid reading full rasters if possible.
-    # But for training we need a representative sample.
-    # Let's read a decimated version (e.g. every 10th pixel) to get a manageable array.
+    total_pixels = height * width
+    logger.info(f"Reference grid: {height}×{width} = {total_pixels:,} pixels")
     
-    decimation = 10 # Adjust based on image size. If 10000x10000, decimation 10 -> 1000x1000 = 1M pixels.
+    # CRITICAL FIX: Adaptive decimation to prevent catastrophic data loss
+    # Previous: decimation=10 caused 422×442 → 42×44 = 1,848 pixels (99% loss)
+    # With NaN filtering, only 16 valid samples remained
+    # New: decimation=2 retains 25% of pixels for robust model training
+    if total_pixels < 250000:  # ~500×500
+        decimation = 2  # Retain 25% of pixels
+    elif total_pixels < 1000000:  # ~1000×1000
+        decimation = 3  # Retain 11% of pixels
+    else:
+        decimation = 5  # Retain 4% for very large grids
+    
+    logger.info(f"Using adaptive decimation: {decimation} (preserves ~{100/decimation**2:.1f}% of data)")
     
     X_list = []
     
@@ -129,10 +144,22 @@ def prepare_training_data(
     
     logger.info(f"Total valid pixels available for training: {len(X_train)}")
     
+    # CRITICAL VALIDATION: Ensure sufficient samples for robust model training
+    if len(X_train) < min_samples:
+        raise ValueError(
+            f"Insufficient training data: {len(X_train)} valid pixels (minimum required: {min_samples}). "
+            f"This usually indicates excessive NaN values in input rasters. "
+            f"Check that all feature rasters have valid data coverage. "
+            f"Decimated grid: {ref_height}×{ref_width} = {ref_height*ref_width} pixels, "
+            f"Valid: {len(X_train)} ({100*len(X_train)/(ref_height*ref_width):.1f}%)"
+        )
+    
     if len(X_train) > sample_size:
         logger.info(f"Subsampling to {sample_size} pixels")
         idx = np.random.choice(len(X_train), sample_size, replace=False)
         X_train = X_train[idx]
+    else:
+        logger.warning(f"Using all {len(X_train)} valid pixels (less than target {sample_size})")
         
     # Imputer
     imputer = SimpleImputer(strategy='mean')
@@ -170,6 +197,7 @@ def classify_anomaly_candidates(
     ocsvm: OneClassSVM,
     iforest: IsolationForest,
     imputer: SimpleImputer,
+    mode: str = 'mineral',
     block_size: int = 2048
 ):
     """
@@ -279,7 +307,11 @@ def classify_anomaly_candidates(
                 # Apply a power transform < 1.0 to boost lower probabilities,
                 # allowing more natural voids (which might have weaker signals) to pass through.
                 # Original was linear (power=1.0 implicitly).
-                prob = np.power(prob, 0.65)
+                if mode == 'mineral':
+                    prob = np.power(prob, 0.65)
+                else:
+                    # Void mode or default: keep linear (power=1.0)
+                    pass
                 
                 # Mask NaNs
                 all_nan = np.all(np.isnan(X_window_flat), axis=1)
@@ -290,10 +322,84 @@ def classify_anomaly_candidates(
                 
     logger.info("Classification complete.")
 
-def main():
-    parser = argparse.ArgumentParser(description="Phase 5: Anomaly Classification")
-    parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "mineral_void_probability.tif"), help="Output path")
-    args = parser.parse_args()
+def main(
+    mosaic_path: Path = None,
+    output_name: Path = None,
+    mode: str = 'mineral',
+    uncertainty_path: Path = None
+):
+    # If called from workflow, use arguments. If called as script, parse args.
+    if mosaic_path is None:
+        parser = argparse.ArgumentParser(description="Phase 5: Anomaly Classification")
+        parser.add_argument("--output", type=str, default=str(OUTPUTS_DIR / "mineral_void_probability.tif"), help="Output path")
+        parser.add_argument("--mode", choices=["mineral", "void"], default="mineral", help="Detection mode")
+        args = parser.parse_args()
+        
+        # Standalone logic (similar to original)
+        # ...
+        # For now, we'll just adapt the workflow call.
+        pass
+    else:
+        # Workflow mode
+        # mosaic_path is the fused belief map
+        # output_name is the prefix for outputs
+        
+        # We need to define feature paths.
+        # In the workflow, we just produced the mosaic (fused belief).
+        # The classification step usually takes multiple features to classify anomalies.
+        # But the fusion step already combined them into a "belief" map?
+        # Or is classification supposed to run ON the fused map + others?
+        
+        # Looking at the original main():
+        # It used: gravity_residual, fused_belief, poisson_corr, insar_mosaic
+        
+        # In the current workflow, we might not have all of these.
+        # We definitely have the mosaic_path (fused belief).
+        # We have gravity residual.
+        # We might not have poisson_corr (Phase 3 seems skipped/not in workflow list).
+        # We might not have insar_mosaic.
+        
+        # CRITICAL FIX: Construct feature paths relative to workflow-specific output directory
+        # The workflow uses output_name with "_data" suffix for processed data
+        # output_name is like: Path("data/outputs/california_full_multisource")
+        # Processed data is in: Path("data/outputs/california_full_multisource_data/processed/...")
+        
+        feature_paths = []
+        
+        # 1. Fused Belief (The mosaic) - this is the primary feature
+        if mosaic_path and Path(mosaic_path).exists():
+            feature_paths.append(str(mosaic_path))
+            
+        # 2. Gravity Residual - look in workflow-specific directory
+        # Try workflow-specific path first (with _data suffix)
+        workflow_data_dir = Path(str(output_name) + "_data") / "processed"
+        grav_res = workflow_data_dir / "gravity" / "gravity_residual_wavelet.tif"
+        if not grav_res.exists():
+            # Fallback to global DATA_DIR if workflow-specific doesn't exist
+            grav_res = DATA_DIR / "processed" / "gravity" / "gravity_residual_wavelet.tif"
+        if grav_res.exists():
+            feature_paths.append(str(grav_res))
+            
+        # 3. PINN Density Model (if available separately, though it might be in fusion)
+        pinn_dens = OUTPUTS_DIR / f"{output_name.name}_density_model.tif"
+        if pinn_dens.exists():
+            feature_paths.append(str(pinn_dens))
+            
+        if not feature_paths:
+            logger.error("No features found for classification.")
+            return
+
+        output_prob_path = str(output_name.with_suffix(".probability.tif"))
+        
+        logger.info(f"Classifying using {len(feature_paths)} features: {feature_paths}")
+        
+        # Train
+        X_train, imputer = prepare_training_data(feature_paths)
+        scaler, ocsvm, iforest = train_models(X_train)
+        
+        # Predict
+        classify_anomaly_candidates(feature_paths, output_prob_path, scaler, ocsvm, iforest, imputer, mode=mode)
+        return
 
     # Define inputs based on previous phases
     # 1. Gravity Residual (Phase 1)
@@ -338,7 +444,7 @@ def main():
     scaler, ocsvm, iforest = train_models(X_train)
     
     # Predict
-    classify_anomaly_candidates(valid_paths, args.output, scaler, ocsvm, iforest, imputer)
+    classify_anomaly_candidates(valid_paths, args.output, scaler, ocsvm, iforest, imputer, mode=args.mode)
 
 if __name__ == "__main__":
     main()

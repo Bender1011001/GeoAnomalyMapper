@@ -95,35 +95,38 @@ def run_workflow(
 
     # 1. Download baseline data
     logger.info("=== STEP 1: Downloading baseline datasets ===")
+    
+    # Create a unique directory for this run's intermediate data to avoid file locking collisions
+    # when running in batch mode.
+    tile_dir = output_name.parent / f"{output_name.name}_data"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    
     try:
+        # Some downloads are safe to share (raw data), but processing steps like fetch_lithology_density
+        # which create rasterized outputs should be isolated.
         download_usa_seasonal(region=region, resolution=resolution, output_dir=DATA_DIR)
         download_usa_coherence(region=region, resolution=resolution, output_dir=DATA_DIR)
         download_lithology(region=region, resolution=resolution, output_dir=DATA_DIR)
-        fetch_lithology_density(region=region, resolution=resolution, output_dir=DATA_DIR)
+        
+        # fetch_lithology_density creates a raster in output_dir/processed/lithology_density.tif
+        # We pass tile_dir so it creates tile_dir/processed/lithology_density.tif
+        fetch_lithology_density(region=region, resolution=resolution, output_dir=tile_dir)
     except Exception as e:
         logger.exception("Failed to download baseline data")
         sys.exit(1)
 
     # 2. Process and reproject static data to match the region exactly
     logger.info("=== STEP 2: Pre-processing static rasters ===")
+    
+    # Create a unique directory for this run's intermediate data to avoid file locking collisions
+    # when running in batch mode.
+    tile_dir = output_name.parent / f"{output_name.name}_data"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    
     try:
-        # process_data_main() expects command line arguments.
-        # We pass them as a list of strings.
-        # The error "workflow.py: error: argument --region: expected one argument" likely comes from process_data.py's parser
-        # failing to parse the arguments correctly, and since sys.argv[0] is workflow.py, it reports that name.
-        # The issue might be that we are passing a list of arguments, but maybe something in the environment or
-        # how argparse works is causing issues.
-        # However, looking at the error again: "argument --region: expected one argument".
-        # This usually happens if the flag is followed by another flag or nothing.
-        # But we are passing region_str right after.
-        # Let's try calling process_all_data directly instead of going through main() and argparse.
-        # This bypasses argument parsing entirely and is much safer when calling from python.
+        # Call process_all_data directly to avoid argparse issues when running as a module
         from process_data import process_all_data
-        process_all_data(region=region, resolution=resolution)
-    except SystemExit as e:
-        # process_data.main() calls sys.exit() on error, catch it to continue workflow
-        if e.code != 0:
-            raise
+        process_all_data(region=region, resolution=resolution, output_dir=tile_dir / "processed")
     except Exception as e:
         logger.exception("Processing static data failed")
         sys.exit(1)
@@ -131,50 +134,125 @@ def run_workflow(
     # 3. Download LiCSAR products (if region is covered)
     logger.info("=== STEP 3: Downloading LiCSAR InSAR data ===")
     try:
-        download_licsar(region=region, output_dir=DATA_DIR)
+        # Note: download_licsar expects frame IDs, not a region.
+        # We skip this step if no frames are provided, or implement a frame finder.
+        logger.warning("Automatic LiCSAR frame detection from region not yet implemented. Skipping download.")
+        # download_licsar(region=region, output_dir=DATA_DIR)
     except Exception as e:
         logger.exception("LiCSAR download failed – will skip InSAR features")
-        # Non‑critical, we can still continue with other features
         pass
 
     # 4. Compute InSAR‑derived features (if data exists)
     logger.info("=== STEP 4: Computing InSAR features ===")
     insar_success = False
     try:
-        compute_insar_features(region=region, resolution=resolution, output_dir=DATA_DIR)
-        insar_success = True
+        insar_dir = DATA_DIR / "raw" / "insar"
+        # Find all coherence files recursively (supporting both .geo.cc.tif and _COH12.tif)
+        coh_paths = list(insar_dir.rglob("*.geo.cc.tif")) + list(insar_dir.rglob("*_COH12.tif"))
+        
+        if coh_paths:
+             coh_mean_path = DATA_DIR / "processed" / "insar" / "coherence_mean.tif"
+             coh_mean_path.parent.mkdir(parents=True, exist_ok=True)
+             
+             coh_paths_str = [str(p) for p in coh_paths]
+             
+             # Check if we have enough data to compute features
+             if len(coh_paths) >= 2:
+                 # Compute mean coherence if it doesn't exist
+                 if not coh_mean_path.exists():
+                     logger.info("Computing mean coherence from available tiles...")
+                     try:
+                         import rasterio
+                         # Load first to get profile
+                         with rasterio.open(coh_paths_str[0]) as src:
+                             profile = src.profile
+                             shape = src.shape
+                         
+                         # Accumulate sum
+                         sum_arr = np.zeros(shape, dtype=np.float32)
+                         count_arr = np.zeros(shape, dtype=np.float32)
+                         
+                         for p in coh_paths_str:
+                             with rasterio.open(p) as src:
+                                 data = src.read(1)
+                                 # Handle nodata
+                                 mask = (data != src.nodata) & np.isfinite(data)
+                                 sum_arr[mask] += data[mask]
+                                 count_arr[mask] += 1
+                         
+                         # Compute mean
+                         mean_arr = np.divide(sum_arr, count_arr, out=np.zeros_like(sum_arr), where=count_arr > 0)
+                         
+                         # Save
+                         profile.update(dtype=rasterio.float32, count=1, compress='lzw')
+                         with rasterio.open(coh_mean_path, 'w', **profile) as dst:
+                             dst.write(mean_arr, 1)
+                         logger.info(f"Saved mean coherence to {coh_mean_path}")
+                     except Exception as e:
+                         logger.error(f"Failed to compute mean coherence: {e}")
+                 
+                 if coh_mean_path.exists():
+                     compute_insar_features(coh_paths_str, str(coh_mean_path))
+                     insar_success = True
+                 else:
+                     logger.warning("Mean coherence missing and could not be computed. Skipping InSAR features.")
+             else:
+                 logger.info("Insufficient InSAR coherence files found. Skipping feature extraction.")
+        else:
+             logger.info("No InSAR coherence files found. Skipping feature extraction.")
+
     except Exception as e:
         logger.exception("Could not compute InSAR features – pipeline continues without them")
 
     # 5. Gravity inversion (PINN)
     logger.info("=== STEP 5: Gravity inversion with PINN ===")
+    step_start = time.time()
     try:
-        # Determine device – subprocess environment variable should force CPU if needed
-        run_gravity_inversion(
-            region=region,
-            resolution=resolution,
-            output_prefix=output_name,
-            config_path=Path("config.yaml")
-        )
+        # invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None)
+
+        gravity_input = tile_dir / "processed" / "gravity" / "gravity_residual_wavelet.tif"
+        density_output = OUTPUTS_DIR / f"{output_name.name}_density_model.tif"
+        # Use the lithology density map created in Step 1 (which uses tile_dir)
+        lithology_input = tile_dir / "processed" / "lithology_density.tif"
+
+        if gravity_input.exists():
+            logger.info(f"PINN input file exists: {gravity_input}")
+            run_gravity_inversion(
+                tif_path=str(gravity_input),
+                output_path=str(density_output),
+                lithology_path=str(lithology_input) if lithology_input.exists() else None,
+                target_mode=mode
+            )
+            logger.info(f"PINN inversion completed in {time.time() - step_start:.1f}s")
+        else:
+            logger.error(f"Gravity input file not found: {gravity_input}")
+            # We can't proceed without gravity in this pipeline
+            sys.exit(1)
+
     except Exception as e:
-        logger.exception("Gravity inversion failed")
+        logger.exception(f"Gravity inversion failed after {time.time() - step_start:.1f}s")
         sys.exit(1)
 
-    # 6. Multi‑resolution feature fusion (mosaic)
-    logger.info("=== STEP 6: Multi‑resolution feature fusion ===")
+    # 6. Multi-resolution feature fusion (mosaic)
+    logger.info("=== STEP 6: Multi-resolution feature fusion ===")
     try:
         # Build list of feature rasters that exist
+        # Note: We need to check what files were actually produced by previous steps
+        # The PINN output name was constructed as: OUTPUTS_DIR / f"{output_name.name}_density_model.tif"
+        
+        pinn_output = OUTPUTS_DIR / f"{output_name.name}_density_model.tif"
+        
         feature_files = [
-            DATA_DIR / "processed" / "magnetic.tif",
-            DATA_DIR / "processed" / "gravity.tif",
-            DATA_DIR / "processed" / "density.tif",
-            DATA_DIR / "processed" / "topography.tif",
-            output_name.with_suffix(".pinn_density.tif"),
+            tile_dir / "processed" / "magnetic" / "magnetic_processed.tif",
+            tile_dir / "processed" / "gravity" / "gravity_processed.tif",
+            tile_dir / "processed" / "lithology_density.tif",
+            tile_dir / "processed" / "dem" / "dem_processed.tif",
+            pinn_output,
         ]
         # Add InSAR features if they exist
         if insar_success:
-            feature_files.append(DATA_DIR / "processed" / "insar_velocity.tif")
-            feature_files.append(DATA_DIR / "processed" / "insar_decorrelation.tif")
+            feature_files.append(tile_dir / "processed" / "insar" / "insar_velocity.tif")
+            feature_files.append(tile_dir / "processed" / "insar" / "insar_decorrelation.tif")
 
         # Filter for existence
         existing = [str(f) for f in feature_files if f.exists()]
@@ -227,7 +305,7 @@ def run_workflow(
 
     elapsed = time.time() - start_time
     logger.info(f"Workflow completed in {elapsed:.2f} seconds")
-    print(f"\n✅ Pipeline finished. Results saved to {output_name}.*")
+    print(f"\n[SUCCESS] Pipeline finished. Results saved to {output_name}.*")
 
 
 if __name__ == "__main__":

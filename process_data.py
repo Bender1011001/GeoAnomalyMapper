@@ -23,6 +23,7 @@ import numpy as np
 import rasterio
 from project_paths import PROCESSED_DIR, RAW_DIR, ensure_directories
 from utils.raster_utils import clip_and_reproject_raster
+from utils.land_mask import create_land_mask, apply_land_mask
 import pywt
 from download_lithology import create_synthetic_lithology
 
@@ -72,9 +73,18 @@ def wavelet_decompose_gravity(
     with rasterio.open(gravity_path) as src:
         grav = src.read(1).astype(np.float64)
         profile = src.profile.copy()
+        nodata = src.nodata
         
-    # Fill NaNs
-    grav = np.where(np.isnan(grav), np.nanmean(grav), grav)
+    # Handle Nodata and NaNs
+    if nodata is not None:
+        grav = np.where(grav == nodata, np.nan, grav)
+        
+    # Fill NaNs with mean to avoid wavelet artifacts
+    # Use nanmean of valid data
+    mean_val = np.nanmean(grav)
+    if np.isnan(mean_val):
+        mean_val = 0.0
+    grav = np.where(np.isnan(grav), mean_val, grav)
 
     # Determine max level if not provided
     if level is None:
@@ -168,12 +178,20 @@ def _write_text_file(path: Path, content: str) -> None:
     logger.info("Wrote %s", path)
 
 
-def process_gravity_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
+def process_gravity_data(
+    region: Tuple[float, float, float, float],
+    resolution: float,
+    output_dir: Optional[Path] = None
+) -> bool:
     """Process gravity data for the requested region."""
     logger.info("\n%s\nPROCESSING GRAVITY DATA\n%s", "=" * 70, "=" * 70)
 
     gravity_dir = RAW_DIR / "gravity"
-    output_dir = PROCESSED_DIR / "gravity"
+    if output_dir is None:
+        output_dir = PROCESSED_DIR / "gravity"
+    else:
+        output_dir = output_dir / "gravity"
+        
     output_dir.mkdir(parents=True, exist_ok=True)
 
     gravity_files = sorted(gravity_dir.glob("*.tif*"))
@@ -204,6 +222,23 @@ def process_gravity_data(region: Tuple[float, float, float, float], resolution: 
     success = clip_and_reproject_raster(gravity_files[0], output_file, region, resolution)
     
     if success:
+        # CRITICAL: Apply land mask BEFORE expensive wavelet processing
+        # Masks ocean areas to reduce computation and false positives
+        logger.info("Applying ocean mask to gravity data...")
+        try:
+            with rasterio.open(output_file, 'r+') as src:
+                data = src.read(1)
+                land_mask = create_land_mask(src)
+                masked_data = apply_land_mask(data, land_mask, fill_value=np.nan, inplace=False)
+                
+                # Overwrite with masked data
+                src.write(masked_data, 1)
+                
+                land_fraction = np.sum(land_mask) / land_mask.size
+                logger.info(f"Land mask applied: {100*land_fraction:.1f}% land coverage")
+        except Exception as e:
+            logger.warning(f"Land masking failed (non-critical): {e}")
+        
         # Automatically run wavelet + TDR after gravity clipping
         residual_path = output_dir / "gravity_residual_wavelet.tif"
         tdr_path = output_dir / "gravity_tdr.tif"
@@ -218,11 +253,21 @@ def process_gravity_data(region: Tuple[float, float, float, float], resolution: 
     return success
 
 
-def process_magnetic_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
+def process_magnetic_data(
+    region: Tuple[float, float, float, float],
+    resolution: float,
+    output_dir: Optional[Path] = None
+) -> bool:
     logger.info("\n%s\nPROCESSING MAGNETIC DATA\n%s", "=" * 70, "=" * 70)
     magnetic_dir = RAW_DIR / "magnetic"
     magnetic_files = sorted(magnetic_dir.glob("EMAG2*.tif*")) + sorted(magnetic_dir.glob("*.tif"))
     
+    if output_dir is None:
+        output_dir = PROCESSED_DIR / "magnetic"
+    else:
+        output_dir = output_dir / "magnetic"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     if not magnetic_files:
         instructions = f"""MAGNETIC DATA MISSING
 ================================
@@ -231,8 +276,7 @@ Download the global EMAG2 or WDMAM model:
 - Or regional high-res data from Geoscience Australia / USGS
 Place the GeoTIFF in data/raw/magnetic/
 """
-        (PROCESSED_DIR / "magnetic").mkdir(parents=True, exist_ok=True)
-        _write_text_file(PROCESSED_DIR / "magnetic" / "MAGNETIC_INSTRUCTIONS.txt", instructions)
+        _write_text_file(output_dir / "MAGNETIC_INSTRUCTIONS.txt", instructions)
         logger.warning("No magnetic data found in %s", magnetic_dir)
         return False
 
@@ -240,12 +284,34 @@ Place the GeoTIFF in data/raw/magnetic/
     magnetic_file = sorted(magnetic_files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
     logger.info("Using magnetic file: %s", magnetic_file.name)
     
-    output_file = PROCESSED_DIR / "magnetic" / "magnetic_processed.tif"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    return clip_and_reproject_raster(magnetic_file, output_file, region, resolution)
+    output_file = output_dir / "magnetic_processed.tif"
+    success = clip_and_reproject_raster(magnetic_file, output_file, region, resolution)
+    
+    if success:
+        # Apply land mask to magnetic data (same as gravity)
+        logger.info("Applying ocean mask to magnetic data...")
+        try:
+            with rasterio.open(output_file, 'r+') as src:
+                data = src.read(1)
+                land_mask = create_land_mask(src)
+                masked_data = apply_land_mask(data, land_mask, fill_value=np.nan, inplace=False)
+                
+                # Overwrite with masked data
+                src.write(masked_data, 1)
+                
+                land_fraction = np.sum(land_mask) / land_mask.size
+                logger.info(f"Land mask applied: {100*land_fraction:.1f}% land coverage")
+        except Exception as e:
+            logger.warning(f"Land masking failed (non-critical): {e}")
+    
+    return success
 
 
-def process_dem_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
+def process_dem_data(
+    region: Tuple[float, float, float, float],
+    resolution: float,
+    output_dir: Optional[Path] = None
+) -> bool:
     logger.info("\n%s\nPROCESSING DEM DATA\n%s", "=" * 70, "=" * 70)
     dem_dir = RAW_DIR / "dem"
     dem_files = sorted(dem_dir.glob("*.tif"))
@@ -254,23 +320,38 @@ def process_dem_data(region: Tuple[float, float, float, float], resolution: floa
         logger.warning("Download Copernicus DEM 30 m tiles for your region.")
         return False
 
-    dem_output = PROCESSED_DIR / "dem" / "dem_processed.tif"
+    if output_dir is None:
+        output_dir = PROCESSED_DIR / "dem"
+    else:
+        output_dir = output_dir / "dem"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    dem_output = output_dir / "dem_processed.tif"
 
     # Ensure DEM uses the same target resolution as other layers to maintain a common grid
     return clip_and_reproject_raster(dem_files[0], dem_output, region, resolution)
 
 
-def process_insar_data(region: Tuple[float, float, float, float], resolution: float) -> bool:
+def process_insar_data(
+    region: Tuple[float, float, float, float],
+    resolution: float,
+    output_dir: Optional[Path] = None
+) -> bool:
     logger.info("\n%s\nPROCESSING INSAR DATA\n%s", "=" * 70, "=" * 70)
     insar_dir = RAW_DIR / "insar"
-    output_dir = PROCESSED_DIR / "insar"
+    
+    if output_dir is None:
+        output_dir = PROCESSED_DIR / "insar"
+    else:
+        output_dir = output_dir / "insar"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if not insar_dir.exists() or not any(insar_dir.iterdir()):
         logger.warning("No Sentinel-1 stacks found in %s (optional step).", insar_dir)
         return False
 
-    processed_files = sorted(insar_dir.glob("*.tif"))
+    # Search recursively because downloads go into subdirectories (e.g. seasonal_usa)
+    processed_files = sorted(insar_dir.rglob("*.tif"))
     if not processed_files:
         guide = f"""# InSAR Processing Guide
 
@@ -310,6 +391,7 @@ def process_lithology_data(region: Tuple[float, float, float, float]) -> bool:
 def process_all_data(
     region: Tuple[float, float, float, float],
     resolution: float = DEFAULT_RESOLUTION,
+    output_dir: Optional[Path] = None,
 ) -> Dict[str, bool]:
     """Run all individual processors and return a success summary."""
 
@@ -318,10 +400,10 @@ def process_all_data(
     logger.info("Output resolution: %.6f° (~%.0f m)\n", resolution, resolution * 111_000)
 
     results: Dict[str, bool] = {
-        'gravity': process_gravity_data(region, resolution),
-        'magnetic': process_magnetic_data(region, resolution),
-        'dem': process_dem_data(region, resolution),
-        'insar': process_insar_data(region, resolution),
+        'gravity': process_gravity_data(region, resolution, output_dir),
+        'magnetic': process_magnetic_data(region, resolution, output_dir),
+        'dem': process_dem_data(region, resolution, output_dir),
+        'insar': process_insar_data(region, resolution, output_dir),
         'lithology': process_lithology_data(region),
     }
 
@@ -335,7 +417,11 @@ def process_all_data(
     else:
         logger.warning("\nInsufficient data for fusion/detection (need gravity or magnetic).")
 
-    log_file = PROCESSED_DIR / "processing_log.json"
+    if output_dir:
+        log_file = output_dir / "processing_log.json"
+    else:
+        log_file = PROCESSED_DIR / "processing_log.json"
+        
     log_payload = {
         'region': region,
         'resolution_deg': resolution,

@@ -10,6 +10,7 @@ magnetic, DEM, InSAR, lithology).
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import List, Tuple
 
@@ -65,7 +66,8 @@ def clip_and_reproject_raster(
     height = max(1, int(round((maxy - miny) / resolution)))
     transform = from_bounds(minx, miny, maxx, maxy, width, height)
 
-    logger.info("Processing %s → %s", input_path.name, output_path.name)
+    logger.info("Processing %s -> %s", input_path.name, output_path.name)
+
 
     resampling_method = Resampling.nearest if is_categorical else Resampling.bilinear
 
@@ -84,6 +86,13 @@ def clip_and_reproject_raster(
         )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if os.path.exists(output_path):
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+
     with rasterio.open(
         output_path,
         'w',

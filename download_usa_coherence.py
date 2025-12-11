@@ -53,7 +53,7 @@ def main(region=None, resolution=None, output_dir=None):
             # This step (STEP 1) printed a warning and continued.
             # So this file doesn't strictly NEED changes to fix the crash, but we can make it quieter.
             
-            dataset='S1_COHERENCE_12_DAY',
+            # dataset='"S1-GRD-COH12",  # Original dataset name that caused the warning',
             maxResults=500
         )
         print(f"Found {len(results)} tiles.")
