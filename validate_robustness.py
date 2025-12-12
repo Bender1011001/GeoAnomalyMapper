@@ -110,6 +110,14 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
     logger.info(f"Gravity path for feature engineering: {gravity_path}")
     logger.info(f"Magnetic path for feature engineering: {magnetic_path}")
 
+    # Generate Expert Version engineered features ONCE before the loop
+    # This prevents file locking issues and redundant computation
+    logger.info("Pre-generating engineered features for LOOCV...")
+    current_feature_paths = generate_engineered_features(
+        feature_paths, gravity_path, magnetic_path
+    )
+    logger.info(f"Generated {len(current_feature_paths)} features (including Expert Version)")
+
     for i in range(n_deposits):
         logger.info(f"\nFold {i+1}/{n_deposits}: Holding out '{deposit_names[i]}'")
 
@@ -121,12 +129,6 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
         # Apply augmentation to training set
         augmented_train_coords = apply_gaussian_augmentation(train_coords, sigma=0.005, n_variations=5)
         logger.info(f"  Training set: {len(train_coords)} deposits → {len(augmented_train_coords)} samples")
-
-        # Generate engineered features for this fold
-        current_feature_paths = generate_engineered_features(
-            feature_paths, gravity_path, magnetic_path
-        )
-        logger.info(f"  Generated {len(current_feature_paths)} features (including engineered)")
 
         # Extract features at training locations
         train_features, train_valid_mask = extract_features_at_points(current_feature_paths, augmented_train_coords)
@@ -144,7 +146,7 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
 
         # Train model
         clf, scaler = train_supervised_model(
-            train_features, negative_features, n_estimators=100, random_state=42
+            train_features, negative_features, n_estimators=100, max_depth=5, min_samples_leaf=5, max_features='sqrt', random_state=42
         )
 
         # Test on held-out deposit
@@ -168,6 +170,9 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
         })
 
         logger.info(f"  LOOCV score: {score:.3f}")
+        if score < 0.5:
+            deposit_type = original_deposits[i]['type']
+            logger.info(f"  MISSED: {deposit_names[i]} ({deposit_type}) score={score:.3f}")
 
     # Calculate LOOCV sensitivity
     sensitivity_threshold = 0.5
@@ -280,24 +285,8 @@ def main():
     else:
         logger.warning("❌ Magnetic features not found")
 
-    # Try fused belief map
-    fused_candidates = [
-        OUTPUTS_DIR / "california_full_multisource.fused.tif",
-        OUTPUTS_DIR / "fusion" / "fused_belief.tif",
-        workflow_data_dir / "fused_belief.tif"
-    ]
-
-    fused_path = None
-    for candidate in fused_candidates:
-        if candidate.exists():
-            fused_path = candidate
-            break
-
-    if fused_path:
-        feature_paths.append(str(fused_path))
-        logger.info("✅ Fused belief map available")
-    else:
-        logger.warning("❌ Fused belief map not found - using individual features only")
+    # Note: Removed fused_belief from feature stack to prevent overfitting
+    # The model should learn from raw physical data and expert features only
 
     if not feature_paths:
         logger.error("No feature files found! Run the full California workflow first.")
@@ -318,9 +307,9 @@ def main():
     logger.info(f"Gravity path for full workflow: {gravity_path}")
     logger.info(f"Magnetic path for full workflow: {magnetic_path}")
     
-    # Generate engineered features for full workflow
+    # Generate Expert Version engineered features for full workflow
     full_feature_paths = generate_engineered_features(feature_paths, gravity_path, magnetic_path)
-    logger.info(f"Generated {len(full_feature_paths)} features for full workflow")
+    logger.info(f"Generated {len(full_feature_paths)} Expert Version features for full workflow")
 
     # Perform LOOCV
     loocv_results = perform_loocv(feature_paths, filtered_deposits, negative_ratio=5.0)

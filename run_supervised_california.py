@@ -30,7 +30,7 @@ import rasterio
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.data_fetcher import fetch_usgs_mrds, get_training_coordinates, validate_deposit_data
-from classify_supervised import classify_supervised
+from classify_supervised import classify_supervised, generate_engineered_features
 from validate_california import KNOWN_FEATURES
 from project_paths import OUTPUTS_DIR
 
@@ -203,24 +203,8 @@ def run_supervised_california_workflow():
     else:
         logger.warning("  ❌ Magnetic features not found")
 
-    # Try to find fused belief map from previous run
-    fused_belief_candidates = [
-        OUTPUTS_DIR / "california_full_multisource.fused.tif",  # Direct TIFF
-        OUTPUTS_DIR / "fusion" / "fused_belief.tif",  # From workflow
-        OUTPUTS_DIR / "california_full_multisource_data" / "fused_belief.tif"  # Alternative
-    ]
-
-    fused_belief_path = None
-    for candidate in fused_belief_candidates:
-        if candidate.exists():
-            fused_belief_path = candidate
-            break
-
-    if fused_belief_path:
-        feature_paths.append(str(fused_belief_path))
-        logger.info("  ✅ Fused belief map available")
-    else:
-        logger.warning("  ❌ Fused belief map not found - using individual features only")
+    # Note: Removed fused_belief from feature stack to prevent overfitting
+    # The model should learn from raw physical data and expert features only
 
     if not feature_paths:
         logger.error("No feature files found! Please run the full California workflow first.")
@@ -246,17 +230,35 @@ def run_supervised_california_workflow():
         logger.info(f"Gravity path for feature engineering: {gravity_path}")
         logger.info(f"Magnetic path for feature engineering: {magnetic_path}")
 
+        # Generate engineered features to get full feature set and names
+        full_feature_paths = generate_engineered_features(feature_paths, gravity_path, magnetic_path)
+        logger.info(f"Using {len(full_feature_paths)} features including engineered ones")
+
         classifier = classify_supervised(
-            feature_paths=feature_paths,
+            feature_paths=full_feature_paths,
             positive_coords=coords,
             output_path=str(probability_map_path),
-            negative_ratio=5.0,  # 5:1 negative to positive ratio (reduced for speed)
+            negative_ratio=5.0,
             n_estimators=100,
+            max_depth=5,
+            min_samples_leaf=5,
+            max_features='sqrt',
             random_state=42,
-            gravity_path=gravity_path,
-            magnetic_path=magnetic_path
+            gravity_path=None,
+            magnetic_path=None
         )
         logger.info("✅ Supervised classification completed")
+
+        # Feature importances
+        importances = classifier.feature_importances_
+        feature_names = [Path(p).stem for p in full_feature_paths]
+        indices = np.argsort(importances)[::-1]
+
+        logger.info("\nFeature Importances (descending):")
+        print("\nFeature Importances (descending):")
+        for rank, idx in enumerate(indices):
+            logger.info(f"{rank+1}. {feature_names[idx]}: {importances[idx]:.4f}")
+            print(f"{rank+1}. {feature_names[idx]}: {importances[idx]:.4f}")
 
     except Exception as e:
         logger.error(f"❌ Supervised classification failed: {e}")
