@@ -206,8 +206,14 @@ def sample_at_location(src, lat, lon, buffer_pixels=3):
         # Mask nodata
         if src.nodata is not None:
             data = np.ma.masked_equal(data, src.nodata)
+            valid_count = data.count()
+        else:
+            # If no nodata, assume all valid? Or check for nan?
+            # Creating a masked array for consistency if nans exist
+            data = np.ma.masked_invalid(data)
+            valid_count = data.count()
         
-        if data.count() == 0:
+        if valid_count == 0:
             return None
             
         return {

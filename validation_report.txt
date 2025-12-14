@@ -1,0 +1,30 @@
+
+NAME                           | TYPE            | SCORE (Max)  | RESULT
+---------------------------------------------------------------------------
+Mountain Pass Mine             | Rare Earths     | -14.1300     | ❌ MISSED
+Rio Tinto Boron Mine           | Borates         | -9.3328      | ❌ MISSED
+Mesquite Mine                  | Gold            | -4.5095      | ❌ MISSED
+Castle Mountain Mine           | Gold            | -6.1323      | ❌ MISSED
+Soledad Mountain Mine          | Gold/Silver     | -15.1931     | ❌ MISSED
+Briggs Mine                    | Gold            | 21.8287      | ✅ DETECTED
+Golden Queen Mine              | Gold/Silver     | -15.1931     | ❌ MISSED
+McLaughlin Mine                | Gold            | 5.3333       | ✅ DETECTED
+Gold Run Mining District       | Gold            | 9.5732       | ✅ DETECTED
+Rand Mining District           | Gold/Silver/Tungsten | 6.2115       | ✅ DETECTED
+Salton Sea Geothermal Field    | Lithium/Geothermal | -4.4416      | ❌ MISSED
+Eagle Mountain Mine            | Iron            | 16.6422      | ✅ DETECTED
+Iron Mountain Mine             | Iron/Copper/Zinc | 31.4739      | ✅ DETECTED
+Leviathan Mine                 | Sulfur/Copper   | 18.5305      | ✅ DETECTED
+New Idria Mercury Mine         | Mercury         | -30.7472     | ❌ MISSED
+Dale Mining District (Test)    | Gold            | 24.5118      | ✅ DETECTED
+New Target Candidate 1         | Unknown         | 27.7830      | ✅ DETECTED
+
+==============================
+VALIDATION SUMMARY
+==============================
+Targets in Region:    17
+Successful Detections: 9
+Missed Detections:     8
+Sensitivity (Recall):  52.9%
+==============================
+

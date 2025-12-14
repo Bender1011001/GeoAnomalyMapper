@@ -94,14 +94,26 @@ class GravityPhysicsLayer(nn.Module):
         
         # Padding to mitigate edge artifacts (spectral leakage)
         # We use reflection padding to maintain continuity at boundaries
-        pad_h = int(H * 0.25) # Increased padding for better FFT stability
-        pad_w = int(W * 0.25)
+        # For CuFFT in FP16 (AMP), dimensions often perform best or require powers of 2 
+        # (or at least multiples of 8/16/32, strictly powers of 2 for some implementations).
+        # Let's target next power of 2 or at least a multiple of 32 for safety and performance.
         
-        # Ensure padded dimensions are even for FFT efficiency
-        if (H + 2*pad_h) % 2 != 0: pad_h += 1
-        if (W + 2*pad_w) % 2 != 0: pad_w += 1
+        target_h = 1 << (H + int(H * 0.25) - 1).bit_length()
+        target_w = 1 << (W + int(W * 0.25) - 1).bit_length()
+        
+        # Ensure minimal padding of ~25%
+        if target_h < H * 1.25: target_h *= 2
+        if target_w < W * 1.25: target_w *= 2
+        
+        pad_total_h = target_h - H
+        pad_total_w = target_w - W
+        
+        pad_h_top = pad_total_h // 2
+        pad_h_bottom = pad_total_h - pad_h_top
+        pad_w_left = pad_total_w // 2
+        pad_w_right = pad_total_w - pad_w_left
 
-        density_padded = F.pad(density_map, (pad_w, pad_w, pad_h, pad_h), mode='reflect')
+        density_padded = F.pad(density_map, (pad_w_left, pad_w_right, pad_h_top, pad_h_bottom), mode='reflect')
         B, C, H_pad, W_pad = density_padded.shape
 
         # 1. Precompute Filter (Lazy Loading)
@@ -134,7 +146,8 @@ class GravityPhysicsLayer(nn.Module):
         gravity_pred_padded = torch.real(torch.fft.ifft2(g_fft))
         
         # 3. Crop back to original size
-        gravity_pred = gravity_pred_padded[:, :, pad_h:pad_h+H, pad_w:pad_w+W]
+        # 3. Crop back to original size
+        gravity_pred = gravity_pred_padded[:, :, pad_h_top:pad_h_top+H, pad_w_left:pad_w_left+W]
         
         return gravity_pred * self.SI_to_mGal
 
@@ -234,7 +247,11 @@ class GradientLoss(nn.Module):
 # ==========================================
 # 5. Inversion Workflow
 # ==========================================
-def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None):
+
+# ==========================================
+# 5. Inversion Workflow
+# ==========================================
+def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None, magnetic_guide_path=None):
     # Load Config
     try:
         app_config = load_config()
@@ -285,6 +302,25 @@ def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None)
         except Exception as e:
             logger.warning(f"Failed to load lithology prior: {e}")
 
+    # --- Load Magnetic Structural Guide ---
+    guide_weights = None
+    if magnetic_guide_path and os.path.exists(magnetic_guide_path):
+        try:
+            from loss_functions import calculate_weights_from_magnetic_gradient
+            with rasterio.open(magnetic_guide_path) as src:
+                mag_data = src.read(
+                    1,
+                    out_shape=(height, width),
+                    resampling=Resampling.bilinear
+                )
+                mag_tensor = torch.from_numpy(mag_data).float().to(device)
+                # Calculate weights: High at smooth areas, Low at edges
+                # Using somewhat sensitive beta for strong edge preservation
+                guide_weights = calculate_weights_from_magnetic_gradient(mag_tensor, beta=1.5).unsqueeze(0).unsqueeze(0)
+                logger.info(f"Loaded Magnetic Guide from {magnetic_guide_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load magnetic guide: {e}")
+
     # --- Preprocessing ---
     # Z-score normalization for stability
     grav_mean = np.nanmean(data)
@@ -306,6 +342,10 @@ def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None)
         config['DEPTH_ESTIMATE'],
         thickness=config.get('THICKNESS_ESTIMATE', 1000.0)
     ).to(device)
+    
+    # Initialize Losses
+    from loss_functions import StructureGuidedTVLoss
+    sg_tv_loss_fn = StructureGuidedTVLoss().to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config['LR'])
     scheduler = CosineAnnealingLR(optimizer, T_max=config['EPOCHS'], eta_min=1e-5)
@@ -343,10 +383,16 @@ def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None)
             # B. Sparsity (L1) - Encourage simple models
             loss_sparsity = torch.mean(torch.abs(pred_residual))
             
-            # C. Total Variation (TV) - Encourage spatial continuity
-            diff_i = torch.abs(pred_residual[:, :, 1:, :] - pred_residual[:, :, :-1, :])
-            diff_j = torch.abs(pred_residual[:, :, :, 1:] - pred_residual[:, :, :, :-1])
-            loss_tv = torch.mean(diff_i) + torch.mean(diff_j)
+            # C. Total Variation (TV) or Structure-Guided TV
+            if guide_weights is not None:
+                # Use the new structure-guided loss
+                # Normalize by number of elements to keep scale comparable to mean() used in standard TV
+                loss_tv = sg_tv_loss_fn(pred_residual, guide_weights) / pred_residual.numel()
+            else:
+                # Standard TV
+                diff_i = torch.abs(pred_residual[:, :, 1:, :] - pred_residual[:, :, :-1, :])
+                diff_j = torch.abs(pred_residual[:, :, :, 1:] - pred_residual[:, :, :, :-1])
+                loss_tv = torch.mean(diff_i) + torch.mean(diff_j)
             
             # D. Mode-Specific Bias
             loss_bias = 0.0
@@ -409,6 +455,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", default="data/processed/gravity_residual.tif", help="Input Gravity Residual GeoTIFF")
     parser.add_argument("--output", default="data/outputs/density_contrast_map.tif", help="Output Density Contrast GeoTIFF")
     parser.add_argument("--lithology", default=None, help="Optional Lithology Prior GeoTIFF")
+    parser.add_argument("--magnetic_guide", default=None, help="Optional Magnetic/Structural Guide GeoTIFF for regularization")
     parser.add_argument("--mode", default=None, choices=['void', 'mineral', 'general'], help="Inversion Target Mode")
     
     args = parser.parse_args()
@@ -417,6 +464,6 @@ if __name__ == "__main__":
         # Ensure output directory exists
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         
-        invert_gravity(args.input, args.output, args.lithology, args.mode)
+        invert_gravity(args.input, args.output, args.lithology, args.mode, args.magnetic_guide)
     else:
         logger.error(f"Input file '{args.input}' not found.")
