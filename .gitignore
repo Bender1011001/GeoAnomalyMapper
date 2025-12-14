@@ -1,5 +1,94 @@
+# Data files
 usa_deposits.csv
 data/
 *.tif
 *.gxf
 *.png
+*.jpg
+*.jpeg
+*.kmz
+*.kml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+geoanomaly-clean/
+
+# PyTorch models
+*.pth
+*.pt
+*.ckpt
+
+# Outputs
+outputs/
+results/
+*.log
+*.txt
+!requirements.txt
+!LICENSE
+!README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Distribution / packaging
+*.whl
+
+# Raster data
+*.hdf
+*.nc
+*.grb
+*.grib
+*.grib2
+
+# Temporary files
+tmp/
+temp/
+*.tmp
