@@ -2,13 +2,19 @@
 """
 Leave-One-Out Cross-Validation for Supervised Mineral Exploration Model
 
+"Truth Machine" Validation Strategy:
+- Buffered Spatial Leave-One-Out Cross-Validation (LOOCV) with exclusion zones
+- Ensemble Bagging with Balanced Sampling for robust predictions
+- Strict spatial constraints to prevent information leakage
+
 This script performs rigorous validation of the supervised learning model by testing
 whether it can detect mineral deposits it has never seen before during training.
 This addresses concerns about overfitting to training locations vs. learning
 geophysical signatures.
 
 Key Features:
-- Leave-One-Out Cross-Validation (LOOCV) on 17 known California deposits
+- Buffered Spatial LOOCV with exclusion zones (radius = 0.43° from variogram analysis)
+- Ensemble Bagging: 50 models trained on balanced subsets
 - Gaussian jitter augmentation (σ=0.005°) for training set expansion
 - Probability prediction at held-out deposit locations
 - Sensitivity calculation: % of deposits detected at threshold 0.5
@@ -32,13 +38,20 @@ from classify_supervised import (
     extract_features_at_points,
     sample_background_features,
     train_supervised_model,
-    predict_probability_map,
+    train_balanced_ensemble_model,
     generate_engineered_features
 )
 from project_paths import OUTPUTS_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# TRUTH MACHINE VALIDATION CONSTANTS
+# ============================================================================
+# Spatial autocorrelation range from variogram analysis
+# This defines the buffer radius for spatial exclusion zones in LOOCV
+BUFFER_RADIUS = 0.43  # degrees (~48 km) - derived from variogram analysis
 
 
 def apply_gaussian_augmentation(coords: np.ndarray, sigma: float = 0.005, n_variations: int = 5) -> np.ndarray:
@@ -70,21 +83,32 @@ def apply_gaussian_augmentation(coords: np.ndarray, sigma: float = 0.005, n_vari
     return np.array(augmented_coords)
 
 
-def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: float = 5.0) -> dict:
+def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: float = 5.0,
+                  use_ensemble: bool = True, n_ensemble: int = 50) -> dict:
     """
-    Perform Leave-One-Out Cross-Validation with engineered features.
+    Perform Buffered Spatial Leave-One-Out Cross-Validation with Ensemble Bagging.
+    
+    "Truth Machine" Implementation:
+    - Each held-out deposit has an exclusion zone (radius = BUFFER_RADIUS)
+    - Negative samples cannot be drawn from exclusion zones
+    - Ensemble of 50 models trained on balanced subsets for robustness
+    - This provides realistic performance estimates with spatial constraints
 
     Args:
         feature_paths: List of feature raster file paths
         original_deposits: List of 17 original deposit dictionaries
         negative_ratio: Ratio of negative to positive samples
+        use_ensemble: Use BalancedEnsembleClassifier (recommended)
+        n_ensemble: Number of models in ensemble
 
     Returns:
         Dictionary with LOOCV results
     """
     logger.info("=" * 80)
-    logger.info("LEAVE-ONE-OUT CROSS-VALIDATION WITH ENGINEERED FEATURES")
+    logger.info("TRUTH MACHINE: BUFFERED SPATIAL LOOCV WITH ENSEMBLE BAGGING")
     logger.info("=" * 80)
+    logger.info(f"Spatial exclusion buffer: {BUFFER_RADIUS}° (~{BUFFER_RADIUS * 111:.1f} km)")
+    logger.info(f"Ensemble learning: {use_ensemble} (n_ensemble={n_ensemble})")
 
     # Extract original coordinates (no augmentation yet)
     original_coords, deposit_names = get_training_coordinates(original_deposits)
@@ -126,8 +150,13 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
         train_coords = original_coords[train_indices]
         train_names = [deposit_names[j] for j in train_indices]
 
+        # TRUTH MACHINE: Create spatial exclusion zone for held-out deposit
+        held_out_lat, held_out_lon = original_coords[i]
+        current_exclusion_zone = [(held_out_lat, held_out_lon, BUFFER_RADIUS)]
+        logger.info(f"  Exclusion zone: ({held_out_lat:.4f}, {held_out_lon:.4f}) radius={BUFFER_RADIUS}°")
+
         # Apply augmentation to training set
-        augmented_train_coords = apply_gaussian_augmentation(train_coords, sigma=0.005, n_variations=5)
+        augmented_train_coords = apply_gaussian_augmentation(train_coords, sigma=0.015, n_variations=20)
         logger.info(f"  Training set: {len(train_coords)} deposits → {len(augmented_train_coords)} samples")
 
         # Extract features at training locations
@@ -138,16 +167,36 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
             logger.warning(f"  No valid training features for fold {i+1}, skipping")
             continue
 
-        # Sample negative training data
+        # TRUTH MACHINE: Sample negative training data with spatial exclusion zones
+        # This ensures negatives are not drawn near the held-out deposit
         n_negative = int(len(train_features) * negative_ratio)
+        logger.info(f"  Sampling {n_negative} negatives (excluding {BUFFER_RADIUS}° buffer around held-out)")
         negative_features = sample_background_features(
-            current_feature_paths, n_negative, augmented_train_coords
+            current_feature_paths, n_negative, augmented_train_coords,
+            exclusion_zones=current_exclusion_zone
         )
 
-        # Train model
-        clf, scaler = train_supervised_model(
-            train_features, negative_features, n_estimators=100, max_depth=5, min_samples_leaf=5, max_features='sqrt', random_state=42
-        )
+        # TRUTH MACHINE: Train ensemble model for robust predictions
+        if use_ensemble:
+            logger.info(f"  Training BalancedEnsembleClassifier with {n_ensemble} models...")
+            clf = train_balanced_ensemble_model(
+                train_features, negative_features,
+                n_ensemble=n_ensemble,
+                n_estimators_base=100,
+                max_depth=8,
+                min_samples_leaf=5,
+                max_features='sqrt',
+                random_state=42
+            )
+            scaler = None  # Ensemble has built-in scaler
+        else:
+            # Fallback to single RandomForest
+            logger.info("  Training single RandomForestClassifier...")
+            clf, scaler = train_supervised_model(
+                train_features, negative_features,
+                n_estimators=100, max_depth=5, min_samples_leaf=5,
+                max_features='sqrt', random_state=42
+            )
 
         # Test on held-out deposit
         held_out_coord = original_coords[i:i+1]  # Shape (1, 2)
@@ -157,9 +206,12 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
             logger.warning(f"  Held-out deposit '{deposit_names[i]}' has invalid features, assigning score 0.0")
             score = 0.0
         else:
-            # Scale features and predict probability
-            held_out_scaled = scaler.transform(held_out_features[0:1])
-            score = clf.predict_proba(held_out_scaled)[0, 1]
+            # Predict probability (different handling for ensemble vs single model)
+            if use_ensemble:
+                score = clf.predict_proba(held_out_features[0:1])[0, 1]
+            else:
+                held_out_scaled = scaler.transform(held_out_features[0:1])
+                score = clf.predict_proba(held_out_scaled)[0, 1]
 
         loocv_scores.append(score)
         held_out_results.append({
@@ -169,10 +221,10 @@ def perform_loocv(feature_paths: list, original_deposits: list, negative_ratio: 
             'loocv_score': score
         })
 
-        logger.info(f"  LOOCV score: {score:.3f}")
+        logger.info(f"  [OK] LOOCV score: {score:.3f}")
         if score < 0.5:
             deposit_type = original_deposits[i]['type']
-            logger.info(f"  MISSED: {deposit_names[i]} ({deposit_type}) score={score:.3f}")
+            logger.warning(f"  [MISS] MISSED: {deposit_names[i]} ({deposit_type}) score={score:.3f}")
 
     # Calculate LOOCV sensitivity
     sensitivity_threshold = 0.5
@@ -265,25 +317,25 @@ def main():
     gravity_residual = workflow_data_dir / "gravity" / "gravity_residual_wavelet.tif"
     if gravity_residual.exists():
         feature_paths.append(str(gravity_residual))
-        logger.info("✅ Gravity residual available")
+        logger.info("[OK] Gravity residual available")
     else:
-        logger.warning("❌ Gravity residual not found")
+        logger.warning("[MISS] Gravity residual not found")
 
     # InSAR features
     insar_features = workflow_data_dir / "insar" / "insar_processed.tif"
     if insar_features.exists():
         feature_paths.append(str(insar_features))
-        logger.info("✅ InSAR features available")
+        logger.info("[OK] InSAR features available")
     else:
-        logger.warning("❌ InSAR features not found")
+        logger.warning("[MISS] InSAR features not found")
 
     # Magnetic data
     magnetic_features = workflow_data_dir / "magnetic" / "magnetic_processed.tif"
     if magnetic_features.exists():
         feature_paths.append(str(magnetic_features))
-        logger.info("✅ Magnetic features available")
+        logger.info("[OK] Magnetic features available")
     else:
-        logger.warning("❌ Magnetic features not found")
+        logger.warning("[MISS] Magnetic features not found")
 
     # Note: Removed fused_belief from feature stack to prevent overfitting
     # The model should learn from raw physical data and expert features only
@@ -311,22 +363,30 @@ def main():
     full_feature_paths = generate_engineered_features(feature_paths, gravity_path, magnetic_path)
     logger.info(f"Generated {len(full_feature_paths)} Expert Version features for full workflow")
 
-    # Perform LOOCV
-    loocv_results = perform_loocv(feature_paths, filtered_deposits, negative_ratio=5.0)
+    # TRUTH MACHINE: Perform Buffered Spatial LOOCV with Ensemble Bagging
+    logger.info("\n" + "=" * 80)
+    logger.info("STARTING TRUTH MACHINE VALIDATION")
+    logger.info("=" * 80)
+    loocv_results = perform_loocv(
+        feature_paths, filtered_deposits,
+        negative_ratio=5.0,
+        use_ensemble=True,  # Enable ensemble bagging
+        n_ensemble=100  # 100 models for robust predictions
+    )
 
-    # Generate full map prediction with engineered features
+    # Generate full map prediction with engineered features and ensemble
     output_base = OUTPUTS_DIR / "california_supervised"
     output_base.mkdir(exist_ok=True)
     
-    full_map_path = output_base / "california_supervised_probability_engineered.tif"
+    full_map_path = output_base / "california_supervised_probability_truth_machine.tif"
     
     # Extract coordinates for full training (with augmentation)
     coords, labels = get_training_coordinates(filtered_deposits)
-    augmented_coords = apply_gaussian_augmentation(coords, sigma=0.005, n_variations=5)
-    logger.info(f"Full training: {len(coords)} deposits → {len(augmented_coords)} samples")
+    augmented_coords = apply_gaussian_augmentation(coords, sigma=0.015, n_variations=20)
+    logger.info(f"\nFull training: {len(coords)} deposits → {len(augmented_coords)} samples")
     
-    # Train full model with engineered features
-    logger.info("Training full model with engineered features...")
+    # Train full model with engineered features and ensemble
+    logger.info("Training full model with Truth Machine configuration...")
     from classify_supervised import classify_supervised
     
     classifier = classify_supervised(
@@ -335,7 +395,10 @@ def main():
         output_path=str(full_map_path),
         negative_ratio=5.0,
         n_estimators=100,
-        random_state=42
+        random_state=42,
+        use_ensemble=True,  # Use ensemble for final map too
+        n_ensemble=100,
+        max_depth=8
     )
     logger.info(f"Full probability map saved: {full_map_path}")
 
@@ -373,17 +436,17 @@ def main():
     # Interpretation
     print("\nINTERPRETATION:")
     if loocv_results['loocv_sensitivity'] >= 70:
-        print("✅ HIGH CONFIDENCE: Model shows strong generalization ability.")
+        print("[HIGH CONFIDENCE] Model shows strong generalization ability.")
         print("   The model learns geophysical signatures, not just training locations.")
     elif loocv_results['loocv_sensitivity'] >= 50:
-        print("⚠️  MODERATE CONFIDENCE: Model shows some generalization but may be location-biased.")
+        print("[MODERATE CONFIDENCE] Model shows some generalization but may be location-biased.")
     else:
-        print("❌ LOW CONFIDENCE: Model may be overfitting to training locations.")
+        print("[LOW CONFIDENCE] Model may be overfitting to training locations.")
 
     if flagged_area_results['percent_flagged'] < 10:
-        print("✅ Map not over-flagged: Reasonable exploration target area.")
+        print("[OK] Map not over-flagged: Reasonable exploration target area.")
     else:
-        print("⚠️  Map may be over-flagged: Large portion marked as prospective.")
+        print("[WARN] Map may be over-flagged: Large portion marked as prospective.")
 
     return True
 

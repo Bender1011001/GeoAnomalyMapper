@@ -1,29 +1,18 @@
-# GeoAnomalyMapper v2.0
+# GeoAnomalyMapper
 
-**Advanced Geophysical Anomaly Detection & Multi-Scale Fusion Pipeline**
+**Multi-Source Geophysical Anomaly Detection Pipeline**
 
-GeoAnomalyMapper v2.0 is a complete rebuild of the anomaly detection system, designed to achieve >95% accuracy in detecting Subsurface Voids / Geological Anomalies and other subterranean features. It addresses previous limitations through a sophisticated multi-stage pipeline integrating signal processing, physics-informed analysis, and machine learning.
+GeoAnomalyMapper is a an advanced anomaly detection system designed to identify subsurface geological features. It uses a multi-stage pipeline integrating signal processing, physics-informed analysis, and machine learning.
 
-## Key Features (v2.0)
+## Key Features
 
 *   **Multi-Scale Fusion:** Combines Bayesian Compressive Sensing (BCS) for resolution enhancement with Dempster-Shafer theory for uncertainty-weighted belief fusion.
-*   **Stable Structure Detection:** Leverages InSAR Coherence Change Detection (CCD), GLCM texture analysis, and structural artificiality metrics to identify surface footprints of underground structures.
-*   **Physics-Informed Analysis:** Utilizes Poisson's relation between gravity and magnetic fields to validate density contrasts against magnetic susceptibility, reducing false positives from geological features.
-*   **Advanced Signal Processing:** Implements Continuous Wavelet Transform (CWT) for multi-scale decomposition and Tilt Derivative (TDR) for precise edge detection of potential voids.
-*   **ML Classification:** Deploys One-Class SVM (OC-SVM) and Isolation Forest models trained on fused belief maps to probabilistically classify anomalies.
-*   **Mineral Exploration Mode:** A specialized mode that "flips the physics" to detect mass excess (ore bodies) instead of mass deficits (voids).
+*   **Stable Structure Detection:** Leverages InSAR Coherence Change Detection (CCD), GLCM texture analysis, and structural artificiality metrics.
+*   **Physics-Informed Analysis:** Utilizes Poisson's relation between gravity and magnetic fields to validate density contrasts.
+*   **Advanced Signal Processing:** Implements Continuous Wavelet Transform (CWT) and Tilt Derivative (TDR) for edge detection.
+*   **ML Classification:** Deploys One-Class SVM (OC-SVM) and Isolation Forest models trained on fused belief maps.
 
-See [`ARCHITECTURE_v2.md`](ARCHITECTURE_v2.md) for the full technical specification.
-
-## Mineral Exploration Mode
-
-New in v2.1, this mode allows you to target dense mineral deposits (e.g., Rare Earths, Copper Porphyries) using the same advanced physics engine.
-
-*   **Target:** Mass Excess (Positive Gravity, High Density).
-*   **Physics:** Inverted density penalties, positive Poisson correlation.
-*   **Data:** Requires specific Gravity, Magnetic, and Lithology datasets.
-
-👉 **[Read the Mineral Exploration Guide](MINERAL_EXPLORATION_GUIDE.md)** for setup and usage instructions.
+See [`ARCHITECTURE_v2.md`](ARCHITECTURE_v2.md) for the technical specification.
 
 ## Installation
 
@@ -49,9 +38,9 @@ New in v2.1, this mode allows you to target dense mineral deposits (e.g., Rare E
 
 ## Usage
 
-The core of v2.0 is the `workflow.py` orchestrator, which manages the entire pipeline from raw data processing to final anomaly classification.
+The core of the system is the `workflow.py` orchestrator.
 
-### Running the Full Pipeline
+### Running the Pipeline
 
 ```bash
 python workflow.py --region "lon_min,lat_min,lon_max,lat_max" --resolution 0.001 --output-name "outputs/project_name"
@@ -66,16 +55,16 @@ python workflow.py --region "-105.5,31.5,-103.5,33.5" --resolution 0.001 --outpu
 
 *   `--region`: Bounding box in WGS84 coordinates (min_lon, min_lat, max_lon, max_lat).
 *   `--resolution`: Output grid resolution in degrees (default: 0.001, approx 100m).
-*   `--output-name`: Prefix for all generated output files (includes directory path).
+*   `--output-name`: Prefix for all generated output files.
 *   `--mode`: Target mode. Options: `void` (default) or `mineral`.
-*   `--skip-visuals`: Flag to skip generation of PNG/KMZ visualizations (useful for batch processing).
+*   `--skip-visuals`: Flag to skip generation of PNG/KMZ visualizations.
 
 ## Pipeline Phases & Outputs
 
 The workflow executes in 6 sequential steps. All outputs are GeoTIFFs prefixed with the `output-name` provided.
 
 1.  **Gravity Processing:**
-    *   `_gravity_residual.tif`: CWT-decomposed residual gravity (local anomalies).
+    *   `_gravity_residual.tif`: CWT-decomposed residual gravity.
     *   `_gravity_tdr.tif`: Tilt Derivative edge detection.
 
 2.  **InSAR Feature Extraction:**
@@ -83,48 +72,38 @@ The workflow executes in 6 sequential steps. All outputs are GeoTIFFs prefixed w
     *   `_structural_artificiality.tif`: Combined metric for man-made structure likelihood.
 
 3.  **Poisson Analysis:**
-    *   `_poisson_correlation.tif`: Correlation between gravity and magnetic fields (validates voids).
+    *   `_poisson_correlation.tif`: Correlation between gravity and magnetic fields.
 
 4.  **Bayesian Fusion:**
-    *   `_gravity_prior_highres.tif`: Downscaled gravity map using higher-resolution covariates (DEM, InSAR).
+    *   `_gravity_prior_highres.tif`: Downscaled gravity map.
 
 5.  **Dempster-Shafer Fusion:**
-    *   `_fused_belief_reinforced.tif`: Combined belief map representing the probability of a void, weighted by source uncertainty.
+    *   `_fused_belief_reinforced.tif`: Combined belief map weighted by source uncertainty.
 
 6.  **Anomaly Classification:**
-    *   `_mineral_void_probability.tif`: **Final Output**. Probability map of Target Void presence (>95% confidence target).
+    *   `_mineral_void_probability.tif`: **Final Output**. Probability map of target presence.
 
 ## Repository Layout
 
 ```
 .
 ├── workflow.py                      # Main CLI orchestrator
-├── process_data.py                  # Gravity/Magnetic processing (CWT, TDR)
-├── insar_features.py                # InSAR CCD, GLCM, Artificiality
+├── process_data.py                  # Gravity/Magnetic processing
+├── insar_features.py                # InSAR/texture analysis
 ├── poisson_analysis.py              # Physics-informed correlation
 ├── multi_resolution_fusion.py       # Bayesian Compressive Sensing
 ├── detect_voids.py                  # Dempster-Shafer Fusion
 ├── classify_anomalies.py            # OC-SVM & Isolation Forest
-├── utils/                           # Shared raster and math utilities
-├── tests/                           # Unit and integration tests
-├── ARCHITECTURE_v2.md               # Technical documentation
-├── requirements.txt                 # Python dependencies
+├── utils/                           # Utilities
+├── tests/                           # Tests
+├── ARCHITECTURE_v2.md               # Documentation
+├── requirements.txt                 # Dependencies
 └── README.md                        # This file
 ```
 
 ## Data Configuration
 
 The system expects raw data in a `data/` directory (not version controlled). You can override this by setting the `GEOANOMALYMAPPER_DATA_DIR` environment variable.
-
-**Expected Structure:**
-```
-data/
-├── raw/
-│   ├── gravity/    # EGM2008 or similar
-│   ├── magnetic/   # EMAG2
-│   ├── dem/        # SRTM/Copernicus
-│   └── insar/      # Sentinel-1 Coherence
-```
 
 ## License
 

@@ -1,0 +1,35 @@
+
+================================================================================
+VALIDATION RESULTS
+================================================================================
+
+Held-Out Deposit Scores:
+Deposit Name             Latitude    Longitude   LOOCV Score
+----------------------------------------------------------------------
+Mountain Pass Mine            35.4769   -115.53330.085
+Rio Tinto Boron Mine          35.0429   -117.67930.612
+Mesquite Mine                 33.0603   -114.99440.427
+Castle Mountain Mine          35.2811   -115.10250.085
+Soledad Mountain Mine         34.9978   -118.18060.959
+Briggs Mine                   35.9375   -117.18500.152
+Golden Queen Mine             34.9869   -118.18890.961
+McLaughlin Mine               38.8381   -122.36390.090
+Gold Run Mining District      39.1808   -120.85580.032
+Rand Mining District          35.3500   -117.65000.057
+Salton Sea Geothermal Field     33.1863   -115.58440.233
+Eagle Mountain Mine           33.8647   -115.52030.186
+Iron Mountain Mine            40.6722   -122.52780.208
+Leviathan Mine                38.7081   -119.65720.034
+New Idria Mercury Mine        36.4144   -120.67360.020
+Dale Mining District          34.0500   -115.75000.215
+New Target Candidate 1        33.9515   -116.00350.220
+
+LOOCV Sensitivity: 17.6% (3/17 deposits detected at threshold 0.5)
+
+Flagged Area Validation:
+Threshold: 0.9
+Flagged Pixels: 16
+Total Pixels: 186,524
+Percent Flagged: 0.01%
+
+INTERPRETATION:
