@@ -37,9 +37,16 @@ def validate_geography(csv_path):
     for idx, row in df.iterrows():
         point = Point(row['longitude'], row['latitude'])
         
-        # Check 1: In continental US bounds (approximate)
-        in_conus = (-125 <= row['longitude'] <= -65 and 
-                    25 <= row['latitude'] <= 50)
+        # Check 1: In US bounds (CONUS + AK + HI)
+        # CONUS: Lat 24-50, Lon -125 to -66
+        # Alaska: Lat 50-72, Lon -179 to -129 (and positive 172)
+        # Hawaii: Lat 18-30, Lon -179 to -154
+        
+        # Simplified broad box for "North America" / US territories
+        in_bounds = (15 <= row['latitude'] <= 75) and (-180 <= row['longitude'] <= -60)
+        
+        # Backward compatibility var name
+        in_conus = in_bounds
         
         # Check 2: In a US state (exact check if shapefile exists)
         if usa is not None:

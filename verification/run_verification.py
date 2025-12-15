@@ -19,32 +19,38 @@ def run_full_verification():
     
     python = sys.executable
 
-    # Check input
-    initial_input = 'data/outputs/undiscovered_targets.csv'
-    if not os.path.exists(initial_input):
-        print(f"WARNING: Initial input {initial_input} not found.")
-        # Proceeding anyway as scripts might check other files? 
-        # Actually verify_geography.py checks, so we let it fail or warn there.
+    # Determine script directory to call siblings correctly
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    def run_step(script_name):
+        script_path = os.path.join(script_dir, script_name)
+        subprocess.run([python, script_path])
 
+    # Check input
+    # If running from root, data is likely in data/outputs
+    # If running from verification/, data is in ../data/outputs
+    # But the scripts themselves usually expect CWD to be root or handle relative paths.
+    # Best practice: Run from root.
+    
     # Stage 1: Geography (1 minute)
     print("\n[1/6] Validating Geography...")
-    subprocess.run([python, 'verify_geography.py'])
+    run_step('verify_geography.py')
     
     # Stage 2: Geology (5 minutes)
     print("\n[2/6] Checking Geological Context...")
-    subprocess.run([python, 'verify_geology.py'])
+    run_step('verify_geology.py')
     
     # Stage 3: Mining Claims (4-5 hours due to API rate limits)
     print("\n[3/6] Checking Mining Claims (Large batch may take hours)...")
-    subprocess.run([python, 'verify_claims.py'])
+    run_step('verify_claims.py')
     
     # Stage 4: Land Status (30 minutes)
     print("\n[4/6] Checking Land Status...")
-    subprocess.run([python, 'verify_land_status.py'])
+    run_step('verify_land_status.py')
     
     # Stage 5: Visual Indicators (2-3 hours)
     print("\n[5/6] Running Visual Analysis (Earth Engine)...")
-    subprocess.run([python, 'verify_visual.py'])
+    run_step('verify_visual.py')
     
     # Stage 6: Generate Final Report
     print("\n[6/6] Generating Final Report...")
@@ -103,8 +109,11 @@ def generate_final_report():
         else:
             final['visual_score'] = 0
 
-        # Fill NaNs
-        final.fillna({'geology_favorable': False, 'has_claims': True, 'mineable': False, 'visual_score': 0}, inplace=True)
+        # Fill NaNs - explicit casting to avoid FutureWarning
+        final['geology_favorable'] = final['geology_favorable'].fillna(False).astype(bool)
+        final['has_claims'] = final['has_claims'].fillna(True).astype(bool)
+        final['mineable'] = final['mineable'].fillna(False).astype(bool)
+        final['visual_score'] = final['visual_score'].fillna(0).astype(int)
         
         # Calculate composite score
         final['composite_score'] = (
