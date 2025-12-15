@@ -847,7 +847,8 @@ def classify_supervised(feature_paths: List[str],
                         block_size: int = 4096,
                         use_ensemble: bool = False,
                         n_ensemble: int = 50,
-                        exclusion_zones: Optional[List[Tuple[float, float, float]]] = None):
+                        exclusion_zones: Optional[List[Tuple[float, float, float]]] = None,
+                        save_model_path: Optional[str] = None):
     """
     Main supervised classification workflow with optimizations.
 
@@ -978,6 +979,12 @@ def classify_supervised(feature_paths: List[str],
     else:
         from classify_supervised import predict_probability_map
         predict_probability_map(feature_paths, classifier, scaler, output_path, block_size)
+
+    if save_model_path:
+        import joblib
+        logger.info(f"Saving trained model to {save_model_path}")
+        joblib.dump(classifier, save_model_path)
+        logger.info("✅ Model saved successfully")
 
     return classifier
 
@@ -1110,6 +1117,8 @@ def main():
                        help="Random state for reproducibility (default: 42)")
     parser.add_argument("--n-workers", type=int, default=None,
                        help="Number of parallel workers (default: auto)")
+    parser.add_argument("--save-model", default=None,
+                       help="Path to save the trained model (e.g. .joblib file)")
     parser.add_argument("--block-size", type=int, default=4096,
                        help="Tile size for prediction (default: 4096)")
 
@@ -1164,7 +1173,8 @@ def main():
             random_state=args.random_state,
             parallel=True,
             n_workers=args.n_workers,
-            block_size=args.block_size
+            block_size=args.block_size,
+            save_model_path=args.save_model
         )
         logger.info("🎉 Optimized supervised classification completed successfully")
 

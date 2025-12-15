@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Bayesian Compressive Sensing (BCS) Downscaling via Random Forest.
-Optimized for high-throughput geospatial fusion.
+Multi-Resolution Feature Fusion via Random Forest Regression.
+(Formerly experimental 'BCS' module)
 
-Improvements:
-- Persistent file handles (avoids re-opening VRTs per window).
-- TQDM progress tracking.
-- Robust path handling.
+This module performs statistical downscaling of gravity data using high-resolution
+covariates (DEM, InSAR, Magnetics). It uses a Random Forest approach to learn
+relationships at coarse scales and predict at fine scales.
+
+Note: Earlier versions referred to this as "Bayesian Compressive Sensing" (BCS).
+The current implementation favors a robust Non-Parametric (Random Forest) approach
+for better empirical performance on geophysical data.
 """
 
 import os
