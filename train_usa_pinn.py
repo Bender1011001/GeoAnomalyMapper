@@ -96,15 +96,19 @@ class USADataset:
                 )
 
                 # Preprocess
-                # Gravity Normalization (Local Z-score for the patch? Or Global?)
-                # Global is better for relative density, but local helps training stability.
-                # Let's use robust local scaling for training.
-                g_mean = np.nanmean(g_data)
-                g_std = np.nanstd(g_data) + 1e-6
-                g_norm = (g_data - g_mean) / g_std
-                g_norm = np.nan_to_num(g_norm, nan=0.0)
+                # Gravity Normalization (Global Physical Normalization)
+                # Research-backed: Scale by fixed global constant to preserve physical magnitude
+                GLOBAL_MAX_GRAVITY = 100.0 # mGal
+                GLOBAL_MAX_MAGNETIC = 1000.0 # nT
                 
-                m_norm = np.nan_to_num(m_data, nan=0.0)
+                # Global scaling
+                g_norm = g_data / GLOBAL_MAX_GRAVITY
+                m_norm = m_data / GLOBAL_MAX_MAGNETIC
+                
+                # Replace NaNs with 0 (implies no signal)
+                g_norm = np.nan_to_num(g_norm, nan=0.0)
+                # m_norm already scaled above, just handle NaNs
+                m_norm = np.nan_to_num(m_norm, nan=0.0)
                 
                 grav_batch.append(g_norm)
                 mag_batch.append(m_norm)

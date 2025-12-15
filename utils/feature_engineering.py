@@ -13,7 +13,7 @@ Improvements over v1:
 
 import numpy as np
 from scipy import ndimage
-from typing import Tuple, Optional, Dict, Union
+from typing import Tuple, Optional, Dict, Union, List
 from skimage import filters
 from skimage.morphology import disk
 
@@ -315,3 +315,148 @@ def stack_features(gravity_data: np.ndarray,
             ])
         
     return np.stack(feature_stack, axis=0), feature_names
+
+
+def generate_synthetic_anomaly(shape: Tuple[int, int] = (64, 64), 
+                             max_amplitude: float = 5.0, 
+                             sigma: float = 5.0,
+                             x_offset: float = 0.0,
+                             y_offset: float = 0.0) -> np.ndarray:
+    """
+    Generates a synthetic Gaussian anomaly (mimicking a density contrast or magnetic source).
+    
+    Args:
+        shape: Grid dimensions (height, width)
+        max_amplitude: Peak amplitude of the anomaly
+        sigma: Standard deviation (width) of the Gaussian
+        x_offset: Offset from center in x direction
+        y_offset: Offset from center in y direction
+        
+    Returns:
+        2D array containing the anomaly
+    """
+    x = np.linspace(-shape[1]//2, shape[1]//2, shape[1])
+    y = np.linspace(-shape[0]//2, shape[0]//2, shape[0])
+    X, Y = np.meshgrid(x, y)
+    
+    # 2D Gaussian function (proxy for a point mass or deep intrusion)
+    g = max_amplitude * np.exp(-((X-x_offset)**2 + (Y-y_offset)**2) / (2 * sigma**2))
+    return g
+
+
+def augment_training_data(real_features: np.ndarray, 
+                         feature_names: List[str],
+                         n_synthetic: int = 1000) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Augments real training data with synthetic anomalies.
+    
+    Matches the feature columns in real_features by generating synthetic gravity/magnetics
+    and computing the corresponding engineered features.
+    
+    Args:
+        real_features: Existing positive training samples (n_samples, n_features)
+        feature_names: List of feature names corresponding to columns in real_features
+        n_synthetic: Number of synthetic samples to generate
+        
+    Returns:
+        Tuple of (combined_features, combined_labels)
+        labels are 1 for both real and synthetic (since we are augmenting positives)
+    """
+    if n_synthetic <= 0:
+        return real_features, np.ones(len(real_features))
+        
+    synthetic_samples = []
+    
+    # Identify base features from names
+    has_gravity = any('gravity' in name and 'gradient' not in name and 'roughness' not in name for name in feature_names)
+    has_magnetic = any('magnetic' in name and 'gradient' not in name and 'roughness' not in name for name in feature_names)
+    
+    # Pre-calculate feature indices for faster assignment
+    feature_map = {name: i for i, name in enumerate(feature_names)}
+    n_features = len(feature_names)
+    
+    print(f"Generating {n_synthetic} synthetic samples...")
+    
+    for _ in range(n_synthetic):
+        # 1. Generate Base Anomaly
+        # Randomize properties
+        sigma = np.random.uniform(2, 8)
+        
+        # Create base grids
+        syn_grav = None
+        syn_mag = None
+        
+        if has_gravity:
+            # Gravity anomaly (density contrast)
+            amp_g = np.random.uniform(2.0, 20.0) # mGal
+            syn_grav = generate_synthetic_anomaly(max_amplitude=amp_g, sigma=sigma)
+            # Add noise
+            syn_grav += np.random.normal(0, 0.1, syn_grav.shape)
+            
+        if has_magnetic:
+            # Magnetic anomaly (susceptibility contrast)
+            # Often correlated but not always perfect overlap. 
+            # We'll make it spatially coincident for "deposits" but maybe diff amplitude
+            amp_m = np.random.uniform(50.0, 500.0) # nT
+            # Maybe slight offset?
+            offset_x = np.random.uniform(-2, 2)
+            offset_y = np.random.uniform(-2, 2)
+            syn_mag = generate_synthetic_anomaly(max_amplitude=amp_m, sigma=sigma, 
+                                               x_offset=offset_x, y_offset=offset_y)
+            # Add noise
+            syn_mag += np.random.normal(0, 2.0, syn_mag.shape)
+            
+        # 2. Compute Features
+        # We need to compute ALL features present in feature_names
+        # We use calculate_all_features on the synthetic grids
+        
+        g_feats = {}
+        m_feats = {}
+        
+        if syn_grav is not None:
+            g_feats = calculate_all_features(syn_grav, window_size=5) # Use defaults
+            g_feats['gravity'] = syn_grav # Add base
+            
+        if syn_mag is not None:
+            m_feats = calculate_all_features(syn_mag, window_size=5)
+            m_feats['magnetic'] = syn_mag # Add base
+            
+        # 3. Extract Center Sample (The "Anomaly")
+        center_y, center_x = 32, 32 # 64x64 grid
+        
+        sample_vector = np.zeros(n_features)
+        
+        for name, idx in feature_map.items():
+            val = 0.0
+            
+            # Map column name to computed feature
+            # Naming convention: 'gravity', 'gravity_gradient', 'gravity_entropy', etc.
+            
+            if 'gravity' in name:
+                key = name.replace('gravity_', '')
+                if key == 'gravity': key = 'gravity'
+                
+                if key in g_feats:
+                    val = g_feats[key][center_y, center_x]
+                    
+            elif 'magnetic' in name:
+                key = name.replace('magnetic_', '')
+                if key == 'magnetic': key = 'magnetic'
+                
+                if key in m_feats:
+                    val = m_feats[key][center_y, center_x]
+            
+            sample_vector[idx] = val
+            
+        synthetic_samples.append(sample_vector)
+        
+    # Combine
+    X_synthetic = np.array(synthetic_samples)
+    
+    # Handle NaNs in synthetic data (possible from edge effects or log(0))
+    X_synthetic = np.nan_to_num(X_synthetic, nan=0.0)
+    
+    X_combined = np.vstack([real_features, X_synthetic])
+    y_combined = np.hstack([np.ones(len(real_features)), np.ones(len(X_synthetic))])
+    
+    return X_combined, y_combined

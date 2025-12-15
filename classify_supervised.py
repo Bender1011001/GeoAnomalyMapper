@@ -44,6 +44,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 from project_paths import OUTPUTS_DIR
 from utils.feature_engineering import stack_features
+from utils.data_fetcher import fetch_usgs_training_data
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -895,7 +896,44 @@ def classify_supervised(feature_paths: List[str],
     # Extract positive features
     logger.info("Extracting features at positive training locations...")
     positive_features, pos_valid_mask = extract_features_at_points(feature_paths, positive_coords)
-    positive_features = positive_features[pos_valid_mask]
+    positive_coords = positive_coords[pos_valid_mask]
+
+    # --- SYNTHETIC DATA INJECTION START ---
+    try:
+        from utils.feature_engineering import augment_training_data
+        
+        # Infer clean feature names from paths for synthetic generation
+        feature_names = []
+        for fpath in feature_paths:
+            fname = Path(fpath).stem.lower()
+            
+            # Handle engineered prefix
+            if fname.startswith('engineered_'):
+                fname = fname.replace('engineered_', '')
+            
+            # Normalize base feature names
+            is_derivative = any(x in fname for x in ['gradient', 'roughness', 'entropy', 'contrast', 'homogeneity', 'curvature', 'shape'])
+            
+            if 'gravity' in fname and not is_derivative:
+                fname = 'gravity'
+            elif 'magnetic' in fname and not is_derivative:
+                fname = 'magnetic'
+                
+            feature_names.append(fname)
+            
+        logger.info(f"Injecting synthetic anomalies into training set (N=1000)...")
+        logger.info(f"Derived feature mapping: {feature_names}")
+        
+        # Augment
+        n_prev = len(positive_features)
+        positive_features, _ = augment_training_data(positive_features, feature_names, n_synthetic=1000)
+        logger.info(f"Augmented positives: {n_prev} -> {len(positive_features)}")
+        
+    except ImportError:
+        logger.warning("Could not import augment_training_data, skipping synthetic injection")
+    except Exception as e:
+        logger.warning(f"Synthetic injection failed: {e}")
+    # --- SYNTHETIC DATA INJECTION END ---
 
     if len(positive_features) == 0:
         raise ValueError("No valid positive training samples found")
@@ -1058,8 +1096,10 @@ def main():
     parser = argparse.ArgumentParser(description="Optimized Supervised Classification for Mineral Exploration")
     parser.add_argument("--features", nargs='+', required=True,
                        help="Paths to feature raster files")
-    parser.add_argument("--positives", required=True,
+    parser.add_argument("--positives", required=False,
                        help="Path to CSV file with positive training coordinates (lat,lon columns)")
+    parser.add_argument("--use-usgs", action="store_true",
+                       help="Use authoritative USGS 'Goldilocks' dataset (~2000 producers)")
     parser.add_argument("--output", required=True,
                        help="Output path for probability GeoTIFF")
     parser.add_argument("--negative-ratio", type=float, default=10.0,
@@ -1076,15 +1116,25 @@ def main():
     args = parser.parse_args()
 
     # Load positive coordinates from CSV
-    if not Path(args.positives).exists():
-        logger.error(f"Positive coordinates file not found: {args.positives}")
-        return
-
+    # Load positive coordinates
     try:
         import pandas as pd
-        coords_df = pd.read_csv(args.positives)
-        if 'lat' not in coords_df.columns or 'lon' not in coords_df.columns:
-            logger.error("CSV must contain 'lat' and 'lon' columns")
+        
+        if args.use_usgs:
+            logger.info("Fetching USGS 'Goldilocks' training dataset...")
+            coords_df = fetch_usgs_training_data()
+            if coords_df.empty:
+                logger.error("Failed to fetch USGS data")
+                return
+                
+        elif args.positives and Path(args.positives).exists():
+            logger.info(f"Loading positives from {args.positives}")
+            coords_df = pd.read_csv(args.positives)
+            if 'lat' not in coords_df.columns or 'lon' not in coords_df.columns:
+                logger.error("CSV must contain 'lat' and 'lon' columns")
+                return
+        else:
+            logger.error("Must specify either --positives <path> or --use-usgs")
             return
 
         positive_coords = coords_df[['lat', 'lon']].values

@@ -18,6 +18,9 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import numpy as np
+import requests
+import io
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -314,3 +317,137 @@ def validate_deposit_data(deposits: List[Dict]) -> bool:
 
     logger.info(f"Validated {valid_count}/{len(deposits)} deposits")
     return valid_count == len(deposits)
+
+
+def fetch_usgs_training_data(local_cache_path: str = 'data/usgs_mrds_full.csv') -> pd.DataFrame:
+    """
+    Fetches and filters the USGS MRDS database for high-quality training sites ("Goldilocks" dataset).
+    
+    Filters:
+    1. Development Status: Producer, Past Producer (removes Occurrences)
+    2. Primary Commodity: Copper, Lithium, Rare Earths, Iron, Gold, Silver, Nickel, Zinc
+    3. Deposit Type: Excludes surficial/placer deposits that lack deep gravity signatures
+    
+    Args:
+        local_cache_path: Path to cache the downloaded full dataset
+        
+    Returns:
+        DataFrame of filtered high-quality training sites
+    """
+    # Create data directory if it doesn't exist
+    Path(local_cache_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # 1. Load Data (Download or Cache)
+    if Path(local_cache_path).exists():
+        logger.info(f"Loading cached USGS database from {local_cache_path}...")
+        try:
+            df = pd.read_csv(local_cache_path, low_memory=False)
+        except Exception as e:
+            logger.warning(f"Failed to read cache: {e}. Re-downloading...")
+            df = None
+            
+    if not Path(local_cache_path).exists() or df is None:
+        url = "https://mrdata.usgs.gov/mrds/mrds.csv"
+        logger.info(f"Downloading USGS Database from {url}...")
+        try:
+            response = requests.get(url, timeout=60)
+            response.raise_for_status()
+            df = pd.read_csv(io.StringIO(response.content.decode('utf-8', errors='replace')), low_memory=False)
+            
+            # Save to cache
+            logger.info(f"Caching database to {local_cache_path}")
+            df.to_csv(local_cache_path, index=False)
+        except Exception as e:
+            logger.error(f"Failed to download USGS data: {e}")
+            raise RuntimeError("Could not fetch USGS MRDS database")
+
+    logger.info(f"Total entries in MRDS: {len(df)}")
+
+    # 2. FILTER: Status = Producer / Past Producer
+    # "Occurrence" and "Prospect" are too noisy for gravity inversion training
+    # Standardizing status strings
+    if 'dev_stat' not in df.columns:
+        logger.warning("Column 'dev_stat' not found. Available columns: " + str(df.columns[:10]))
+        return pd.DataFrame()
+        
+    # Filter for producers
+    df['dev_stat'] = df['dev_stat'].astype(str).str.title()
+    high_confidence = df[df['dev_stat'].isin(['Producer', 'Past Producer'])]
+    logger.info(f"Filtered by Status (Producer/Past Producer): {len(high_confidence)}")
+
+    # 2b. FILTER: Country = United States
+    if 'country' in df.columns:
+        high_confidence = high_confidence[high_confidence['country'] == 'United States']
+        logger.info(f"Filtered by Country (United States): {len(high_confidence)}")
+    else:
+        logger.warning("Column 'country' not found, skipping country filter")
+
+    # 3. FILTER: Target Commodities
+    # Focusing on commodities that form massive deposits detectable by gravity
+    targets = ['Copper', 'Lithium', 'Rare Earths', 'Iron', 'Gold', 'Silver', 'Zinc', 'Nickel']
+    
+    if 'commod1' in high_confidence.columns:
+        # Check if primary commodity contains any of our targets
+        # case insensitive match
+        pattern = '|'.join(targets)
+        relevant_minerals = high_confidence[high_confidence['commod1'].astype(str).str.contains(pattern, case=False, na=False)]
+        logger.info(f"Filtered by Commodity ({', '.join(targets)}): {len(relevant_minerals)}")
+    else:
+        logger.warning("Column 'commod1' not found, skipping commodity filter")
+        relevant_minerals = high_confidence
+
+    # 4. FILTER: Massive Deposit Types (Tier 1)
+    # Exclude "Vein", "Shear zone", "Pegmatite" (unless huge), "Placer"
+    # Include only massive types that create density contrast
+    
+    if 'dep_type' in relevant_minerals.columns:
+        # Positive inclusion list for massive deposits
+        massive_types = [
+            'Porphyry', 'VMS', 'Volcanogenic massive sulfide', 
+            'SEDEX', 'Sedimentary exhalative', 
+            'Skarn', 'IOCG', 'Iron oxide copper gold',
+            'Mississipi Valley', 'MVT',
+            'Kimberlite', 'Carbonatite',
+            'Epithermal', 
+            'Massive sulfide',
+            'Stratabound',
+            'Stockwork',
+            'Lode',           # Structurally controlled but significant
+            'Replacement',    # e.g., Carbonate Replacement (CRD)
+            'Disseminated',   # Large volume low grade
+            'Breccia',        # Breccia pipes
+            'Manto',          # Manto type
+            'Polymetallic'    # Poly-metallic replacement/vein systems
+        ]
+        
+        # Strict Inclusion Logic
+        # We only keep deposits that match our "Massive" whitelist.
+        allowed_pattern = '|'.join(massive_types)
+        
+        # Convert to string and handle NaNs
+        dep_types = relevant_minerals['dep_type'].astype(str)
+        
+        # Filter for allowed types
+        strict_included = relevant_minerals[dep_types.str.contains(allowed_pattern, case=False, na=False)]
+        logger.info(f"Filtered by Strict Allowed Types: {len(strict_included)}")
+        
+        # We strictly trust this list for the "Goldilocks" dataset.
+        hard_rock = strict_included
+    else:
+        hard_rock = relevant_minerals
+
+    # Select and rename columns for consistency
+    # Looking for: name, lat, lon, type
+    # MRDS columns: site_name, latitude, longitude, dep_type, commod1
+    
+    final_df = hard_rock[['site_name', 'latitude', 'longitude', 'commod1', 'dev_stat', 'dep_type']].copy()
+    final_df = final_df.rename(columns={
+        'site_name': 'name',
+        'latitude': 'lat',
+        'longitude': 'lon',
+        'dep_type': 'type'
+    })
+    
+    # Return formatted DataFrame
+    logger.info(f"Final 'Goldilocks' training set size: {len(final_df)} sites")
+    return final_df
