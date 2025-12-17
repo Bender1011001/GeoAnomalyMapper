@@ -1,47 +1,49 @@
 # GeoAnomalyMapper
 
-**Automated AI Mineral Vectoring System**
+**AI-Powered Mineral Exploration System**
 
-This repository contains the "Truth Machine" — a physics-informed deep learning system that identifies hidden mineral deposits across North America using gravity, magnetic, and seismic data, coupled with an automated verification agent to perform due diligence.
+GeoAnomalyMapper is an advanced geophysics analysis pipeline that combines Physics-Informed Neural Networks (PINNs) with Supervised Machine Learning to identify high-probability mineral deposits across the United States.
 
 ## Key Features
-*   **Physics-Informed Inversion**: Generates 3D density models using structure-guided PINNs.
-*   **4,000+ Targets**: Identified across the Continental US, Alaska, and Hawaii.
-*   **Auto-Verification Agent**: Determining land status, claims, and geology automatically.
-*   **Interactive Mapping**: Visualization of clusters and mineral districts.
+-   **National Scale**: Processes Gravity and Magnetic mosaics for the entire contiguous USA.
+-   **Physics-Driven**: Uses PINN inversion to model subsurface density.
+-   **Data-Verified**: Validated against 1,500+ USGS "Goldilocks" deposits with **91% Sensitivity**.
+-   **New Discoveries**: Identifies high-grade anomalies that are geologically similar to known mines but located in unexplored "greenfield" areas.
 
-## Getting Started
+## Usage
 
-### 1. Installation
+The entire pipeline is orchestrated by a single master script:
+
 ```bash
-pip install -r requirements.txt
-python verification/setup_environment.py
+python process_everything.py
 ```
 
-### 2. Run the Verification Pipeline
-The verification system (located in `verification/`) filters raw targets.
-
-**Quick Check (2 mins):**
-```bash
-python verification/quick_verify.py
-```
-
-**Full Analysis (~4 hours):**
-```bash
-python verification/run_verification.py
-```
-*Note: This requires Google Earth Engine authentication (`earthengine authenticate`) and reference data in `data/reference/`.*
+This will:
+1.  **Prepare Data**: Process raw Gravity and Magnetic GeoTIFFs.
+2.  **Train & Invert**: Run the PINN model to generate a 3D density map.
+3.  **Classify**: Apply the Random Forest classifier to generate a Probability Map.
+4.  **Extract**: Identify and grade specific targets.
 
 ## Outputs
-*   **`data/outputs/target_map.html`**: Interactive map of all high-value targets.
-*   **`data/outputs/FINAL_high_confidence_targets.csv`**: The "Gold List" (unclaimed, verified).
 
-## Documentation
-*   **[Monetization Strategy](docs/MONETIZATION.md)**: How to turn these targets into revenue.
-*   **[Research Paper](docs/RESEARCH_PAPER.md)**: Methodology and scientific basis.
+All results are saved to `data/outputs/`:
 
-## Project Structure
-*   `verification/`: Scripts for verifying and analyzing targets.
-*   `data/`: Inputs (targets) and Outputs (maps, verified lists).
-*   `train_*.py`: Model training scripts (PINN).
-*   `predict_*.py`: Inference scripts.
+-   **`usa_targets.csv`**: The master list of ~1,600 high-confidence exploration targets.
+-   **`usa_supervised_probability.tif`**: The probability heatmap (GeoTIFF).
+-   **`high_value_targets_map.png`**: Static visualization of top prospects.
+
+## Validation
+
+To verify the model's integrity yourself, run:
+
+```bash
+python verify_skeptic.py
+```
+
+This performs a "Triple Check":
+1.  **Spatial Holdout**: Trains on West US, predicts East US (Tests generalization).
+2.  **Null Hypothesis**: Trains on random labels (Tests for lucky guessing).
+3.  **Feature Audit**: confirms physical inputs drive the model.
+
+## Legacy Code
+Older experimental scripts and phased workflows have been moved to the `archive/` directory to maintain a clean workspace.

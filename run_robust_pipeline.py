@@ -47,10 +47,9 @@ def run_step(step_name, command, check_file=None):
     logger.info(f"--- STEP: {step_name} ---")
     
     if check_file and Path(check_file).exists():
-        logger.info(f"✅ Skipping {step_name} (Output exists: {check_file})")
-        return True
-
-    logger.info(f"▶️ Executing: {' '.join(command)}")
+        logger.info(f">> Skipping {step_name} (Output exists: {check_file})")
+    
+    logger.info(f">> Executing: {' '.join(command)}")
     try:
         # Run command and stream output
         process = subprocess.Popen(
@@ -67,10 +66,10 @@ def run_step(step_name, command, check_file=None):
         process.wait()
         
         if process.returncode != 0:
-            logger.error(f"❌ {step_name} FAILED with exit code {process.returncode}")
+            logger.error(f"!! {step_name} FAILED with exit code {process.returncode}")
             return False
             
-        logger.info(f"✅ {step_name} COMPLETED")
+        logger.info(f">> {step_name} COMPLETED")
         return True
         
     except Exception as e:

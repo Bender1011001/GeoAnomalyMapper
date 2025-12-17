@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geoanomalymapper"
+version = "1.0.0"
+description = "Minimal global geophysical anomaly mapper"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "GeoAnomalyMapper contributors"}]
+keywords = ["geophysics", "gis", "raster", "gravity", "insar"]
+
+dependencies = [
+    "numpy>=1.20.0",
+    "rasterio>=1.3.0",
+    "affine>=2.3.0",
+    "tqdm>=4.60.0",
+    "matplotlib>=3.5.0",
+    "simplekml>=1.3.6",
+    "scipy>=1.7.0",
+    "scikit-learn>=1.0.0",
+    "python-dotenv>=0.19.0",
+    "requests>=2.25.0",
+    "urllib3>=1.26.0",
+    "pyshtools>=4.10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/GeoAnomalyMapper/GeoAnomalyMapper"
+Documentation = "https://github.com/GeoAnomalyMapper/GeoAnomalyMapper#readme"
+Issues = "https://github.com/GeoAnomalyMapper/GeoAnomalyMapper/issues"
+
+[project.scripts]
+geoanomalymapper = "workflow:main"
+geoanomalymapper-process-data = "process_data:main"
+geoanomalymapper-fuse = "multi_resolution_fusion:main"
+geoanomalymapper-detect = "detect_voids:main"
+geoanomalymapper-visualize = "create_visualization:main"
+geoanomalymapper-validate = "validate_against_known_features:main"
+geoanomalymapper-enhanced-viz = "create_enhanced_visualization:main"
+geoanomalymapper-insar-guide = "process_insar_data:main"
+
+[project.optional-dependencies]
+cog = ["rio-cogeo>=3.0.0"]
+insar = [
+    "isce2>=2.6.0",
+    "mintpy>=1.5.0",
+]
+all = [
+    "rio-cogeo>=3.0.0",
+    "isce2>=2.6.0",
+    "mintpy>=1.5.0",
+]
+
+[tool.setuptools]
+py-modules = [
+    "process_data",
+    "multi_resolution_fusion",
+    "detect_voids",
+    "create_visualization",
+    "validate_against_known_features",
+    "workflow",
+    "project_paths",
+]
+
+[tool.setuptools.packages.find]
+include = ["utils"]
