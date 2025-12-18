@@ -164,6 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("targets", help="Path to extracted targets CSV")
     parser.add_argument("--known", default="data/usgs_goldilocks.csv", help="Path to known deposits CSV")
+    parser.add_argument("--output-dir", default="data/outputs", help="Directory to save results")
     args = parser.parse_args()
     
-    grade_targets(args.targets, args.known)
+    grade_targets(args.targets, args.known, output_dir=args.output_dir)

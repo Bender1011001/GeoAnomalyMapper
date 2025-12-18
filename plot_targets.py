@@ -7,10 +7,11 @@ from pathlib import Path
 import rasterio
 from rasterio.plot import show
 
-def create_maps(targets_csv, tif_path=None, output_dir='outputs'):
+def create_maps(targets_csv, tif_path=None, output_dir='data/outputs'):
     """
     Creates HTML interactive map and Static PNG map.
     """
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     print(f"Loading targets from {targets_csv}...")
     df = pd.read_csv(targets_csv)
     

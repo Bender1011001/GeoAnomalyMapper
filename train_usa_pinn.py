@@ -158,10 +158,10 @@ def train_usa(grav_path, mag_path, output_model_path, epochs=100, patch_size=256
         
         # Training Steps per Epoch
         steps = dataset.batches
-        pbar = tqdm(range(steps), desc=f"Epoch {epoch+1}/{epochs}", leave=False)
+        pbar = tqdm(range(steps), desc=f"Epoch {epoch+1}/{epochs}", leave=False, ascii=True)
         
         for _ in pbar:
-            grav, mag = dataset.sample_batch(batch_size=4) # Batch size 4 fitting in VRAM?
+            grav, mag = dataset.sample_batch(batch_size=8) # Increased batch size for efficiency
             grav = grav.to(device)
             mag = mag.to(device)
             
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument("--gravity", default="data/outputs/usa_supervised/usa_gravity_mosaic.tif")
     parser.add_argument("--magnetic", default="data/outputs/usa_supervised/usa_magnetic_mosaic.tif")
     parser.add_argument("--output", default="usa_pinn_model.pth")
-    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--epochs", type=int, default=100)
     args = parser.parse_args()
     
     if os.path.exists(args.gravity) and os.path.exists(args.magnetic):

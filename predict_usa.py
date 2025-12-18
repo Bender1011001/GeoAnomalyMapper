@@ -27,7 +27,7 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
         h, w = src.shape
         profile = src.profile.copy()
         
-        profile.update(dtype=rasterio.float32, count=1, compress='deflate', tiled=True)
+        profile.update(dtype=rasterio.float32, count=1, compress='deflate', tiled=False)
         
         # Open output file
         # We process tile by tile and write directly to output
@@ -63,9 +63,10 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
                     data = src.read(1, window=window)
                     
                     # Handle NaNs
-                    d_mean = np.nanmean(data)
-                    d_std = np.nanstd(data) + 1e-6
-                    norm_data = (data - d_mean) / d_std
+                    # Normalization (MATCHING TRAINING SCRIPT)
+                    # Train script uses global scaling: val / 100.0
+                    # Do NOT use local Z-score here, or amplitudes will be wrong.
+                    norm_data = data / 100.0
                     norm_data = np.nan_to_num(norm_data, nan=0.0)
                     
                     # To Tensor

@@ -100,7 +100,7 @@ def main():
          "--gravity", str(GRAVITY_MOSAIC),
          "--magnetic", str(MAGNETIC_MOSAIC),
          "--output", str(PINN_MODEL),
-         "--epochs", "20"], # Reduced for speed in this demo run
+         "--epochs", "100"], # Full training run
         check_file=PINN_MODEL
     ): return
 
@@ -143,7 +143,7 @@ def main():
         [PYTHON_EXE, "validate_robustness.py"]
     )
 
-    logger.info("🎉 Full Pipeline Execution Finished Successfully!")
+    logger.info("Full Pipeline Execution Finished Successfully!")
 
 if __name__ == "__main__":
     main()

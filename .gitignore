@@ -8,7 +8,7 @@ data/
 *.jpeg
 *.kmz
 *.kml
-
+*.csv
 # Python
 __pycache__/
 *.py[cod]
@@ -92,3 +92,7 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+validation_results/
+mrds_data/
+mrds_data/**
