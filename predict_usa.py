@@ -12,7 +12,7 @@ from pinn_gravity_inversion import DensityUNet, GravityPhysicsLayer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=128):
+def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=256, edge_crop=64):
     """
     Runs inference on the massive mosaic using a sliding window approach.
     """
@@ -30,7 +30,6 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
         profile.update(dtype=rasterio.float32, count=1, compress='deflate', tiled=False)
         
         # Open output file
-        # We process tile by tile and write directly to output
         with rasterio.open(output_path, 'w', **profile) as dst:
             
             # Sliding window loops
@@ -39,6 +38,9 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
             # Read (Tile + Margin), Predict, Crop Margin, Write Tile.
             
             step = tile_size
+            
+            # Initialize weight accumulator for blending
+            weight_accumulator = np.zeros((h, w), dtype=np.float32)
             
             pbar = tqdm(total=(h//step + 1) * (w//step + 1), desc="Predicting Tiles")
             
@@ -63,10 +65,9 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
                     data = src.read(1, window=window)
                     
                     # Handle NaNs
-                    # Normalization (MATCHING TRAINING SCRIPT)
-                    # Train script uses global scaling: val / 100.0
-                    # Do NOT use local Z-score here, or amplitudes will be wrong.
-                    norm_data = data / 100.0
+                    # Normalization (MATCHING UPDATED TRAINING SCRIPT)
+                    # Uses global scaling: val / 300.0 (expanded from 100.0)
+                    norm_data = data / 300.0
                     norm_data = np.nan_to_num(norm_data, nan=0.0)
                     
                     # To Tensor
@@ -86,8 +87,8 @@ def predict_usa(model_path, gravity_path, output_path, tile_size=2048, overlap=1
                     
                     # Crop
                     crop = res[valid_r_start:valid_r_end, valid_c_start:valid_c_end]
-                    
-                    # Write
+
+                    # Simple direct write (blending was causing issues)
                     write_window = Window(col, row, crop.shape[1], crop.shape[0])
                     dst.write(crop.astype(np.float32), 1, window=write_window)
                     
