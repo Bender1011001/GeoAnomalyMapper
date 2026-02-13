@@ -150,10 +150,74 @@ class GravityPhysicsLayer(nn.Module):
         gravity_pred_padded = torch.real(torch.fft.ifft2(g_fft))
         
         # 3. Crop back to original size
-        # 3. Crop back to original size
+        # 3. Crop back        # 3. Unpad
         gravity_pred = gravity_pred_padded[:, :, pad_h_top:pad_h_top+H, pad_w_left:pad_w_left+W]
         
+        # Scale to mGal (from SI)
         return gravity_pred * self.SI_to_mGal
+
+
+class MagneticPhysicsLayer(nn.Module):
+    """
+    Implements Forward Magnetic Modeling in the frequency domain.
+    Converts a Susceptibility map (CHI) to Total Magnetic Intensity (TMI).
+    """
+    def __init__(self, pixel_size_meters, mean_depth, inclination=65, declination=0):
+        super().__init__()
+        self.pixel_size = pixel_size_meters
+        self.depth = mean_depth
+        self.inc = np.radians(inclination)
+        self.dec = np.radians(declination)
+        self.mag_filter = None
+
+    def forward(self, susceptibility_map):
+        """
+        Args:
+            susceptibility_map (Tensor): [B, 1, H, W] in SI units.
+        Returns:
+            Tensor: [B, 1, H, W] Magnetic anomaly in NanoTesla (nT).
+        """
+        B, C, H, W = susceptibility_map.shape
+        
+        # Padding
+        target_h = 1 << (H + int(H * 0.25) - 1).bit_length()
+        target_w = 1 << (W + int(W * 0.25) - 1).bit_length()
+        if target_h < H * 1.25: target_h *= 2
+        if target_w < W * 1.25: target_w *= 2
+        
+        pad_h_top = (target_h - H) // 2
+        pad_w_left = (target_w - W) // 2
+        
+        chi_padded = F.pad(susceptibility_map, (pad_w_left, target_w - W - pad_w_left, 
+                                               pad_h_top, target_h - H - pad_h_top), mode='reflect')
+        
+        # Precompute Magnetic Filter
+        if self.mag_filter is None or self.mag_filter.shape[-2:] != chi_padded.shape[-2:]:
+            device = susceptibility_map.device
+            H_pad, W_pad = chi_padded.shape[-2:]
+            
+            freq_y = torch.fft.fftfreq(H_pad, d=self.pixel_size).to(device)
+            freq_x = torch.fft.fftfreq(W_pad, d=self.pixel_size).to(device)
+            KY, KX = torch.meshgrid(freq_y, freq_x, indexing='ij')
+            
+            K = 2 * np.pi * torch.sqrt(KX**2 + KY**2)
+            
+            # Simplified Magnetic Response (Bhattacharyya, 1964)
+            # This is a first-order approximation for a magnetized layer
+            # In TMI, the response falls off as e^(-kz)
+            response = torch.exp(-K * self.depth) * K
+            
+            # Normalize to nT (Rough scaling for Earth's field ~50,000 nT)
+            # T = 50,000 * CHI * Response
+            self.mag_filter = response.unsqueeze(0).unsqueeze(0) * 50000.0
+
+        # FFT Convolution
+        chi_fft = torch.fft.fft2(chi_padded)
+        mag_fft = chi_fft * self.mag_filter
+        mag_pred = torch.real(torch.fft.ifft2(mag_fft))
+        
+        # Unpad
+        return mag_pred[:, :, pad_h_top:pad_h_top+H, pad_w_left:pad_w_left+W]
 
 # ==========================================
 # 3. Neural Network Architecture (ML Engineer)
@@ -174,26 +238,50 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+# Helper for Downsampling
+class Down(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(in_channels, out_channels)
+        )
+    def forward(self, x):
+        return self.maxpool_conv(x)
+
+# Helper for Upsampling
+class Up(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        # Pad x1 if its dimensions don't match x2
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
 class DensityUNet(nn.Module):
     """
-    U-Net architecture optimized for density inversion.
+    U-Net architecture optimized for density or susceptibility inversion.
     """
-    def __init__(self, max_density=500.0):
+    def __init__(self, max_val=500.0):
         super().__init__()
-        self.max_density = max_density
+        self.max_val = max_val
         
         self.inc = DoubleConv(1, 32)
-        self.down1 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(32, 64))
-        self.down2 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(64, 128))
-        self.down3 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(128, 256))
+        self.down1 = Down(32, 64)
+        self.down2 = Down(64, 128)
+        self.down3 = Down(128, 256)
         
-        self.up1 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv1 = DoubleConv(256 + 128, 128)
-        self.up2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv2 = DoubleConv(128 + 64, 64)
-        self.up3 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv3 = DoubleConv(64 + 32, 32)
-        
+        self.up1 = Up(256 + 128, 128)
+        self.up2 = Up(128 + 64, 64)
+        self.up3 = Up(64 + 32, 32)
         self.outc = nn.Conv2d(32, 1, kernel_size=1)
 
     def forward(self, x):
@@ -202,23 +290,12 @@ class DensityUNet(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         
-        x = self.up1(x4)
-        if x.shape != x3.shape: x = F.interpolate(x, size=x3.shape[2:])
-        x = torch.cat([x, x3], dim=1)
-        x = self.conv1(x)
-        
-        x = self.up2(x)
-        if x.shape != x2.shape: x = F.interpolate(x, size=x2.shape[2:])
-        x = torch.cat([x, x2], dim=1)
-        x = self.conv2(x)
-        
-        x = self.up3(x)
-        if x.shape != x1.shape: x = F.interpolate(x, size=x1.shape[2:])
-        x = torch.cat([x, x1], dim=1)
-        x = self.conv3(x)
+        x = self.up1(x4, x3)
+        x = self.up2(x, x2)
+        x = self.up3(x, x1)
         
         # Tanh activation to bound the output density
-        return torch.tanh(self.outc(x)) * self.max_density
+        return torch.tanh(self.outc(x)) * self.max_val
 
 # ==========================================
 # 4. Advanced Loss Functions
@@ -255,19 +332,24 @@ class GradientLoss(nn.Module):
 # ==========================================
 # 5. Inversion Workflow
 # ==========================================
-def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None, magnetic_guide_path=None):
+# ==========================================
+# 5. Inversion Workflow
+# ==========================================
+def invert_gravity(tif_path, output_path, config_path=None, lithology_path=None, magnetic_guide_path=None, target_mode='mineral', checkpoint_path=None):
+    """
+    Invert gravity data to density contrast.
+    If checkpoint_path is provided, loads a pre-trained model (e.g. synthetic DUB expert).
+    """
     # Load Config
-    try:
-        app_config = load_config()
-        # Merge with defaults for missing keys
-        config = {**DEFAULT_CONFIG, **app_config.get('gravity_inversion', {})}
-    except Exception:
-        logger.warning("Could not load config.yaml, using defaults.")
-        config = DEFAULT_CONFIG
-
+    config = DEFAULT_CONFIG.copy() # Simplification for now
+    
     # Override mode
-    mode = target_mode if target_mode else config.get('TARGET_MODE', 'mineral')
+    mode = target_mode
     logger.info(f"Inversion Mode: {mode.upper()}")
+    
+    # Speed up if using pre-trained model - we just need to adapt to local geology
+    if checkpoint_path:
+        config['EPOCHS'] = 100
 
     # Setup Device
     device, use_amp = get_device(config)
@@ -340,7 +422,12 @@ def invert_gravity(tif_path, output_path, lithology_path=None, target_mode=None,
     target_gravity = torch.nan_to_num(target_gravity, nan=0.0)
 
     # --- Initialize Model & Optimizer ---
-    model = DensityUNet(max_density=config['MAX_DENSITY']).to(device)
+    model = DensityUNet(max_val=800.0).to(device)
+    
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        logger.info(f"Loading pre-trained model from {checkpoint_path}")
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        
     physics = GravityPhysicsLayer(
         pixel_size,
         config['DEPTH_ESTIMATE'],

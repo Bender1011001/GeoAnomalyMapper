@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
+from generate_synthetic_dubs import generate_synthetic_batch
 
 from pinn_gravity_inversion import DensityUNet, GravityPhysicsLayer, DEFAULT_CONFIG
 from loss_functions import StructureGuidedTVLoss, calculate_weights_from_magnetic_gradient
@@ -137,21 +138,31 @@ class USADataset:
         self.grav_src.close()
         self.mag_src.close()
 
-def train_usa(grav_path, mag_path, output_model_path, epochs=100, patch_size=256):
+def train_usa(grav_path, mag_path, output_model_path, epochs=100, patch_size=256, mode='mineral'):
+    """
+    Train PINN for gravity or magnetic inversion.
+    """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logger.info(f"Training on {device}")
+    torch.backends.cudnn.benchmark = True
+    logger.info(f"Training on {device} | Mode: {mode.upper()}")
     
-    # Datasets - separate train and validation
+    # Increase batch size for GPU efficiency
+    batch_size = 5 if torch.cuda.is_available() else 4
+    
+    # Datasets
     train_dataset = USADataset(grav_path, mag_path, patch_size=patch_size, batches_per_epoch=80)
     val_dataset = USADataset(grav_path, mag_path, patch_size=patch_size, batches_per_epoch=20)
-    logger.info(f"Pixel size estimated: {train_dataset.pixel_size_m:.1f}m")
-    logger.info(f"Training batches: {train_dataset.batches}, Validation batches: {val_dataset.batches}")
     
-    # Model
-    model = DensityUNet(max_density=800.0).to(device)
+    # Model - higher max value for susceptibility (SI can be high for iron)
+    max_val = 1.0 if mode == 'magnetic' else 800.0
+    model = DensityUNet(max_val=max_val).to(device)
     
     # Physics
-    physics = GravityPhysicsLayer(train_dataset.pixel_size_m, mean_depth=200.0).to(device)
+    if mode == 'magnetic':
+        from pinn_gravity_inversion import MagneticPhysicsLayer
+        physics = MagneticPhysicsLayer(train_dataset.pixel_size_m, mean_depth=200.0).to(device)
+    else:
+        physics = GravityPhysicsLayer(train_dataset.pixel_size_m, mean_depth=200.0).to(device)
     
     # Loss
     sg_tv_loss = StructureGuidedTVLoss().to(device)
@@ -169,38 +180,69 @@ def train_usa(grav_path, mag_path, output_model_path, epochs=100, patch_size=256
     for epoch in range(epochs):
         # ============ TRAINING PHASE ============
         model.train()
-        train_loss = 0
+        train_loss = 0.0  # Explicit float
+        batch_count = 0
         
         pbar = tqdm(range(train_dataset.batches), desc=f"Epoch {epoch+1}/{epochs} [Train]", leave=False, ascii=True)
         
+        scaler = GradScaler('cuda') if torch.cuda.is_available() else None
+        
         for _ in pbar:
-            grav, mag = train_dataset.sample_batch(batch_size=8)
-            grav = grav.to(device)
-            mag = mag.to(device)
+            if mode == 'synthetic':
+                # Generate synthetic DUB density maps
+                gt_density, _ = generate_synthetic_batch(batch_size=batch_size, patch_size=patch_size)
+                gt_density = gt_density.to(device)
+                # Forward project to get 'observed' gravity
+                target = physics(gt_density)
+                grav = target
+                mag = target
+            else:
+                grav, mag = train_dataset.sample_batch(batch_size=batch_size)
+                grav = grav.to(device)
+                mag = mag.to(device)
+                target = mag if mode == 'magnetic' else grav
             
             optimizer.zero_grad()
             
-            pred_density = model(grav)
-            pred_gravity = physics(pred_density)
-            
-            loss_mse = F.mse_loss(pred_gravity, grav)
-            weights = calculate_weights_from_magnetic_gradient(mag, beta=1.5)
-            loss_reg = sg_tv_loss(pred_density, weights) / pred_density.numel()
-            loss_sparsity = torch.mean(torch.abs(pred_density))
-            
-            loss = 10.0 * loss_mse + 0.1 * loss_reg + 0.001 * loss_sparsity
+            # AMP Forward Pass
+            with autocast('cuda', enabled=torch.cuda.is_available()):
+                pred_val = model(grav)
+                
+                # Physics FFT must use FP32 to avoid overflow
+                with torch.amp.autocast('cuda', enabled=False):
+                    pred_obs = physics(pred_val.float())
+                
+                loss_mse = F.mse_loss(pred_obs, target)
+                weights = calculate_weights_from_magnetic_gradient(mag, beta=1.5)
+                loss_reg = sg_tv_loss(pred_val, weights) / pred_val.numel()
+                loss_sparsity = torch.mean(torch.abs(pred_val))
+                
+                if mode == 'void':
+                    loss_bias = torch.mean(F.relu(pred_val))
+                elif mode == 'magnetic' or mode == 'synthetic':
+                    loss_bias = torch.tensor(0.0, device=device)
+                else:
+                    loss_bias = torch.mean(F.relu(-pred_val))
+                
+                loss = 10.0 * loss_mse + 0.1 * loss_reg + 0.001 * loss_sparsity + 0.5 * loss_bias
             
             if torch.isnan(loss):
-                optimizer.zero_grad()
                 continue
-                
-            loss.backward()
-            optimizer.step()
             
-            train_loss += loss.item()
-            pbar.set_postfix(loss=loss.item())
+            if scaler:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
+            
+            loss_val = loss.item()
+            train_loss += loss_val
+            batch_count += 1
+            pbar.set_postfix(loss=loss_val)
         
-        avg_train_loss = train_loss / train_dataset.batches
+        avg_train_loss = train_loss / max(batch_count, 1)
         
         # ============ VALIDATION PHASE ============
         model.eval()
@@ -259,9 +301,16 @@ if __name__ == "__main__":
     parser.add_argument("--magnetic", default="data/outputs/usa_supervised/usa_magnetic_mosaic.tif")
     parser.add_argument("--output", default="usa_pinn_model.pth")
     parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--mode", choices=['mineral', 'void', 'magnetic', 'synthetic'], default='mineral',
+                       help="'mineral' for gravity/ore, 'void' for DUBs/caves, 'magnetic' for metal/susceptibility, 'synthetic' for pre-training")
     args = parser.parse_args()
     
+    # Set output filename based on mode if not specified
+    if args.output == "usa_pinn_model.pth":
+        if args.mode == 'void': args.output = "usa_pinn_model_void.pth"
+        elif args.mode == 'magnetic': args.output = "usa_pinn_model_magnetic.pth"
+    
     if os.path.exists(args.gravity) and os.path.exists(args.magnetic):
-        train_usa(args.gravity, args.magnetic, args.output, args.epochs)
+        train_usa(args.gravity, args.magnetic, args.output, args.epochs, mode=args.mode)
     else:
         print("Mosaics not found. Skipping training.")

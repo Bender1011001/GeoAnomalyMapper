@@ -148,6 +148,12 @@ def rasterize_glim(gdb_path, ref_tif, output_tif):
         
         gdf = gpd.read_file(gdb_path, layer=layer_name)
         
+        # CRITICAL: Reproject to WGS84 (GLiM is in World_Eckert_IV projection)
+        logger.info(f"Source CRS: {gdf.crs}")
+        if gdf.crs != 'EPSG:4326':
+            logger.info("Reprojecting GLiM to WGS84 (EPSG:4326)...")
+            gdf = gdf.to_crs('EPSG:4326')
+        
         # Map Lithology to Density
         dens_map = {
             'su': 2.0, 'ss': 2.4, 'sc': 2.7, 'sm': 2.5, 'py': 2.2,

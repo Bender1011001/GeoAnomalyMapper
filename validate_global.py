@@ -29,8 +29,13 @@ def validate_global_prediction(prediction_tif, mrds_csv):
         nodata = src.nodata
         
         # Sample raster at MRDS locations
-        # rasterio.index(lon, lat) -> row, col
-        rows, cols = src.index(df['longitude'].values, df['latitude'].values)
+        # Use rowcol for vectorization (src.index fails on arrays in some versions)
+        from rasterio.transform import rowcol
+        rows, cols = rowcol(transform, df['longitude'].values, df['latitude'].values)
+        
+        # rowcol returns ints or floats depending on op, usually OK for array indexing if cast
+        rows = np.array(rows).astype(int)
+        cols = np.array(cols).astype(int)
         
         # Handle out of bounds
         valid = (rows >= 0) & (rows < src.height) & (cols >= 0) & (cols < src.width)
