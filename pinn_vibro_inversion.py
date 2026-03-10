@@ -143,7 +143,7 @@ class FourierFeatures(nn.Module):
     Frequency Functions in Low Dimensional Domains".
     """
 
-    def __init__(self, in_dim: int = 3, num_frequencies: int = 128, sigma: float = 10.0):
+    def __init__(self, in_dim: int = 3, num_frequencies: int = 128, sigma: float = 1.5):
         super().__init__()
         self.num_frequencies = num_frequencies
         # Random projection matrix (frozen, not learned)
@@ -470,35 +470,19 @@ def surface_data_loss(
     return F.mse_loss(U_mag, observed_vibration)
 
 
-def deep_boundary_loss(
+def global_sparsity_loss(
     model: VibroInversionPINN,
-    deep_coords: torch.Tensor,
+    coords: torch.Tensor,
     c_background: float = 3500.0,
 ) -> torch.Tensor:
     """
-    At great depth, wave speed should revert to the background crustal value.
-    This prevents the PINN from hallucinating structure where there is none.
-
-    Parameters
-    ----------
-    model : VibroInversionPINN
-        The PINN model.
-    deep_coords : torch.Tensor
-        (N, 3) coordinates near maximum depth (z ≈ 1).
-    c_background : float
-        Background wave speed in m/s.
-
-    Returns
-    -------
-    torch.Tensor
-        Scalar MSE loss penalizing deviation from background.
+    Occam's Razor: Enforces L1 sparsity globally.
+    Assumes the Earth is solid rock (3500) everywhere, heavily penalizing the 
+    creation of voids unless the surface data absolutely demands them.
     """
-    _, _, c_pred = model(deep_coords)
-    target = torch.full_like(c_pred, c_background)
-    # Normalize by c_background² so loss measures fractional deviation (~0-1 scale)
-    # Without this, MSE of (c_pred - 3500)² is ~millions, completely dominating
-    # the total loss despite a small weight.
-    return F.mse_loss(c_pred, target) / (c_background ** 2)
+    _, _, c_pred = model(coords)
+    # L1 norm (abs) creates sharp cutoffs, unlike L2 (MSE) which creates blurry gradients
+    return torch.mean(torch.abs(c_pred - c_background)) / c_background
 
 
 def tv_regularization(
@@ -748,6 +732,12 @@ def train_vibro_pinn(
         logger.info(f"Downsampled vibration map: {orig_shape} -> {vib_map.shape} "
                     f"(scale={scale:.4f}, saves {orig_shape[0]*orig_shape[1]*4/1024**2:.0f} MB VRAM)")
 
+    # FIX: Smooth the SAR speckle noise so the Laplacian doesn't explode!
+    from scipy.ndimage import gaussian_filter
+    logger.info("Applying Gaussian filter to suppress SAR high-frequency speckle...")
+    # A sigma of 2.0 smooths out the microscopic noise the network is abusing
+    vib_map = gaussian_filter(vib_map, sigma=2.0)
+
     # Normalize vibration map
     vib_mean = np.nanmean(vib_map)
     vib_std = np.nanstd(vib_map)
@@ -834,7 +824,7 @@ def train_vibro_pinn(
     sys.stdout.flush()
 
     training_start = time.time()
-    loss_history = {"total": [], "physics": [], "data": [], "reg": [], "deep": []}
+    loss_history = {"total": [], "physics": [], "data": [], "reg": [], "sparse": []}
     best_loss = float('inf')
 
     model.train()
@@ -852,7 +842,7 @@ def train_vibro_pinn(
         # Gradient accumulation: run multiple micro-batches per optimizer step
         epoch_loss_physics = 0.0
         epoch_loss_data = 0.0
-        epoch_loss_deep = 0.0
+        epoch_loss_sparse = 0.0
         epoch_loss_reg = 0.0
         epoch_loss_total = 0.0
 
@@ -913,15 +903,7 @@ def train_vibro_pinn(
                     logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: data loss = {loss_data.item():.6f}")
                     sys.stdout.flush()
 
-                # 3. Deep boundary loss: c → background at depth
-                deep_coords = sample_deep_points(
-                    cfg["batch_size_boundary"] // 4, device
-                )
-                loss_deep = deep_boundary_loss(
-                    model, deep_coords, cfg["background_wave_speed"]
-                )
-
-                # 4. TV regularization (uses detached coords, no create_graph)
+                # 3. Global Sparsity Loss (The Rock Tax)
                 # NOTE: x_coll/y_coll/z_coll may be float64 from physics loss.
                 # Model is back to float32, so we must cast coords back.
                 reg_coords = torch.cat([
@@ -929,6 +911,12 @@ def train_vibro_pinn(
                     y_coll.detach().float(),
                     z_coll.detach().float()
                 ], dim=-1)
+                
+                loss_sparse = global_sparsity_loss(
+                    model, reg_coords, cfg["background_wave_speed"]
+                )
+
+                # 4. TV regularization (uses detached coords, no create_graph)
                 loss_reg = tv_regularization(
                     model, reg_coords, cfg["background_wave_speed"]
                 )
@@ -936,9 +924,12 @@ def train_vibro_pinn(
             # Total loss (scaled by accumulation steps for gradient averaging)
             phys_weighted = current_physics_weight * loss_physics
             data_weighted = cfg["data_weight"] * loss_data
-            deep_weighted = cfg["deep_prior_weight"] * loss_deep
+            
+            # Massive penalty for hallucinating voids
+            sparse_weighted = 5.0 * loss_sparse 
             reg_weighted = cfg["regularization_weight"] * loss_reg
-            loss_unscaled = phys_weighted + data_weighted + deep_weighted + reg_weighted
+            
+            loss_unscaled = phys_weighted + data_weighted + sparse_weighted + reg_weighted
             loss = loss_unscaled / accum_steps
 
             if verbose:
@@ -946,7 +937,7 @@ def train_vibro_pinn(
                     f"  E{epoch} μ{accum_step+1}/{accum_steps}: "
                     f"phys={loss_physics.item():.4f}×{cfg['physics_weight']}={phys_weighted.item():.4f}, "
                     f"data={loss_data.item():.4f}×{cfg['data_weight']}={data_weighted.item():.4f}, "
-                    f"deep={loss_deep.item():.4f}×{cfg['deep_prior_weight']}={deep_weighted.item():.4f}, "
+                    f"sparse={loss_sparse.item():.4f}×5.0={sparse_weighted.item():.4f}, "
                     f"reg={loss_reg.item():.4f}×{cfg['regularization_weight']}={reg_weighted.item():.4f}, "
                     f"total_unscaled={loss_unscaled.item():.4f}, "
                     f"loss_for_backward={loss.item():.6f}"
@@ -965,20 +956,20 @@ def train_vibro_pinn(
             # Extract scalar values BEFORE deleting tensors
             _phys_val = loss_physics.item()
             _data_val = loss_data.item()
-            _deep_val = loss_deep.item()
+            _sparse_val = loss_sparse.item()
             _reg_val = loss_reg.item()
             _loss_val = loss.item()
 
-            del loss, loss_unscaled, phys_weighted, data_weighted, deep_weighted, reg_weighted
-            del loss_physics, loss_data, loss_deep, loss_reg
-            del x_coll, y_coll, z_coll, surface_coords, surface_values, deep_coords, reg_coords
+            del loss, loss_unscaled, phys_weighted, data_weighted, sparse_weighted, reg_weighted
+            del loss_physics, loss_data, loss_sparse, loss_reg
+            del x_coll, y_coll, z_coll, surface_coords, surface_values, reg_coords
             if device.type == 'cuda':
                 torch.cuda.empty_cache()
 
             # Track per-step losses (average across accum steps)
             epoch_loss_physics += _phys_val / accum_steps
             epoch_loss_data += _data_val / accum_steps
-            epoch_loss_deep += _deep_val / accum_steps
+            epoch_loss_sparse += _sparse_val / accum_steps
             epoch_loss_reg += _reg_val / accum_steps
             epoch_loss_total += _loss_val
 
@@ -1016,7 +1007,7 @@ def train_vibro_pinn(
         loss_history["physics"].append(epoch_loss_physics)
         loss_history["data"].append(epoch_loss_data)
         loss_history["reg"].append(epoch_loss_reg)
-        loss_history["deep"].append(epoch_loss_deep)
+        loss_history["sparse"].append(epoch_loss_sparse)
 
         if epoch_loss_total < best_loss:
             best_loss = epoch_loss_total
@@ -1035,10 +1026,10 @@ def train_vibro_pinn(
             logger.info(
                 f"[E{epoch:04d}] OBJECTIVE: "
                 f"phys_raw={epoch_loss_physics:.6f} data_raw={epoch_loss_data:.6f} "
-                f"deep_raw={epoch_loss_deep:.6f} reg_raw={epoch_loss_reg:.6f} | "
+                f"sparse_raw={epoch_loss_sparse:.6f} reg_raw={epoch_loss_reg:.6f} | "
                 f"weighted: phys={epoch_loss_physics*cfg['physics_weight']:.4f} "
                 f"data={epoch_loss_data*cfg['data_weight']:.4f} "
-                f"deep={epoch_loss_deep*cfg['deep_prior_weight']:.4f} "
+                f"sparse={epoch_loss_sparse*5.0:.4f} "
                 f"reg={epoch_loss_reg*cfg['regularization_weight']:.4f} | "
                 f"total={epoch_loss_total:.6f} lr={optimizer.param_groups[0]['lr']:.2e} "
                 f"grad_norm={total_grad_norm:.4f}"
@@ -1055,7 +1046,7 @@ def train_vibro_pinn(
                 loss=f"{epoch_loss_total:.4f}",
                 phys=f"{epoch_loss_physics:.4f}",
                 data=f"{epoch_loss_data:.4f}",
-                deep=f"{epoch_loss_deep:.4f}",
+                sparse=f"{epoch_loss_sparse:.4f}",
                 lr=f"{optimizer.param_groups[0]['lr']:.2e}",
                 mem=mem_info,
             )
