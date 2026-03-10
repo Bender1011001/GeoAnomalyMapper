@@ -96,11 +96,13 @@ DEFAULT_INVERSION_CONFIG = {
 
     # Training parameters
     "epochs": 5000,                   # PINNs need thousands to carve sharp shapes — was 3000
-    "lr": 1e-4,
+    "lr": 5e-5,                       # Gentler start — physics loss is ~1M, need stable gradients
     "batch_size_collocation": 512,    # Interior collocation points per micro-batch
     "batch_size_boundary": 256,       # Surface boundary points per micro-batch
     "gradient_accumulation_steps": 4, # Effective batch = 512*4 = 2048 collocation per optimizer step
-    "physics_weight": 1.0,            # Helmholtz residual weight
+    "physics_weight": 0.001,           # Helmholtz residual weight — scaled DOWN because raw physics
+    # loss starts at ~1.2M. With weight=0.001 → effective ~1200,
+    # comparable to data contribution of ~115 (50.0 × 2.3).
     "data_weight": 50.0,              # Surface data fit weight — was 10.0
     # CRITICAL: data_weight=50 prevents "Trivial Collapse" where the PINN
     # ignores surface observations and predicts uniform 3500 m/s everywhere.
