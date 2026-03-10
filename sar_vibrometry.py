@@ -282,7 +282,7 @@ def compute_vibration_frequency_map(
     t_centered_var = torch.sum(t_centered ** 2)
     t_centered_view = t_centered.view(-1, 1, 1)
 
-    chunk_size = 256
+    chunk_size = 64  # Smaller chunks to avoid OOM on large bursts
     for start_r in range(0, h, chunk_size):
         end_r = min(start_r + chunk_size, h)
         
@@ -359,6 +359,15 @@ def run_vibrometry_pipeline(
         )
     logger.info(f"SLC shape: {slc_data.shape}, dtype: {slc_data.dtype}")
 
+    # Crop large bursts to avoid OOM — 4096x4096 is still >>800m domain
+    max_dim = 4096
+    if slc_data.shape[0] > max_dim or slc_data.shape[1] > max_dim:
+        h_orig, w_orig = slc_data.shape
+        r0 = max(0, h_orig // 2 - max_dim // 2)
+        c0 = max(0, w_orig // 2 - max_dim // 2)
+        slc_data = slc_data[r0:r0+max_dim, c0:c0+max_dim]
+        logger.info(f"Cropped SLC from {h_orig}x{w_orig} to {slc_data.shape[0]}x{slc_data.shape[1]} (center crop)")
+
     # 2. Sub-aperture decomposition
     logger.info("Step 2: Doppler sub-aperture decomposition...")
     sub_apertures = extract_doppler_sub_apertures(
@@ -368,6 +377,7 @@ def run_vibrometry_pipeline(
         apply_taper=cfg["hamming_taper"],
     )
     logger.info(f"  Generated {len(sub_apertures)} sub-apertures")
+    torch.cuda.empty_cache()
 
     # 3. Interferometric phase tracking
     logger.info("Step 3: Computing sub-aperture interferograms...")
@@ -378,6 +388,7 @@ def run_vibrometry_pipeline(
     logger.info(
         f"  Mean coherence: {coherence_maps.mean().item():.4f}"
     )
+    torch.cuda.empty_cache()
 
     # 4. Vibration velocity map
     logger.info("Step 4: Converting phase to vibration velocity...")
