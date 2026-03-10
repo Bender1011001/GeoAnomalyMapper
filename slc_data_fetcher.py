@@ -327,8 +327,37 @@ def extract_slc_burst(
     if safe_path.suffix == ".zip":
         tmp_extract = SLC_RAW_DIR / "tmp_extract"
         tmp_extract.mkdir(parents=True, exist_ok=True)
+
+        # Selective extraction: only measurement TIFF + annotation XML for requested swath
+        # This avoids extracting the full 5.5GB SAFE archive (saves ~4GB disk)
+        swath_pattern = swath.lower()  # e.g. "iw2"
         with zipfile.ZipFile(safe_path, 'r') as zf:
-            zf.extractall(tmp_extract)
+            members_to_extract = []
+            for name in zf.namelist():
+                name_lower = name.lower()
+                # Extract only measurement TIFFs and annotation XMLs for our swath
+                if (f"measurement/" in name_lower and swath_pattern in name_lower and
+                        name_lower.endswith('.tiff')):
+                    members_to_extract.append(name)
+                elif (f"annotation/" in name_lower and swath_pattern in name_lower and
+                      name_lower.endswith('.xml') and 'calibration' not in name_lower):
+                    members_to_extract.append(name)
+                # Also extract directory entries for structure
+                elif name.endswith('/') and ('.SAFE' in name):
+                    members_to_extract.append(name)
+
+            logger.info(f"Selective extraction: {len(members_to_extract)} files from ZIP "
+                        f"(skipping {len(zf.namelist()) - len(members_to_extract)} unneeded files)")
+            for member in members_to_extract:
+                zf.extract(member, tmp_extract)
+
+        # Delete ZIP immediately to free ~5.5GB
+        try:
+            safe_path.unlink()
+            logger.info(f"Deleted ZIP after selective extraction: {safe_path.name}")
+        except Exception as e:
+            logger.warning(f"Could not delete ZIP: {e}")
+
         # Find the .SAFE directory inside
         safe_dirs = list(tmp_extract.glob("*.SAFE"))
         if not safe_dirs:
