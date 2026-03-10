@@ -126,6 +126,24 @@ RESOLUTION_PROFILES = {
 # ============================================================
 PHASE_1_TARGETS = [
     {
+        "name": "Great Pyramid of Giza (Khufu)",
+        "lat": 29.9792,
+        "lon": 31.1342,
+        "buffer_deg": 0.15,
+        "description": "Biondi's main target — claimed spiral columns & 80m chambers. JRE #2443 discussion.",
+        "expected_depth_m": 500,
+        "expected_void_type": "artificial_cavity",
+    },
+    {
+        "name": "Khafre Pyramid (Giza)",
+        "lat": 29.9761,
+        "lon": 31.1313,
+        "buffer_deg": 0.1,
+        "description": "Biondi claims strongest anomalies here (vertical spirals + deep corridors).",
+        "expected_depth_m": 1000,
+        "expected_void_type": "artificial_cavity",
+    },
+    {
         "name": "Carlsbad Caverns (NM)",
         "lat": 32.1742,
         "lon": -104.4459,
@@ -151,24 +169,6 @@ PHASE_1_TARGETS = [
         "description": "Instrumented borehole intersecting the fault. Good for testing varying density fields.",
         "expected_depth_m": 3000,
         "expected_void_type": "fault_zone",
-    },
-    {
-        "name": "Great Pyramid of Giza (Khufu)",
-        "lat": 29.9792,
-        "lon": 31.1342,
-        "buffer_deg": 0.15,
-        "description": "Biondi's main target — claimed spiral columns & 80m chambers. JRE #2443 discussion.",
-        "expected_depth_m": 500,
-        "expected_void_type": "artificial_cavity",
-    },
-    {
-        "name": "Khafre Pyramid (Giza)",
-        "lat": 29.9761,
-        "lon": 31.1313,
-        "buffer_deg": 0.1,
-        "description": "Biondi claims strongest anomalies here (vertical spirals + deep corridors).",
-        "expected_depth_m": 1000,
-        "expected_void_type": "artificial_cavity",
     },
     {
         "name": "Menkaure Pyramid (Giza)",
@@ -407,6 +407,14 @@ def execute_biondi_pipeline_for_target(
                     if extracted:
                         slc_filepath = str(extracted[0])
                         result["data_source"] = "sentinel1"
+                    # Delete ZIP to save disk (5.5GB+ per file)
+                    try:
+                        zip_path = Path(downloaded_path)
+                        if zip_path.exists():
+                            zip_path.unlink()
+                            logger.info(f"Deleted ZIP to save disk: {zip_path.name}")
+                    except Exception as e:
+                        logger.warning(f"Could not delete ZIP: {e}")
             elif not earthdata_user or not earthdata_pass:
                 logger.warning("EARTHDATA credentials not found — cannot download real SLC data.")
             else:
@@ -448,6 +456,14 @@ def execute_biondi_pipeline_for_target(
 
     vib_amp_path = vibro_results.get("vibration_amplitude_npy")
     vib_freq_path = vibro_results.get("vibration_frequency_npy")
+
+    # Delete burst .npy files to save disk (~1GB)
+    burst_dir = target_out_dir / "bursts"
+    if burst_dir.exists():
+        import shutil
+        burst_size_mb = sum(f.stat().st_size for f in burst_dir.rglob('*') if f.is_file()) / (1024**2)
+        shutil.rmtree(burst_dir, ignore_errors=True)
+        logger.info(f"Deleted burst dir to save disk: {burst_size_mb:.0f} MB freed")
 
     if not vib_amp_path:
         msg = "Vibrometry processing failed."
