@@ -328,29 +328,45 @@ def helmholtz_physics_loss(
         """Compute ∇²U with chain-rule corrections."""
         dU_dx = torch.autograd.grad(
             U, x, grad_outputs=torch.ones_like(U),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
         dU_dy = torch.autograd.grad(
             U, y, grad_outputs=torch.ones_like(U),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
         dU_dz = torch.autograd.grad(
             U, z, grad_outputs=torch.ones_like(U),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
+
+        # Handle None gradients (when input isn't used in graph)
+        if dU_dx is None:
+            dU_dx = torch.zeros_like(U)
+        if dU_dy is None:
+            dU_dy = torch.zeros_like(U)
+        if dU_dz is None:
+            dU_dz = torch.zeros_like(U)
 
         d2U_dx2 = torch.autograd.grad(
             dU_dx, x, grad_outputs=torch.ones_like(dU_dx),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
         d2U_dy2 = torch.autograd.grad(
             dU_dy, y, grad_outputs=torch.ones_like(dU_dy),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
         d2U_dz2 = torch.autograd.grad(
             dU_dz, z, grad_outputs=torch.ones_like(dU_dz),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True, allow_unused=True
         )[0]
+
+        # Handle None second derivatives
+        if d2U_dx2 is None:
+            d2U_dx2 = torch.zeros_like(U)
+        if d2U_dy2 is None:
+            d2U_dy2 = torch.zeros_like(U)
+        if d2U_dz2 is None:
+            d2U_dz2 = torch.zeros_like(U)
 
         # Apply chain-rule scaling to convert normalized → physical gradients
         return (d2U_dx2 + d2U_dy2) * (scale_xy ** 2) + d2U_dz2 * (scale_z ** 2)
