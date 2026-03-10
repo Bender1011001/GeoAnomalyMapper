@@ -137,11 +137,12 @@ RESOLUTION_PROFILES = {
         "excitation_frequency_hz": 0.5,       # Deepest penetration
         "synthetic_grid_size": 512,
         "num_sub_apertures": 7,               # More frequency sampling
-        "batch_size_collocation": 8192,       # Larger batches → better gradient estimates
-        "batch_size_boundary": 2048,
-        "gradient_accumulation_steps": 1,
-        "hidden_layers": 10,                  # Deeper network
-        "hidden_neurons": 768,                # Wider network → more capacity
+        # NOTE: float64 physics doubles model VRAM. These sizes fit on 24GB 4090.
+        "batch_size_collocation": 4096,       # Was 8192 — halved for float64 physics
+        "batch_size_boundary": 1024,          # Was 2048 — halved for float64 physics
+        "gradient_accumulation_steps": 2,     # 2 accum steps = effective 8192 batch
+        "hidden_layers": 8,                   # Was 10 — matches standard (stable)
+        "hidden_neurons": 512,                # Was 768 — halved VRAM usage in float64
     },
 }
 
