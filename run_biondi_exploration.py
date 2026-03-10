@@ -394,7 +394,12 @@ def execute_biondi_pipeline_for_target(
     # --------------------------------------------------------
     # STEP 1: SLC Data Acquisition
     # --------------------------------------------------------
-    logger.info("\n--- STEP 1: Fetching Sentinel-1 SLC Data ---")
+    # Priority order: 1) Umbra X-band (free, 16cm res, Spotlight mode)
+    #                 2) Sentinel-1 C-band (free, 5x20m res, TOPSAR mode)
+    # Umbra is preferred because Spotlight mode provides the 60s dwell time
+    # needed for Doppler vibrometry. Sentinel-1's 0.1s TOPSAR sweep cannot
+    # track sub-second micro-vibrations.
+    logger.info("\n--- STEP 1: SLC Data Acquisition (Umbra → Sentinel-1 → Synthetic) ---")
     earthdata_user = credentials.get("EARTHDATA_USERNAME")
     earthdata_pass = credentials.get("EARTHDATA_PASSWORD")
 
@@ -408,44 +413,79 @@ def execute_biondi_pipeline_for_target(
     if use_synthetic_fallback:
         logger.info("Forcing synthetic data generation (skipping real SLC download for speed).")
     else:
+        # === TRY UMBRA FIRST (best for Doppler tomography) ===
         try:
-            slc_products = slc_data_fetcher.search_sentinel1_slc(
+            logger.info("Searching Umbra Space Open Data (X-band, 16cm-1m, Spotlight)...")
+            umbra_products = slc_data_fetcher.search_umbra_open_data(
                 bbox=bbox,
-                max_results=1
+                max_results=3
             )
-
-            if slc_products and earthdata_user and earthdata_pass:
-                logger.info(f"Found {len(slc_products)} SLC products. Downloading first...")
-                download_dir = target_out_dir / "raw_slc"
-                downloaded_path = slc_data_fetcher.download_slc_product(
-                    product=slc_products[0],
-                    output_dir=download_dir,
-                    earthdata_username=earthdata_user,
-                    earthdata_password=earthdata_pass,
-                )
-                if downloaded_path:
-                    logger.info("Extracting first burst from downloaded SAFE file...")
-                    extracted = slc_data_fetcher.extract_slc_burst(
-                        Path(downloaded_path),
-                        output_dir=target_out_dir / "bursts"
+            if umbra_products:
+                logger.info(f"Found {len(umbra_products)} Umbra X-band SLC products!")
+                for up in umbra_products:
+                    downloaded_path = slc_data_fetcher.download_umbra_slc(
+                        product=up,
+                        output_dir=target_out_dir / "raw_slc" / "umbra"
                     )
-                    if extracted:
-                        slc_filepath = str(extracted[0])
-                        result["data_source"] = "sentinel1"
-                    # Delete ZIP to save disk (5.5GB+ per file)
-                    try:
-                        zip_path = Path(downloaded_path)
-                        if zip_path.exists():
-                            zip_path.unlink()
-                            logger.info(f"Deleted ZIP to save disk: {zip_path.name}")
-                    except Exception as e:
-                        logger.warning(f"Could not delete ZIP: {e}")
-            elif not earthdata_user or not earthdata_pass:
-                logger.warning("EARTHDATA credentials not found — cannot download real SLC data.")
+                    if downloaded_path:
+                        logger.info("Extracting SLC from Umbra GeoTIFF...")
+                        extracted = slc_data_fetcher.extract_umbra_slc_burst(
+                            Path(downloaded_path),
+                            output_dir=target_out_dir / "bursts"
+                        )
+                        if extracted:
+                            slc_filepath = str(extracted[0])
+                            result["data_source"] = f"umbra_xband ({up.get('resolution_m', '?')}m)"
+                            logger.info(f"Using Umbra X-band SLC: {up.get('granule_name')} "
+                                        f"(resolution: {up.get('resolution_m', '?')}m)")
+                            break
             else:
-                logger.warning(f"No Sentinel-1 SLC products found over {target['name']}.")
+                logger.info("No Umbra data available for this area — trying Sentinel-1...")
         except Exception as e:
-            logger.warning(f"SLC acquisition failed (non-fatal): {e}")
+            logger.warning(f"Umbra data acquisition failed (non-fatal): {e}")
+
+        # === FALLBACK TO SENTINEL-1 (lower resolution but broader coverage) ===
+        if not slc_filepath:
+            try:
+                slc_products = slc_data_fetcher.search_sentinel1_slc(
+                    bbox=bbox,
+                    max_results=1
+                )
+
+                if slc_products and earthdata_user and earthdata_pass:
+                    logger.info(f"Found {len(slc_products)} Sentinel-1 products. Downloading first...")
+                    logger.warning("NOTE: Sentinel-1 C-band (5x20m, TOPSAR) has limited Doppler sensitivity. "
+                                   "Results will be lower resolution than X-band Spotlight data.")
+                    download_dir = target_out_dir / "raw_slc"
+                    downloaded_path = slc_data_fetcher.download_slc_product(
+                        product=slc_products[0],
+                        output_dir=download_dir,
+                        earthdata_username=earthdata_user,
+                        earthdata_password=earthdata_pass,
+                    )
+                    if downloaded_path:
+                        logger.info("Extracting first burst from downloaded SAFE file...")
+                        extracted = slc_data_fetcher.extract_slc_burst(
+                            Path(downloaded_path),
+                            output_dir=target_out_dir / "bursts"
+                        )
+                        if extracted:
+                            slc_filepath = str(extracted[0])
+                            result["data_source"] = "sentinel1_cband"
+                        # Delete ZIP to save disk (5.5GB+ per file)
+                        try:
+                            zip_path = Path(downloaded_path)
+                            if zip_path.exists():
+                                zip_path.unlink()
+                                logger.info(f"Deleted ZIP to save disk: {zip_path.name}")
+                        except Exception as e:
+                            logger.warning(f"Could not delete ZIP: {e}")
+                elif not earthdata_user or not earthdata_pass:
+                    logger.warning("EARTHDATA credentials not found — cannot download Sentinel-1 data.")
+                else:
+                    logger.warning(f"No Sentinel-1 SLC products found over {target['name']}.")
+            except Exception as e:
+                logger.warning(f"SLC acquisition failed (non-fatal): {e}")
 
     # Fallback: generate proper synthetic data
     if not slc_filepath and use_synthetic_fallback:

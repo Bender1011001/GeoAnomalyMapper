@@ -591,6 +591,344 @@ def search_capella_slc(
         return []
 
 
+def search_umbra_open_data(
+    bbox: Tuple[float, float, float, float],
+    max_results: int = 10,
+) -> List[Dict]:
+    """
+    Search the Umbra Space Open Data catalog on AWS S3 for high-resolution
+    X-band SAR SLC imagery.
+
+    Umbra provides some of the highest resolution SAR data in the world
+    (down to 16cm resolution) and hosts a massive free archive on AWS:
+        s3://umbra-open-data-catalog/
+
+    This is the PREFERRED data source for Biondi SAR Doppler Tomography
+    because:
+      1. X-band (~3cm wavelength) penetrates shallow structures better than C-band
+      2. Spotlight mode: the satellite "stares" at the target for up to 60s,
+         providing the massive dwell time needed to extract sub-millimeter
+         Doppler shifts from subsurface resonance
+      3. 16cm-1m resolution is 20-100x finer than Sentinel-1's 5x20m pixels
+
+    Parameters
+    ----------
+    bbox : tuple
+        (west, south, east, north) in WGS84 degrees.
+    max_results : int
+        Maximum number of results to return.
+
+    Returns
+    -------
+    list of dict
+        Product metadata from the Umbra open data catalog.
+    """
+    import requests
+
+    west, south, east, north = bbox
+    logger.info(
+        f"Searching Umbra Open Data: bbox=({west:.3f},{south:.3f},{east:.3f},{north:.3f})"
+    )
+
+    # Umbra hosts a STAC catalog at their open data endpoint
+    stac_url = "https://s3.us-west-2.amazonaws.com/umbra-open-data-catalog/stac/catalog.json"
+
+    # Try the STAC search endpoint first
+    stac_search_url = "https://api.canopy.umbra.space/archive/search"
+    headers = {"Content-Type": "application/json"}
+
+    payload = {
+        "bbox": [west, south, east, north],
+        "limit": max_results,
+        "query": {
+            "sar:product_type": {"eq": "SLC"},
+        }
+    }
+
+    products = []
+
+    try:
+        response = requests.post(stac_search_url, json=payload, headers=headers, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            for feature in data.get("features", []):
+                props = feature.get("properties", {})
+                assets = feature.get("assets", {})
+
+                # Find the SLC GeoTIFF asset
+                slc_asset = None
+                for asset_key, asset_val in assets.items():
+                    href = asset_val.get("href", "")
+                    if href.endswith(".tif") or href.endswith(".tiff"):
+                        slc_asset = href
+                        break
+
+                product_info = {
+                    "granule_name": feature.get("id", "unknown"),
+                    "provider": "Umbra Space",
+                    "band": "X-band",
+                    "resolution_m": props.get("sar:resolution_range", 0.5),
+                    "start_time": props.get("datetime", ""),
+                    "polarization": props.get("sar:polarizations", ["VV"])[0] if isinstance(
+                        props.get("sar:polarizations"), list) else "VV",
+                    "orbit_state": props.get("sat:orbit_state", ""),
+                    "processing_level": "SLC",
+                    "download_url": slc_asset or "",
+                    "s3_prefix": f"s3://umbra-open-data-catalog/{feature.get('id', '')}/",
+                    "assets": {k: v.get("href", "") for k, v in assets.items()},
+                }
+                products.append(product_info)
+
+            logger.info(f"Umbra STAC search: found {len(products)} X-band SLC products")
+        else:
+            logger.warning(f"Umbra STAC search returned {response.status_code}, trying S3 listing fallback")
+            # Fallback: try direct S3 listing (no auth needed for open data)
+            products = _search_umbra_s3_fallback(bbox, max_results)
+
+    except requests.RequestException as e:
+        logger.warning(f"Umbra API search failed: {e}, trying S3 listing fallback")
+        products = _search_umbra_s3_fallback(bbox, max_results)
+
+    return products
+
+
+def _search_umbra_s3_fallback(
+    bbox: Tuple[float, float, float, float],
+    max_results: int = 10,
+) -> List[Dict]:
+    """
+    Fallback: list Umbra open data directly from AWS S3 (no API key needed).
+
+    The S3 bucket is public and contains STAC item JSONs with bounding box
+    metadata that we can filter client-side.
+    """
+    import requests
+
+    bucket_url = "https://umbra-open-data-catalog.s3.us-west-2.amazonaws.com"
+    west, south, east, north = bbox
+
+    products = []
+    try:
+        # List the root catalog to find collection indices
+        catalog_url = f"{bucket_url}/stac/catalog.json"
+        resp = requests.get(catalog_url, timeout=15)
+        if resp.status_code != 200:
+            logger.warning(f"Umbra S3 catalog not accessible: HTTP {resp.status_code}")
+            return []
+
+        catalog = resp.json()
+        # Get links to child catalogs/collections
+        child_links = [
+            link for link in catalog.get("links", [])
+            if link.get("rel") == "child"
+        ]
+
+        # Sample a subset of collections to find matches
+        checked = 0
+        for link in child_links[:50]:  # Check first 50 collections
+            if len(products) >= max_results:
+                break
+            try:
+                child_url = link.get("href", "")
+                if not child_url.startswith("http"):
+                    child_url = f"{bucket_url}/stac/{child_url}"
+
+                child_resp = requests.get(child_url, timeout=10)
+                if child_resp.status_code != 200:
+                    continue
+
+                child_data = child_resp.json()
+                child_bbox = child_data.get("extent", {}).get("spatial", {}).get("bbox", [[]])
+                if child_bbox and child_bbox[0]:
+                    cb = child_bbox[0]  # [west, south, east, north]
+                    # Check if bboxes overlap
+                    if (cb[0] <= east and cb[2] >= west and
+                        cb[1] <= north and cb[3] >= south):
+                        # Found an overlapping collection — get its items
+                        item_links = [
+                            l for l in child_data.get("links", [])
+                            if l.get("rel") == "item"
+                        ]
+                        for item_link in item_links[:5]:
+                            item_url = item_link.get("href", "")
+                            if not item_url.startswith("http"):
+                                # Resolve relative URL
+                                base = child_url.rsplit("/", 1)[0]
+                                item_url = f"{base}/{item_url}"
+
+                            item_resp = requests.get(item_url, timeout=10)
+                            if item_resp.status_code == 200:
+                                item = item_resp.json()
+                                props = item.get("properties", {})
+                                assets = item.get("assets", {})
+
+                                slc_url = ""
+                                for ak, av in assets.items():
+                                    href = av.get("href", "")
+                                    if href.endswith(".tif") or href.endswith(".tiff"):
+                                        slc_url = href
+                                        break
+
+                                products.append({
+                                    "granule_name": item.get("id", "unknown"),
+                                    "provider": "Umbra Space (S3)",
+                                    "band": "X-band",
+                                    "resolution_m": props.get("sar:resolution_range", 0.5),
+                                    "start_time": props.get("datetime", ""),
+                                    "polarization": "VV",
+                                    "processing_level": "SLC",
+                                    "download_url": slc_url,
+                                    "assets": {k: v.get("href", "") for k, v in assets.items()},
+                                })
+                checked += 1
+            except Exception:
+                continue
+
+        logger.info(f"Umbra S3 fallback: checked {checked} collections, found {len(products)} matching products")
+
+    except Exception as e:
+        logger.warning(f"Umbra S3 fallback failed: {e}")
+
+    return products
+
+
+def download_umbra_slc(
+    product: Dict,
+    output_dir: Optional[Path] = None,
+) -> Optional[Path]:
+    """
+    Download an Umbra Space SLC GeoTIFF from their open data catalog.
+
+    No authentication is needed — Umbra's open data is publicly hosted on AWS S3.
+
+    Parameters
+    ----------
+    product : dict
+        Product metadata from search_umbra_open_data().
+    output_dir : Path, optional
+        Directory to save the downloaded file.
+
+    Returns
+    -------
+    Path or None
+        Path to the downloaded GeoTIFF, or None if download failed.
+    """
+    import requests
+
+    if output_dir is None:
+        output_dir = SLC_RAW_DIR / "umbra"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    url = product.get("download_url", "")
+    if not url:
+        logger.warning(f"No download URL for Umbra product: {product.get('granule_name')}")
+        return None
+
+    granule_name = product.get("granule_name", "unknown")
+    output_path = output_dir / f"{granule_name}.tif"
+
+    # Cache check
+    if output_path.exists() and output_path.stat().st_size > 0:
+        logger.info(f"Umbra SLC already downloaded (cached): {output_path} "
+                     f"({output_path.stat().st_size / 1024**2:.0f} MB)")
+        return output_path
+
+    logger.info(f"Downloading Umbra SLC: {granule_name} from {url[:80]}...")
+
+    try:
+        response = requests.get(url, stream=True, timeout=300)
+        response.raise_for_status()
+
+        total_size = int(response.headers.get("content-length", 0))
+        downloaded = 0
+
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192 * 16):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total_size > 0 and downloaded % (10 * 1024 * 1024) == 0:
+                    pct = downloaded / total_size * 100
+                    logger.info(f"  Download progress: {downloaded / 1024**2:.0f} / "
+                                f"{total_size / 1024**2:.0f} MB ({pct:.0f}%)")
+
+        logger.info(f"Downloaded Umbra SLC: {output_path} ({output_path.stat().st_size / 1024**2:.0f} MB)")
+        return output_path
+
+    except requests.RequestException as e:
+        logger.error(f"Umbra SLC download failed: {e}")
+        if output_path.exists():
+            output_path.unlink()
+        return None
+
+
+def extract_umbra_slc_burst(
+    tiff_path: Path,
+    output_dir: Optional[Path] = None,
+) -> List[Path]:
+    """
+    Extract complex SLC data from an Umbra GeoTIFF.
+
+    Umbra SLC data is stored as complex-valued GeoTIFFs (unlike Sentinel-1's
+    two-band I/Q format). The data is typically a single Spotlight acquisition
+    covering a small area at very high resolution.
+
+    Parameters
+    ----------
+    tiff_path : Path
+        Path to the Umbra SLC GeoTIFF.
+    output_dir : Path, optional
+        Output directory for the extracted .npy burst.
+
+    Returns
+    -------
+    list of Path
+        Paths to extracted burst files (.npy).
+    """
+    if output_dir is None:
+        output_dir = SLC_BURSTS_DIR / "umbra"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        import rasterio
+    except ImportError:
+        raise ImportError("rasterio required for reading SLC TIFFs")
+
+    with rasterio.open(str(tiff_path)) as src:
+        num_bands = src.count
+        height = src.height
+        width = src.width
+
+        logger.info(f"Umbra SLC: {height}x{width}, bands={num_bands}, "
+                     f"dtype={src.dtypes[0]}")
+
+        if num_bands >= 2:
+            # Two-band I/Q format
+            band_i = src.read(1).astype(np.float32)
+            band_q = src.read(2).astype(np.float32)
+            slc_complex = band_i + 1j * band_q
+        else:
+            raw = src.read(1)
+            if np.iscomplexobj(raw):
+                slc_complex = raw.astype(np.complex64)
+            else:
+                # Single-band real — reinterpret as interleaved I/Q
+                raw_flat = raw.flatten().astype(np.float32)
+                if len(raw_flat) % 2 == 0:
+                    slc_complex = raw_flat[0::2] + 1j * raw_flat[1::2]
+                    new_width = width // 2
+                    slc_complex = slc_complex.reshape(height, new_width)
+                else:
+                    slc_complex = raw.astype(np.complex64)
+
+    # Umbra Spotlight data is a single continuous acquisition (no bursts),
+    # so we save the entire image as one "burst"
+    burst_file = output_dir / f"{tiff_path.stem}_slc.npy"
+    np.save(burst_file, slc_complex)
+    logger.info(f"Extracted Umbra SLC: shape={slc_complex.shape}, saved to {burst_file.name}")
+
+    return [burst_file]
+
+
 def build_slc_inventory(
     lat: float,
     lon: float,
