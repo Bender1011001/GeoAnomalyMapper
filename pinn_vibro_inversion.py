@@ -735,20 +735,11 @@ def train_vibro_pinn(
     param_count = sum(p.numel() for p in model.parameters())
     logger.info(f"PINN parameters: {param_count:,}")
 
-    # torch.compile for fused kernels (PyTorch 2.0+)
-    use_compile = cfg.get("use_compile", True) and device.type == "cuda"
-    if use_compile:
-        import sys
-        if sys.platform == "win32":
-            logger.info("torch.compile disabled (Triton is not natively supported on Windows)")
-        else:
-            try:
-                _dynamo = getattr(__import__('torch', fromlist=['_dynamo']), '_dynamo')
-                _dynamo.config.suppress_errors = True
-                model = torch.compile(model, mode="reduce-overhead")
-                logger.info("torch.compile enabled (reduce-overhead mode) — first epochs will be slower")
-            except Exception as e:
-                logger.warning(f"torch.compile failed, falling back to eager mode: {e}")
+    # torch.compile DISABLED: CUDA Graphs (reduce-overhead mode) is incompatible
+    # with torch.autograd.grad calls used in Helmholtz PDE physics loss.
+    # The dynamic computation graph changes each iteration, which CUDA Graphs
+    # cannot handle — it causes "tensor output of CUDAGraphs overwritten" errors.
+    logger.info("torch.compile disabled (incompatible with autograd.grad in physics loss)")
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["lr"])
