@@ -922,10 +922,12 @@ def train_vibro_pinn(
                 )
 
                 # 4. TV regularization (uses detached coords, no create_graph)
+                # NOTE: x_coll/y_coll/z_coll may be float64 from physics loss.
+                # Model is back to float32, so we must cast coords back.
                 reg_coords = torch.cat([
-                    x_coll.detach(),
-                    y_coll.detach(),
-                    z_coll.detach()
+                    x_coll.detach().float(),
+                    y_coll.detach().float(),
+                    z_coll.detach().float()
                 ], dim=-1)
                 loss_reg = tv_regularization(
                     model, reg_coords, cfg["background_wave_speed"]
