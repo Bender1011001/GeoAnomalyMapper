@@ -76,47 +76,72 @@ EXPLORE_DIR.mkdir(parents=True, exist_ok=True)
 # ============================================================
 # PIPELINE RESOLUTION PROFILES
 # ============================================================
-# Controls tradeoff between speed and detection quality
+# Controls tradeoff between speed and detection quality.
+# 
+# TRIVIAL COLLAPSE FIX (2025-03-10):
+#   - deep_prior_weight reduced from 0.1/0.05/0.02 → 0.01/0.005/0.001
+#     (Old values penalized deep anomalies so heavily the PINN predicted solid rock everywhere)
+#   - data_weight increased from 10.0 → 50.0
+#     (Forces the PINN to trust satellite surface observations over smoothing)
+#   - domain_width_m and max_depth_m added per profile
+#     (Old: 5000m domain / 32 grid = 156m voxels → anomalies averaged out)
+#   - excitation_frequency_hz added per profile
+#     (Low freq penetrates deeper; high freq resolves shallow detail)
+#
 RESOLUTION_PROFILES = {
     "quick": {
-        "epochs": 150,
-        "grid_nx": 32,
-        "grid_ny": 32,
-        "grid_nz": 16,
-        "deep_prior_weight": 0.1,
+        "epochs": 500,                        # Quick sanity check
+        "grid_nx": 64,                        # Was 32 → 64 for basic visibility
+        "grid_ny": 64,
+        "grid_nz": 32,                        # Was 16
+        "domain_width_m": 800.0,              # Focused domain (was implicitly 5000)
+        "max_depth_m": 500.0,                 # Shallow scan (was implicitly 5000)
+        "deep_prior_weight": 0.01,            # Was 0.1 — caused trivial collapse
+        "data_weight": 50.0,                  # Was 10.0
+        "excitation_frequency_hz": 2.0,       # Medium-depth penetration
         "synthetic_grid_size": 256,
         "num_sub_apertures": 3,
-        "batch_size_collocation": 16384,
-        "batch_size_boundary": 4096,
+        "batch_size_collocation": 4096,
+        "batch_size_boundary": 1024,
         "gradient_accumulation_steps": 1,
-        "hidden_layers": 4,
-        "hidden_neurons": 128,
+        "hidden_layers": 6,                   # Was 4
+        "hidden_neurons": 256,                # Was 128
     },
     "standard": {
-        "epochs": 2000,
-        "grid_nx": 64,
-        "grid_ny": 64,
-        "grid_nz": 32,
-        "deep_prior_weight": 0.05,
+        "epochs": 3000,                       # Was 2000 — PINNs need more iterations
+        "grid_nx": 128,                       # Was 64 → 128 for ~6m resolution
+        "grid_ny": 128,
+        "grid_nz": 64,                        # Was 32
+        "domain_width_m": 800.0,              # Focused domain
+        "max_depth_m": 1000.0,                # Was 5000m (too deep for 500m targets)
+        "deep_prior_weight": 0.005,           # Was 0.05 — caused trivial collapse
+        "data_weight": 50.0,                  # Was 10.0
+        "excitation_frequency_hz": 1.0,       # Deep microseismic peak
         "synthetic_grid_size": 512,
         "num_sub_apertures": 5,
-        "batch_size_collocation": 4096,      # 4096 — fits easily in 24GB 4090 VRAM
-        "batch_size_boundary": 1024,         # 1024 surface points
-        "gradient_accumulation_steps": 1,    # No accumulation needed on 4090
-        "hidden_layers": 8,                  # Full model depth
-        "hidden_neurons": 512,               # Full model width
+        "batch_size_collocation": 4096,       # Fits easily in 24GB 4090 VRAM
+        "batch_size_boundary": 1024,          # 1024 surface points
+        "gradient_accumulation_steps": 1,     # No accumulation needed on 4090
+        "hidden_layers": 8,                   # Full model depth
+        "hidden_neurons": 512,                # Full model width
     },
     "high": {
-        "epochs": 500,
-        "grid_nx": 64,
-        "grid_ny": 64,
-        "grid_nz": 32,
-        "deep_prior_weight": 0.02,
-        "synthetic_grid_size": 256,
-        "num_sub_apertures": 5,
-        "batch_size_collocation": 16384,
-        "batch_size_boundary": 4096,
-        "gradient_accumulation_steps": 2,
+        "epochs": 5000,                       # Full convergence
+        "grid_nx": 128,                       # Fine spatial resolution
+        "grid_ny": 128,
+        "grid_nz": 64,                        # Fine depth resolution
+        "domain_width_m": 800.0,              # Focused domain
+        "max_depth_m": 1000.0,                # Max depth for detailed scans
+        "deep_prior_weight": 0.001,           # Was 0.02 — minimal deep regularization
+        "data_weight": 50.0,                  # Was 10.0
+        "excitation_frequency_hz": 0.5,       # Deepest penetration
+        "synthetic_grid_size": 512,
+        "num_sub_apertures": 7,               # More frequency sampling
+        "batch_size_collocation": 8192,       # Larger batches → better gradient estimates
+        "batch_size_boundary": 2048,
+        "gradient_accumulation_steps": 1,
+        "hidden_layers": 10,                  # Deeper network
+        "hidden_neurons": 768,                # Wider network → more capacity
     },
 }
 
@@ -494,21 +519,48 @@ def execute_biondi_pipeline_for_target(
     vib_map = np.load(vib_amp_path)
     freq_map = np.load(vib_freq_path) if vib_freq_path else None
 
+    # Adapt domain to target: use target's expected depth to set max_depth
+    # and use buffer_deg to estimate a sensible domain_width
+    target_depth = target.get("expected_depth_m", 500)
+    # Domain depth should be ~2x expected depth to capture full anomaly extent
+    adaptive_max_depth = min(profile.get("max_depth_m", 1000.0), max(target_depth * 2.0, 200.0))
+    # Use profile's domain width (already shrunk to 800m) or adapt from buffer_deg
+    adaptive_domain_width = profile.get("domain_width_m", 800.0)
+
+    # Select excitation frequency based on target depth:
+    #   Shallow (0-100m) → 5-15 Hz, Medium (100-500m) → 1-5 Hz, Deep (500m+) → 0.5-1 Hz
+    adaptive_freq_hz = profile.get("excitation_frequency_hz", 1.0)
+    if target_depth <= 100:
+        adaptive_freq_hz = max(adaptive_freq_hz, 5.0)   # Shallow: higher freq
+    elif target_depth <= 500:
+        adaptive_freq_hz = max(adaptive_freq_hz, 1.0)   # Medium depth
+    # else: use profile's default (0.5-1.0 Hz for deep)
+
+    pinn_config = {
+        "epochs": profile["epochs"],
+        "grid_nx": profile["grid_nx"],
+        "grid_ny": profile["grid_ny"],
+        "grid_nz": profile["grid_nz"],
+        "domain_width_m": adaptive_domain_width,
+        "max_depth_m": adaptive_max_depth,
+        "deep_prior_weight": profile["deep_prior_weight"],
+        "data_weight": profile.get("data_weight", 50.0),
+        "excitation_frequency_hz": adaptive_freq_hz,
+        "batch_size_collocation": profile.get("batch_size_collocation", 4096),
+        "batch_size_boundary": profile.get("batch_size_boundary", 1024),
+        "gradient_accumulation_steps": profile.get("gradient_accumulation_steps", 1),
+        "hidden_layers": profile.get("hidden_layers", 8),
+        "hidden_neurons": profile.get("hidden_neurons", 512),
+    }
+
+    logger.info(f"  PINN config: domain={adaptive_domain_width:.0f}m, depth={adaptive_max_depth:.0f}m, "
+                f"freq={adaptive_freq_hz:.1f}Hz, grid={profile['grid_nx']}x{profile['grid_ny']}x{profile['grid_nz']}, "
+                f"deep_prior={profile['deep_prior_weight']}, data_weight={profile.get('data_weight', 50.0)}")
+
     pinn_results = pinn_vibro_inversion.train_vibro_pinn(
         vibration_map=vib_map,
         output_dir=str(pinn_out_dir),
-        config={
-            "epochs": profile["epochs"],
-            "grid_nx": profile["grid_nx"],
-            "grid_ny": profile["grid_ny"],
-            "grid_nz": profile["grid_nz"],
-            "deep_prior_weight": profile["deep_prior_weight"],
-            "batch_size_collocation": profile.get("batch_size_collocation", 512),
-            "batch_size_boundary": profile.get("batch_size_boundary", 256),
-            "gradient_accumulation_steps": profile.get("gradient_accumulation_steps", 4),
-            "hidden_layers": profile.get("hidden_layers", 6),
-            "hidden_neurons": profile.get("hidden_neurons", 256),
-        },
+        config=pinn_config,
         frequency_map=freq_map
     )
 

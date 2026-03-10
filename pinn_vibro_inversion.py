@@ -74,30 +74,42 @@ INVERSION_DIR = DATA_DIR / "inversion_3d"
 INVERSION_OUTPUTS = INVERSION_DIR / "outputs"
 
 DEFAULT_INVERSION_CONFIG = {
-    # Domain parameters
-    "max_depth_m": 5000.0,         # Maximum inversion depth (meters)
-    "grid_nx": 64,                  # X grid resolution for collocation
-    "grid_ny": 64,                  # Y grid resolution
-    "grid_nz": 32,                  # Z (depth) grid resolution
-    "domain_width_m": 5000.0,       # Horizontal domain extent (meters)
+    # Domain parameters — SHRUNK to achieve ~6m voxel resolution
+    # Old: 5000m domain / 32 grid = 156m voxels (erases 15m chambers)
+    # New: 800m domain / 128 grid = 6.25m voxels (resolves tunnels/chambers)
+    "max_depth_m": 1000.0,           # Maximum inversion depth (meters) — was 5000
+    "grid_nx": 128,                   # X grid resolution — was 64
+    "grid_ny": 128,                   # Y grid resolution — was 64
+    "grid_nz": 64,                    # Z (depth) grid resolution — was 32
+    "domain_width_m": 800.0,          # Horizontal domain extent (meters) — was 5000
 
     # Physics parameters
     "background_wave_speed": 3500.0,  # Mean crustal P-wave speed (m/s)
     "min_wave_speed": 300.0,          # Air/void wave speed (m/s)
     "max_wave_speed": 6000.0,         # Dense rock wave speed (m/s)
-    "excitation_frequency_hz": 5.0,   # Dominant ambient seismic frequency
+    "excitation_frequency_hz": 1.0,   # Deep earth microseismic peak — was 5.0
+    # Frequency guide:
+    #   0.5-1.0 Hz → deep structures (500-2000m)
+    #   2.0-5.0 Hz → medium depth (100-500m)
+    #   5.0-15.0 Hz → shallow structures (0-100m)
     "density_background": 2670.0,     # Mean crustal density (kg/m³)
 
     # Training parameters
-    "epochs": 3000,
+    "epochs": 5000,                   # PINNs need thousands to carve sharp shapes — was 3000
     "lr": 1e-4,
-    "batch_size_collocation": 512,    # Interior collocation points per micro-batch (small for 8GB GPU + 2nd-order autograd graph)
+    "batch_size_collocation": 512,    # Interior collocation points per micro-batch
     "batch_size_boundary": 256,       # Surface boundary points per micro-batch
     "gradient_accumulation_steps": 4, # Effective batch = 512*4 = 2048 collocation per optimizer step
     "physics_weight": 1.0,            # Helmholtz residual weight
-    "data_weight": 10.0,              # Surface data fit weight
+    "data_weight": 50.0,              # Surface data fit weight — was 10.0
+    # CRITICAL: data_weight=50 prevents "Trivial Collapse" where the PINN
+    # ignores surface observations and predicts uniform 3500 m/s everywhere.
+    # The higher weight forces the AI to trust the satellite data.
     "regularization_weight": 0.01,    # Smoothness/sparsity weight
-    "deep_prior_weight": 0.1,         # Force c→background at depth
+    "deep_prior_weight": 0.001,       # Force c→background at depth — was 0.1
+    # CRITICAL: deep_prior_weight=0.001 stops the AI from erasing deep anomalies.
+    # At 0.1, the penalty for predicting voids at depth was so high that the
+    # PINN learned it was "cheaper" to predict solid rock everywhere.
 
     # Network architecture
     "hidden_layers": 8,
