@@ -521,7 +521,7 @@ def render_3d_subsurface(
     # 4. Anomaly Report
     # ============================================================
     report_path = Path(output_dir) / "anomaly_report.txt"
-    with open(report_path, 'w') as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write("=" * 70 + "\n")
         f.write("SAR DOPPLER TOMOGRAPHY — SUBSURFACE ANOMALY REPORT\n")
         f.write("=" * 70 + "\n\n")
@@ -591,6 +591,24 @@ def run_visualization_pipeline(
     if config:
         cfg.update(config)
 
+    # FAILSAFE DOMAIN BUG FIX: Auto-parse metadata from PINN output
+    # If domain_width_m/max_depth_m weren't passed in config (old codepath),
+    # read them from the inversion_metadata.txt produced by the PINN.
+    wave_speed_file = Path(wave_speed_path)
+    metadata_file = wave_speed_file.parent / "inversion_metadata.txt"
+    if metadata_file.exists():
+        logger.info(f"Loading domain config from {metadata_file}")
+        with open(metadata_file, 'r') as mf:
+            for line in mf:
+                line = line.strip()
+                if line.startswith("max_depth_m:") and "max_depth_m" not in (config or {}):
+                    cfg["max_depth_m"] = float(line.split(":")[1].strip())
+                elif line.startswith("domain_width_m:") and "domain_width_m" not in (config or {}):
+                    cfg["domain_width_m"] = float(line.split(":")[1].strip())
+                elif line.startswith("background_wave_speed_ms:") and "background_wave_speed" not in (config or {}):
+                    cfg["background_wave_speed"] = float(line.split(":")[1].strip())
+        logger.info(f"  Domain: {cfg.get('domain_width_m')}m wide x {cfg.get('max_depth_m')}m deep")
+
     if output_dir is None:
         output_dir = str(VIZ_DIR)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -633,7 +651,7 @@ def run_visualization_pipeline(
         import csv
         csv_path = Path(output_dir) / "detected_anomalies.csv"
         fieldnames = list(anomalies[0].keys())
-        with open(csv_path, 'w', newline='') as f:
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for a in anomalies:

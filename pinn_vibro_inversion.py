@@ -100,15 +100,15 @@ DEFAULT_INVERSION_CONFIG = {
     "batch_size_collocation": 512,    # Interior collocation points per micro-batch
     "batch_size_boundary": 256,       # Surface boundary points per micro-batch
     "gradient_accumulation_steps": 1, # Simplify — 1 step for faster iteration
-    "physics_weight": 0.0001,         # Target Helmholtz residual weight (after warmup)
+    # --- REBALANCED WEIGHTS (FIX FOR TRIVIAL COLLAPSE) ---
+    # Old: physics=0.0001, data=50, sparsity=5.0 (hardcoded) → uniform rock prediction
+    # New: physics dominates, sparsity uses Cauchy prior (allows large deviations)
+    "physics_weight": 1.0,            # Helmholtz PDE is the primary driver
     "physics_warmup_epochs": 500,     # Ramp physics_weight from 0→target over this many epochs
-    # CRITICAL: Physics warmup lets the network first learn from SAR data
-    # (data_weight=50) to establish a reasonable wave speed field, THEN
-    # gradually introduce the Helmholtz PDE constraint. Without warmup,
-    # the raw physics loss (~20M) causes NaN within 15 epochs.
-    "data_weight": 50.0,              # Surface data fit weight — forces trust in satellite data
-    "regularization_weight": 0.01,    # Smoothness/sparsity weight
-    "deep_prior_weight": 0.001,       # Force c→background at depth
+    "data_weight": 20.0,              # Surface fit — lowered (Sentinel-1 data is noisy)
+    "sparsity_weight": 0.01,          # Cauchy sparsity (was hardcoded 5.0 L1 — caused collapse)
+    "regularization_weight": 0.1,     # TV regularization — promotes sharp void boundaries
+    "deep_prior_weight": 0.1,         # Force c→background in bottom 20% of domain
 
     # Network architecture
     "hidden_layers": 8,
@@ -476,13 +476,52 @@ def global_sparsity_loss(
     c_background: float = 3500.0,
 ) -> torch.Tensor:
     """
-    Occam's Razor: Enforces L1 sparsity globally.
-    Assumes the Earth is solid rock (3500) everywhere, heavily penalizing the 
-    creation of voids unless the surface data absolutely demands them.
+    Robust Cauchy Prior: replaces the old L1 sparsity that caused trivial collapse.
+
+    The Cauchy distribution's heavy tails mean:
+    - Small deviations from background (noise) → aggressively penalized
+    - Large deviations (real voids at 343 m/s) → gradient FLATTENS OUT,
+      allowing the model to predict genuine anomalies without exploding loss.
+
+    With gamma=0.05, the prior flattens for deviations > 5% from background.
+    A void (343 vs 3500 m/s = 90% deviation) gets essentially the same
+    penalty as a 10% deviation, unlike L1 which scales linearly forever.
     """
     _, _, c_pred = model(coords)
-    # L1 norm (abs) creates sharp cutoffs, unlike L2 (MSE) which creates blurry gradients
-    return torch.mean(torch.abs(c_pred - c_background)) / c_background
+    deviation = torch.abs(c_pred - c_background) / c_background
+    gamma = 0.05  # Flattens out heavily after 5% deviation
+    return torch.mean(gamma * torch.log1p((deviation / gamma) ** 2))
+
+
+def deep_boundary_loss(
+    model: VibroInversionPINN,
+    coords: torch.Tensor,
+    c_background: float = 3500.0,
+) -> torch.Tensor:
+    """
+    Ensures wave speed returns to background in the deep Earth (bottom 20% of domain).
+
+    Physical justification: We don't expect to find caves/tunnels at the very
+    bottom of our scanning domain. This prevents downward hallucination of voids
+    without constraining the shallow/medium depth where structures actually exist.
+    """
+    _, _, c_pred = model(coords)
+    return F.mse_loss(c_pred, torch.full_like(c_pred, c_background)) / (c_background ** 2)
+
+
+def sample_deep_points(
+    batch_size: int,
+    device: torch.device,
+    z_min: float = 0.8,
+) -> torch.Tensor:
+    """
+    Sample points in the deep portion of the domain (z > z_min) for deep boundary loss.
+    Returns (batch_size, 3) tensor with x ∈ [-1,1], y ∈ [-1,1], z ∈ [z_min, 1.0]
+    """
+    x = 2 * torch.rand(batch_size, 1, device=device) - 1
+    y = 2 * torch.rand(batch_size, 1, device=device) - 1
+    z = z_min + (1.0 - z_min) * torch.rand(batch_size, 1, device=device)
+    return torch.cat([x, y, z], dim=-1)
 
 
 def tv_regularization(
@@ -777,11 +816,28 @@ def train_vibro_pinn(
     param_count = sum(p.numel() for p in model.parameters())
     logger.info(f"PINN parameters: {param_count:,}")
 
-    # torch.compile DISABLED: CUDA Graphs (reduce-overhead mode) is incompatible
-    # with torch.autograd.grad calls used in Helmholtz PDE physics loss.
-    # The dynamic computation graph changes each iteration, which CUDA Graphs
-    # cannot handle — it causes "tensor output of CUDAGraphs overwritten" errors.
-    logger.info("torch.compile disabled (incompatible with autograd.grad in physics loss)")
+    # === ENABLE TF32 TENSOR CORES (H100/A100/4090) ===
+    # TF32 uses 19-bit floats (10-bit mantissa) for matmul — nearly float32 precision
+    # but utilizes tensor cores for ~2-3x speedup. This is FREE performance.
+    if device.type == 'cuda':
+        torch.set_float32_matmul_precision('high')
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        logger.info("TF32 tensor cores ENABLED (high precision matmul)")
+
+    # torch.compile in DEFAULT mode works UNLESS float64 physics is enabled.
+    # When float64 physics is on, we cast inputs to double mid-forward-pass,
+    # which breaks TorchInductor's compiled graph (double != float matmul error).
+    use_float64_physics = cfg.get("use_float64_physics", True)
+    if hasattr(torch, 'compile') and device.type == 'cuda' and not use_float64_physics:
+        try:
+            model = torch.compile(model, mode='default')
+            logger.info("torch.compile enabled (default mode — compatible with autograd.grad)")
+        except Exception as e:
+            logger.warning(f"torch.compile failed, continuing without: {e}")
+    else:
+        reason = "float64 physics enabled (incompatible)" if use_float64_physics else "not available"
+        logger.info(f"torch.compile disabled ({reason})")
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["lr"])
@@ -793,13 +849,36 @@ def train_vibro_pinn(
     nan_recoveries = 0
     max_nan_recoveries = cfg.get("max_nan_recoveries", 20)
     grad_clip_norm = cfg.get("grad_clip_norm", 0.1)
-    use_float64_physics = cfg.get("use_float64_physics", True)
+    # use_float64_physics already set above — don't re-read
     physics_warmup_epochs = cfg.get("physics_warmup_epochs", 500)
     target_physics_weight = cfg["physics_weight"]
 
     # GPU-accelerated surface sampler (eliminates CPU bottleneck)
     surface_sampler = SurfaceSamplerGPU(vib_normalized, device)
     logger.info("GPU surface sampler initialized (pre-computed CDF + coordinate LUTs)")
+
+    # === AUTO-SCALE BATCH SIZES based on available VRAM ===
+    # The 4090 was using 0.1/23.5GB — massively underutilized.
+    # Scale batch sizes up to fill ~50% of free VRAM for throughput.
+    if device.type == 'cuda':
+        gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        model_mem_gb = sum(p.numel() * p.element_size() for p in model.parameters()) / (1024**3)
+        free_mem_gb = gpu_mem_gb - model_mem_gb - 1.0  # Leave 1GB headroom
+        # Memory per unit depends on precision mode:
+        # float64 physics: ~8KB per colloc point (autograd graph in double)
+        # float32 + TF32:  ~3KB per colloc point (compile fuses kernels)
+        gb_per_unit = 8.0 if use_float64_physics else 3.0
+        max_scale = 8 if use_float64_physics else 16  # float32 can scale higher
+        scale_factor = max(1, min(max_scale, int(free_mem_gb / gb_per_unit)))
+        base_colloc = cfg["batch_size_collocation"]
+        base_boundary = cfg["batch_size_boundary"]
+        cfg["batch_size_collocation"] = base_colloc * scale_factor
+        cfg["batch_size_boundary"] = base_boundary * scale_factor
+        if scale_factor > 1:
+            logger.info(f"AUTO-SCALED batch sizes {scale_factor}x: "
+                        f"colloc {base_colloc}→{cfg['batch_size_collocation']}, "
+                        f"boundary {base_boundary}→{cfg['batch_size_boundary']} "
+                        f"(free VRAM: {free_mem_gb:.1f}GB)")
 
     # Gradient accumulation config
     accum_steps = cfg.get("gradient_accumulation_steps", 1)
@@ -824,7 +903,7 @@ def train_vibro_pinn(
     sys.stdout.flush()
 
     training_start = time.time()
-    loss_history = {"total": [], "physics": [], "data": [], "reg": [], "sparse": []}
+    loss_history = {"total": [], "physics": [], "data": [], "reg": [], "sparse": [], "deep": []}
     best_loss = float('inf')
 
     model.train()
@@ -836,9 +915,6 @@ def train_vibro_pinn(
 
         device_type = 'cuda' if device.type == 'cuda' else 'cpu'
 
-        # Verbose logging for first 3 epochs to diagnose hangs
-        verbose = (epoch < 3)
-
         # Gradient accumulation: run multiple micro-batches per optimizer step
         epoch_loss_physics = 0.0
         epoch_loss_data = 0.0
@@ -847,9 +923,7 @@ def train_vibro_pinn(
         epoch_loss_total = 0.0
 
         for accum_step in range(accum_steps):
-            if verbose:
-                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: sampling collocation...")
-                sys.stdout.flush()
+
 
             # === Physics warmup: ramp physics_weight from 0→target over warmup epochs ===
             if physics_warmup_epochs > 0 and epoch < physics_warmup_epochs:
@@ -868,11 +942,6 @@ def train_vibro_pinn(
                 y_coll = y_coll.double()
                 z_coll = z_coll.double()
 
-            if verbose:
-                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: computing physics loss (float64={use_float64_physics})...")
-                if device.type == 'cuda':
-                    logger.info(f"    VRAM before physics: {torch.cuda.memory_allocated(0)/(1024**2):.0f} MB")
-                sys.stdout.flush()
 
             loss_physics = helmholtz_physics_loss(
                 model, x_coll, y_coll, z_coll, omega,
@@ -881,27 +950,13 @@ def train_vibro_pinn(
                 c_background=cfg["background_wave_speed"],
             )
 
-            if verbose:
-                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: physics loss = {loss_physics.item():.6f} (weight={current_physics_weight:.6f})")
-                if device.type == 'cuda':
-                    logger.info(f"    VRAM after physics: {torch.cuda.memory_allocated(0)/(1024**2):.0f} MB")
-                sys.stdout.flush()
-
             # === Data + regularization losses can use AMP safely ===
             with torch.amp.autocast(device_type, enabled=use_amp):
-                if verbose:
-                    logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: sampling surface points...")
-                    sys.stdout.flush()
-
                 # 2. Data loss: Surface vibration fit (GPU-accelerated sampler)
                 surface_coords, surface_values = surface_sampler.sample(
                     cfg["batch_size_boundary"]
                 )
                 loss_data = surface_data_loss(model, surface_coords, surface_values)
-
-                if verbose:
-                    logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: data loss = {loss_data.item():.6f}")
-                    sys.stdout.flush()
 
                 # 3. Global Sparsity Loss (The Rock Tax)
                 # NOTE: x_coll/y_coll/z_coll may be float64 from physics loss.
@@ -921,30 +976,22 @@ def train_vibro_pinn(
                     model, reg_coords, cfg["background_wave_speed"]
                 )
 
+                # 5. Deep boundary loss: enforce background at bottom 20% of domain
+                deep_coords = sample_deep_points(cfg["batch_size_boundary"], device)
+                loss_deep = deep_boundary_loss(
+                    model, deep_coords, cfg["background_wave_speed"]
+                )
+
             # Total loss (scaled by accumulation steps for gradient averaging)
             phys_weighted = current_physics_weight * loss_physics
             data_weighted = cfg["data_weight"] * loss_data
-            
-            # Massive penalty for hallucinating voids
-            sparse_weighted = 5.0 * loss_sparse 
+            sparse_weighted = cfg.get("sparsity_weight", 0.01) * loss_sparse
             reg_weighted = cfg["regularization_weight"] * loss_reg
+            deep_weighted = cfg.get("deep_prior_weight", 0.1) * loss_deep
             
-            loss_unscaled = phys_weighted + data_weighted + sparse_weighted + reg_weighted
+            loss_unscaled = phys_weighted + data_weighted + sparse_weighted + reg_weighted + deep_weighted
             loss = loss_unscaled / accum_steps
 
-            if verbose:
-                logger.info(
-                    f"  E{epoch} μ{accum_step+1}/{accum_steps}: "
-                    f"phys={loss_physics.item():.4f}×{cfg['physics_weight']}={phys_weighted.item():.4f}, "
-                    f"data={loss_data.item():.4f}×{cfg['data_weight']}={data_weighted.item():.4f}, "
-                    f"sparse={loss_sparse.item():.4f}×5.0={sparse_weighted.item():.4f}, "
-                    f"reg={loss_reg.item():.4f}×{cfg['regularization_weight']}={reg_weighted.item():.4f}, "
-                    f"total_unscaled={loss_unscaled.item():.4f}, "
-                    f"loss_for_backward={loss.item():.6f}"
-                )
-                if device.type == 'cuda':
-                    logger.info(f"    VRAM: {torch.cuda.memory_allocated(0)/(1024**2):.0f} MB allocated")
-                sys.stdout.flush()
 
             # Backprop (accumulate gradients)
             if use_amp:
@@ -952,19 +999,19 @@ def train_vibro_pinn(
             else:
                 loss.backward()
 
-            # Aggressively free autograd graph memory (2nd-order graph can hold ~2-4 GB)
-            # Extract scalar values BEFORE deleting tensors
+            # Extract scalar values BEFORE deleting tensors to free autograd graph
             _phys_val = loss_physics.item()
             _data_val = loss_data.item()
             _sparse_val = loss_sparse.item()
             _reg_val = loss_reg.item()
+            _deep_val = loss_deep.item()
             _loss_val = loss.item()
 
-            del loss, loss_unscaled, phys_weighted, data_weighted, sparse_weighted, reg_weighted
-            del loss_physics, loss_data, loss_sparse, loss_reg
-            del x_coll, y_coll, z_coll, surface_coords, surface_values, reg_coords
-            if device.type == 'cuda':
-                torch.cuda.empty_cache()
+            del loss, loss_unscaled, phys_weighted, data_weighted, sparse_weighted, reg_weighted, deep_weighted
+            del loss_physics, loss_data, loss_sparse, loss_reg, loss_deep
+            del x_coll, y_coll, z_coll, surface_coords, surface_values, reg_coords, deep_coords
+            # NOTE: Removed torch.cuda.empty_cache() — it syncs CPU-GPU and costs
+            # ~50-100ms per call. PyTorch's caching allocator reuses memory fine.
 
             # Track per-step losses (average across accum steps)
             epoch_loss_physics += _phys_val / accum_steps
@@ -1013,35 +1060,42 @@ def train_vibro_pinn(
             best_loss = epoch_loss_total
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
 
-        # Gradient norm logging every 20 epochs
-        if epoch % 20 == 0:
-            grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
-            if grad_norms:
-                total_grad_norm = torch.norm(torch.stack(grad_norms), 2).item()
-            else:
-                total_grad_norm = 0.0
+        # === CHECKPOINT SAVING every 500 epochs ===
+        if epoch > 0 and epoch % 500 == 0:
+            ckpt_path = Path(output_dir) / f"checkpoint_epoch_{epoch}.pth"
+            ckpt = {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_loss': best_loss,
+                'loss_history': {k: v[:] for k, v in loss_history.items()},
+                'nan_recoveries': nan_recoveries,
+            }
+            torch.save(ckpt, ckpt_path)
+            # Also overwrite a "latest" checkpoint for easy resume
+            latest_path = Path(output_dir) / "checkpoint_latest.pth"
+            torch.save(ckpt, latest_path)
+            logger.info(f"[CHECKPOINT] Saved epoch {epoch} to {ckpt_path} (best_loss={best_loss:.6f})")
+            sys.stdout.flush()
 
-        # Exact objective decomposition every 50 epochs
-        if epoch % 50 == 0:
+        # Detailed objective decomposition every 200 epochs (reduced from 50)
+        if epoch % 200 == 0:
+            grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
+            total_grad_norm = torch.norm(torch.stack(grad_norms), 2).item() if grad_norms else 0.0
             logger.info(
-                f"[E{epoch:04d}] OBJECTIVE: "
-                f"phys_raw={epoch_loss_physics:.6f} data_raw={epoch_loss_data:.6f} "
-                f"sparse_raw={epoch_loss_sparse:.6f} reg_raw={epoch_loss_reg:.6f} | "
-                f"weighted: phys={epoch_loss_physics*cfg['physics_weight']:.4f} "
-                f"data={epoch_loss_data*cfg['data_weight']:.4f} "
-                f"sparse={epoch_loss_sparse*5.0:.4f} "
-                f"reg={epoch_loss_reg*cfg['regularization_weight']:.4f} | "
+                f"[E{epoch:04d}] phys={epoch_loss_physics:.4f} "
+                f"data={epoch_loss_data:.4f} sparse={epoch_loss_sparse:.4f} "
                 f"total={epoch_loss_total:.6f} lr={optimizer.param_groups[0]['lr']:.2e} "
                 f"grad_norm={total_grad_norm:.4f}"
             )
             sys.stdout.flush()
 
-        if epoch % 10 == 0:
+        if epoch % 20 == 0:
             mem_info = ""
             if device.type == 'cuda':
                 mem_used = torch.cuda.memory_allocated(0) / (1024**3)
                 mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                mem_info = f" GPU:{mem_used:.1f}/{mem_total:.1f}GB"
+                mem_info = f"GPU:{mem_used:.1f}/{mem_total:.1f}GB"
             loop.set_postfix(
                 loss=f"{epoch_loss_total:.4f}",
                 phys=f"{epoch_loss_physics:.4f}",
@@ -1162,9 +1216,11 @@ def train_vibro_pinn(
             f.write(f"{k}: {v}\n")
     outputs["metadata"] = str(meta_path)
 
-    # Save loss history
-    loss_path = Path(output_dir) / "loss_history.npy"
-    np.save(loss_path, {k: np.array(v) for k, v in loss_history.items()})
+    # Save loss history (JSON for reliable serialization — npy scalar bug fixed)
+    loss_path = Path(output_dir) / "loss_history.json"
+    import json as _json
+    with open(loss_path, 'w') as _f:
+        _json.dump({k: [float(x) for x in v] for k, v in loss_history.items()}, _f)
     outputs["loss_history"] = str(loss_path)
 
     # Log summary

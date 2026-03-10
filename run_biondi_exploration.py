@@ -90,59 +90,72 @@ EXPLORE_DIR.mkdir(parents=True, exist_ok=True)
 #
 RESOLUTION_PROFILES = {
     "quick": {
-        "epochs": 500,                        # Quick sanity check
-        "grid_nx": 64,                        # Was 32 → 64 for basic visibility
+        "epochs": 500,
+        "grid_nx": 64,
         "grid_ny": 64,
-        "grid_nz": 32,                        # Was 16
-        "domain_width_m": 800.0,              # Focused domain (was implicitly 5000)
-        "max_depth_m": 500.0,                 # Shallow scan (was implicitly 5000)
-        "deep_prior_weight": 0.01,            # Was 0.1 — caused trivial collapse
-        "data_weight": 50.0,                  # Was 10.0
-        "excitation_frequency_hz": 2.0,       # Medium-depth penetration
+        "grid_nz": 32,
+        "domain_width_m": 800.0,
+        "max_depth_m": 500.0,
+        # REBALANCED WEIGHTS (2026-03-10 expert fix for trivial collapse)
+        "physics_weight": 1.0,
+        "data_weight": 20.0,
+        "sparsity_weight": 0.01,
+        "regularization_weight": 0.1,
+        "deep_prior_weight": 0.1,
+        "excitation_frequency_hz": 2.0,
         "synthetic_grid_size": 256,
         "num_sub_apertures": 3,
         "batch_size_collocation": 4096,
         "batch_size_boundary": 1024,
         "gradient_accumulation_steps": 1,
-        "hidden_layers": 6,                   # Was 4
-        "hidden_neurons": 256,                # Was 128
+        "hidden_layers": 6,
+        "hidden_neurons": 256,
     },
     "standard": {
-        "epochs": 3000,                       # Was 2000 — PINNs need more iterations
-        "grid_nx": 128,                       # Was 64 → 128 for ~6m resolution
+        "epochs": 3000,
+        "grid_nx": 128,
         "grid_ny": 128,
-        "grid_nz": 64,                        # Was 32
-        "domain_width_m": 800.0,              # Focused domain
-        "max_depth_m": 1000.0,                # Was 5000m (too deep for 500m targets)
-        "deep_prior_weight": 0.005,           # Was 0.05 — caused trivial collapse
-        "data_weight": 50.0,                  # Was 10.0
-        "excitation_frequency_hz": 1.0,       # Deep microseismic peak
+        "grid_nz": 64,
+        "domain_width_m": 800.0,
+        "max_depth_m": 1000.0,
+        # REBALANCED WEIGHTS (2026-03-10 expert fix for trivial collapse)
+        "physics_weight": 1.0,                # Was implicit 0.0001 — now primary driver
+        "data_weight": 20.0,                  # Was 50.0 — lowered (Sentinel-1 is noisy)
+        "sparsity_weight": 0.01,              # Was hardcoded 5.0 — caused collapse
+        "regularization_weight": 0.1,         # Was 0.01 — promotes sharp boundaries
+        "deep_prior_weight": 0.1,             # Was 0.005 — keeps deep earth solid
+        "excitation_frequency_hz": 1.0,
         "synthetic_grid_size": 512,
         "num_sub_apertures": 5,
-        "batch_size_collocation": 4096,       # Fits easily in 24GB 4090 VRAM
-        "batch_size_boundary": 1024,          # 1024 surface points
-        "gradient_accumulation_steps": 1,     # No accumulation needed on 4090
-        "hidden_layers": 8,                   # Full model depth
-        "hidden_neurons": 512,                # Full model width
+        "batch_size_collocation": 4096,
+        "batch_size_boundary": 1024,
+        "gradient_accumulation_steps": 1,
+        "hidden_layers": 8,
+        "hidden_neurons": 512,
     },
     "high": {
-        "epochs": 5000,                       # Full convergence
-        "grid_nx": 128,                       # Fine spatial resolution
+        "epochs": 5000,
+        "grid_nx": 128,
         "grid_ny": 128,
-        "grid_nz": 64,                        # Fine depth resolution
-        "domain_width_m": 800.0,              # Focused domain
-        "max_depth_m": 1000.0,                # Max depth for detailed scans
-        "deep_prior_weight": 0.001,           # Was 0.02 — minimal deep regularization
-        "data_weight": 50.0,                  # Was 10.0
+        "grid_nz": 64,
+        "domain_width_m": 800.0,
+        "max_depth_m": 1000.0,
+        # REBALANCED WEIGHTS (2026-03-10 expert fix for trivial collapse)
+        "physics_weight": 1.0,                # Was implicit 0.0001 — now primary driver
+        "data_weight": 20.0,                  # Was 50.0 — lowered (Sentinel-1 is noisy)
+        "sparsity_weight": 0.01,              # Was hardcoded 5.0 — caused collapse
+        "regularization_weight": 0.1,         # Was 0.01 — promotes sharp boundaries
+        "deep_prior_weight": 0.1,             # Was 0.001 — keeps deep earth solid
         "excitation_frequency_hz": 0.5,       # Deepest penetration
         "synthetic_grid_size": 512,
-        "num_sub_apertures": 7,               # More frequency sampling
-        # NOTE: float64 physics doubles model VRAM. These sizes fit on 24GB 4090.
-        "batch_size_collocation": 4096,       # Was 8192 — halved for float64 physics
-        "batch_size_boundary": 1024,          # Was 2048 — halved for float64 physics
-        "gradient_accumulation_steps": 2,     # 2 accum steps = effective 8192 batch
-        "hidden_layers": 8,                   # Was 10 — matches standard (stable)
-        "hidden_neurons": 512,                # Was 768 — halved VRAM usage in float64
+        "num_sub_apertures": 7,
+        # H100 OPTIMIZATION:
+        "use_float64_physics": False,         # TF32 is sufficient, enables torch.compile
+        "batch_size_collocation": 8192,       # float32 = half VRAM
+        "batch_size_boundary": 2048,
+        "gradient_accumulation_steps": 1,
+        "hidden_layers": 8,
+        "hidden_neurons": 768,                # float32 frees VRAM for bigger model
     },
 }
 
@@ -561,19 +574,25 @@ def execute_biondi_pipeline_for_target(
         "grid_nz": profile["grid_nz"],
         "domain_width_m": adaptive_domain_width,
         "max_depth_m": adaptive_max_depth,
-        "deep_prior_weight": profile["deep_prior_weight"],
-        "data_weight": profile.get("data_weight", 50.0),
+        # Loss weights (all configurable now — no more hardcoded sparsity)
+        "physics_weight": profile.get("physics_weight", 1.0),
+        "data_weight": profile.get("data_weight", 20.0),
+        "sparsity_weight": profile.get("sparsity_weight", 0.01),
+        "regularization_weight": profile.get("regularization_weight", 0.1),
+        "deep_prior_weight": profile.get("deep_prior_weight", 0.1),
         "excitation_frequency_hz": adaptive_freq_hz,
         "batch_size_collocation": profile.get("batch_size_collocation", 4096),
         "batch_size_boundary": profile.get("batch_size_boundary", 1024),
         "gradient_accumulation_steps": profile.get("gradient_accumulation_steps", 1),
         "hidden_layers": profile.get("hidden_layers", 8),
         "hidden_neurons": profile.get("hidden_neurons", 512),
+        "use_float64_physics": profile.get("use_float64_physics", True),
     }
 
     logger.info(f"  PINN config: domain={adaptive_domain_width:.0f}m, depth={adaptive_max_depth:.0f}m, "
                 f"freq={adaptive_freq_hz:.1f}Hz, grid={profile['grid_nx']}x{profile['grid_ny']}x{profile['grid_nz']}, "
-                f"deep_prior={profile['deep_prior_weight']}, data_weight={profile.get('data_weight', 50.0)}")
+                f"physics_w={pinn_config['physics_weight']}, data_w={pinn_config['data_weight']}, "
+                f"sparsity_w={pinn_config['sparsity_weight']}, deep_w={pinn_config['deep_prior_weight']}")
 
     pinn_results = pinn_vibro_inversion.train_vibro_pinn(
         vibration_map=vib_map,
@@ -608,6 +627,9 @@ def execute_biondi_pipeline_for_target(
         config={
             "void_threshold": 0.5,
             "min_anomaly_voxels": 3,
+            # FIX: Pass actual PINN domain so visualizer renders at correct scale
+            "domain_width_m": adaptive_domain_width,
+            "max_depth_m": adaptive_max_depth,
         },
         interactive=False
     )
@@ -755,8 +777,8 @@ if __name__ == "__main__":
 
     while current_phase <= 3:
         targets = phase_map[current_phase]
-        if current_phase == 1:
-            targets = [t for t in targets if "Giza" in t["name"]]
+        # Phase 1: Run ALL targets — validation sites (Carlsbad, Mammoth)
+        # FIRST to prove the pipeline works on known voids, THEN Egypt.
         logger.info(f"\n{'#'*70}")
         logger.info(f"# STARTING EXPLORATION PHASE {current_phase}")
         logger.info(f"# Targets: {len(targets)}")
