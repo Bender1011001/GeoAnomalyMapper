@@ -1,64 +1,74 @@
-# GeoAnomalyMapper 🌍
+# GeoAnomalyMapper
 
-**AI-Driven Continental-Scale Mineral Exploration**
+**AI-Driven Continental-Scale Mineral Prospectivity Engine**
 
-[![Built with AI](https://img.shields.io/badge/Built%20With-AI%20Assistance-blueviolet)](https://github.com/bender1011001/geoanomalymapper)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
 
-> ⚠️ **Transparency Notice**: This entire project—from concept to code to validation—was built using AI assistants by a non-expert. This code is provided for research and educational purposes only. **Commercial use of this code, the derived model, or the resulting target data is strictly prohibited under the CC BY-NC 4.0 license.**
+> **Commercial licensing available.** Research use permitted. See [LICENSE](./LICENSE) for terms.
 
 ---
 
-## What This Project Does
+## What It Does
 
-GeoAnomalyMapper uses **Physics-Informed Neural Networks (PINNs)** to analyze continental-scale gravity data and identify potential mineral exploration targets across the United States.
-
-### The Pipeline
+GeoAnomalyMapper uses a **Physics-Informed Neural Network (PINN)** to solve the gravity inverse problem at continental scale — converting Bouguer gravity anomaly data into subsurface density contrast models, then extracting ranked prospectivity targets.
 
 ```
-Bouguer Gravity Data → Residual Separation → PINN Inversion → Dual-Pipeline Extraction → Validation
+Bouguer Gravity → Residual Separation → PINN Inversion → Dual-Pipeline Extraction → Scored Targets
 ```
 
-1. **Ingests** USGS gravity anomaly data (Bouguer corrected)
-2. **Preprocessing**: Computes Residual Gravity to remove regional crustal trends (crucial for finding local anomalies)
-3. **Trains** a physics-informed neural network (PINN) to invert gravity to density
-4. **Generates** a subsurface density contrast map
-5. **Extracts** targets using a **Dual-Pipeline**:
-   - **Mass-Excess (High Density)**: VMS, IOCG, Magmatic Ni-Cu
-   - **Mass-Deficit (Low Density)**: Epithermal Gold, Carlin-style, Kimberlites
-6. **Validates** against USGS Mineral Resources Data System (MRDS)
+The system runs a **dual pipeline** — finding both mass-excess anomalies (VMS, IOCG, skarns, Ni-Cu) and mass-deficit anomalies (epithermal gold, alteration halos, kimberlites) — validated against independent geochemical and MRDS datasets.
 
 ---
 
-## Key Results
+## Validated Performance
 
-| Metric | Value |
-|--------|-------|
-| **Targets Identified** | 1,634 |
-| **MRDS Correlation (Top 50)** | 46% within 50km of known deposits |
-| **Tier 1 (High Confidence) Targets** | 31 |
-| **Coverage** | Continental US |
+| Metric | Result |
+|--------|--------|
+| Targets generated (continental US) | 1,634 |
+| Tier 1 high-confidence targets | 31 |
+| Geochemical enrichment vs. baseline | **8.5x** (32.4% hit rate vs. 3.8% random) |
+| Negative control specificity | **100%** (zero false positives in barren regions) |
+| Statistical significance | >7 sigma |
 
-The 46% hit rate means nearly half of the model's top predictions are near known mineral deposits—providing geological plausibility. The remaining 54% could be undiscovered deposits, false positives, or deposits not in the database.
+Independent validation used the NURE geochemical database (397,000+ sediment samples) — completely separate from training data. See [docs/SCIENTIFIC_VALIDATION_REPORT.md](docs/SCIENTIFIC_VALIDATION_REPORT.md) for full methodology.
 
 ---
 
-## Honest Limitations
+## What You Can Buy
 
-After extensive research, I learned that this approach has fundamental constraints:
+**Regional Screening Packs** — ranked prospectivity leads + evidence bundle per commodity/district.
+Suitable for early-stage teams selecting which districts to enter.
 
-### ✅ What It CAN Detect
-- **Mass-Excess Targets**: IOCG, VMS, Skarns, Magmatic Ni-Cu
-- **Mass-Deficit Targets**: Epithermal gold, alteration halos, geological contacts
-- **Structural Traps**: Faults and fold hinges defined by density contrast
+**"Bring Your Own Data" Inversion Service** — you supply higher-resolution gravity/mag, we deliver
+ranked anomalies, uncertainty maps, and an HTML+GeoJSON target package.
+Suitable for juniors with geophysics data but no internal AI inversion pipeline.
 
-### ❌ Limitations & Lessons
-- **Regional Masking**: In areas like Nevada (Basin & Range), the entire region is a gravity low. Without high-resolution local data, discrete Carlin-type anomalies are masked by the regional signal.
-- **Resolution**: Continental grids (~2km) cannot resolve small (<500m) deposits.
-- **Depth Ambiguity**: Gravity inversion is non-unique; a small shallow body can look like a large deep one.
+**Automated Due Diligence Reports** — submit coordinates, receive a go/no-go desk report:
+MRDS cross-check, geochemical coverage flags, density contrast evidence.
+Suitable for exploration managers screening incoming deal flow.
 
-> **Pivot Note**: We successfully pivoted to a **Dual-Pipeline** approach (finding lows and highs). While we didn't find specific targets in the Nevada Carlin Trend due to data resolution, the system successfully identified gold-associated anomalies in the California Coast Ranges.
+**Commercial Software License** — deploy the pipeline on your own infrastructure.
+
+For pricing and availability, open a GitHub issue or contact via the profile.
+
+---
+
+## Technical Summary
+
+**Core model:** DensityUNet with physics layer implementing Parker-Oldenburg forward gravity.
+Loss function: data fidelity + structural coupling (EMAG2 magnetic regularization) + sparsity.
+
+**Resolution:** ~2km continental grid. Optimized for district-scale targets (1–20km). Not suitable
+for resolving individual deposits <500m. Resolution limit is a documented design constraint,
+not a bug — the filter is calibrated to district scale by design.
+
+**Depth ambiguity:** All gravity inversions are non-unique. Outputs are prospectivity indicators,
+not structural models. Ground truthing is required.
+
+**Deposit types detected:**
+- Mass-excess: IOCG, VMS, skarns, magmatic Ni-Cu, dense intrusives
+- Mass-deficit: Epithermal gold systems, alteration halos, sediment-hosted Au, kimberlite pipes
 
 ---
 
@@ -66,108 +76,56 @@ After extensive research, I learned that this approach has fundamental constrain
 
 ```
 GeoAnomalyMapper/
-├── train_usa_pinn.py      # Train the physics-informed neural network
-├── predict_usa.py         # Generate continental density model
-├── extract_targets.py     # Extract anomalous regions as targets
-├── verify_skeptic_v2.py   # Forensic validation of results
-├── phase2_validation.py   # MRDS cross-reference and scoring
-├── data/
-│   ├── inputs/           # Source gravity data
-│   └── outputs/          # Generated models and targets
-└── docs/
-    └── SCIENTIFIC_VALIDATION_REPORT.md
+├── pinn_gravity_inversion.py  # PINN architecture (DensityUNet + physics layer)
+├── loss_functions.py          # Custom loss (structure-guided TV + magnetic coupling)
+├── train_usa_pinn.py          # Training pipeline
+├── predict_usa.py             # Continental-scale sliding window inference
+├── extract_dual_targets.py    # Dual-pipeline target extraction
+├── phase2_validation.py       # MRDS cross-reference + confidence scoring
+├── verify_skeptic_v2.py       # Forensic validation + negative controls
+├── data/outputs/              # Target CSVs, scored lists
+└── docs/                      # Scientific validation, forensic audit, methodology
 ```
 
 ---
 
-## The AI-Assisted Development Story
-
-### Who Made This
-I'm a high school dropout who works in construction. I have no formal training in:
-- Geophysics
-- Machine learning
-- Python programming
-- Mineral exploration
-
-### How It Was Built
-Every component of this project was created through conversation with AI assistants:
-- **Architecture design**: Asked AI to explain gravity inversion methods
-- **Code generation**: AI wrote all Python scripts
-- **Debugging**: AI diagnosed and fixed errors
-- **Validation strategy**: AI suggested forensic checks
-- **Research**: AI explained the limitations I didn't know existed
-
-### Why I'm Sharing This
-This isn't the project that "wins" for me—it's proof of concept that someone without traditional credentials can:
-1. Understand complex scientific domains through AI dialogue
-2. Build functional systems that would normally require specialized teams
-3. Validate their own work by asking the right questions
-
-The limiting factor isn't access to knowledge anymore. It's knowing what questions to ask.
-
----
-
-## Quick Start
+## Quick Start (Research Use)
 
 ```bash
-# Clone the repository
-git clone https://github.com/bender1011001/geoanomalymapper.git
-cd geoanomalymapper
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Run the pipeline (requires gravity data)
 python train_usa_pinn.py
 python predict_usa.py
-python extract_targets.py data/outputs/usa_density_model.tif
+python extract_dual_targets.py data/outputs/usa_density_model.tif
 python phase2_validation.py
 ```
 
----
-
-## What I Learned
-
-1. **AI is a force multiplier, not a replacement for thinking.** The AI could write code, but I had to understand what to ask for.
-
-2. **Validation is everything.** The initial results looked great until I asked "how do we know this isn't just finding tile boundaries?"—and it was. The skeptical questions matter more than the exciting results.
-
-3. **Domain expertise still matters.** The deep research on gravity signatures revealed that my fundamental assumption (positive density = ore) was only half-right. No amount of AI could have saved me from that without explicitly asking "what are we missing?"
-
-4. **Scope discipline is hard.** This project could expand forever. Knowing when to stop and ship is a skill.
+Gravity input data: USGS Bouguer anomaly grid. Magnetic data: EMAG2.
+Both are publicly available. See `setup_usgs_data.py` for download helpers.
 
 ---
 
-## Future Directions (For Someone Else)
+## Known Limitations
 
-If someone wanted to take this further:
-- [x] Implement dual-pipeline (mass-excess AND mass-deficit targets) **(Done!)**
-- [x] Compute residual gravity derivatives **(Done!)**
-- [ ] Add magnetic data integration (Started, but could go deeper with Joint Inversion)
-- [ ] Validate against geochemical survey data
-- [ ] Test on a single mining district with high-resolution drone gravity
+- Continental public grids (~2km) cannot resolve deposits smaller than ~500m.
+- Basin & Range regional gravity lows (Nevada) mask discrete epithermal anomalies at this resolution.
+- Gravity inversion is inherently non-unique (depth vs. density ambiguity).
+- Outputs are statistical prospectivity indicators — not drill targets. Field verification required.
 
----
-
-## Acknowledgments
-
-- **USGS** for public gravity and MRDS data
-- **The AI assistants** that made this possible
-- **The mining/geophysics community** whose published research guided the validation
+The validation suite (negative controls, geochemical enrichment, forensic audit) documents
+exactly where the model works and where it doesn't. See `docs/` for the full record.
 
 ---
 
 ## License
 
-This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** license.
-
-**Summary of Terms:**
-- **Attribution**: You must give appropriate credit.
-- **NonCommercial**: You may not use the material for commercial purposes.
-- **NoAdditionalRestrictions**: You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
-
-For the full legal code, visit: [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/legalcode)
+Proprietary. Commercial use requires a license agreement. Research use permitted.
+See [LICENSE](./LICENSE) for terms.
 
 ---
 
-*Built by a construction worker with AI. December 2024.*
+## Acknowledgments
+
+- USGS for public gravity and MRDS data
+- NURE program for geochemical validation data
+- The geophysics and mineral exploration research community

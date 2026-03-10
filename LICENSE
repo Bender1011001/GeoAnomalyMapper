@@ -1,17 +1,54 @@
-Creative Commons Attribution-NonCommercial 4.0 International Public License
+PROPRIETARY SOFTWARE LICENSE
 
-By exercising the Licensed Rights (defined below), You accept and agree to be bound by the terms and conditions of this Creative Commons Attribution-NonCommercial 4.0 International Public License ("Public License"). To the extent this Public License may be interpreted as a contract, You are granted the Licensed Rights in consideration of Your acceptance of these terms and conditions, and the Licensor grants You such rights in consideration of benefits the Licensor receives from making the Licensed Material available under these terms and conditions.
+Copyright (c) 2024-2026. All Rights Reserved.
 
-Section 1 -- Definitions.
+GeoAnomalyMapper — AI-Driven Mineral Exploration System
 
-[Full License Text Omitted for brevity, using standard CC BY-NC 4.0 preamble]
+TERMS AND CONDITIONS
 
-Copyright (c) 2025 The GeoAnomalyMapper Team
+1. OWNERSHIP
+   This software, its source code, trained model weights, methodology, output data,
+   and all associated documentation are the exclusive intellectual property of the
+   copyright holder.
 
-This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
-To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
+2. PERMITTED USES (Research / Review)
+   The research codebase is made available for:
+   - Academic research and peer review
+   - Personal, non-commercial experimentation
+   - Educational study of physics-informed neural networks
 
-TERMS SUMMARY:
-- Attribution: You must give appropriate credit, provide a link to the license, and indicate if changes were made.
-- NonCommercial: You may not use the material for commercial purposes.
-- NoAdditionalRestrictions: You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+3. PROHIBITED USES (without a Commercial License)
+   Without a separately executed Commercial License Agreement, you may NOT:
+   - Use this software, its outputs, or derivatives to generate revenue
+   - Sell, sublicense, or distribute output data (target lists, heatmaps, reports)
+   - Use this system in a commercial due diligence, exploration, or advisory capacity
+   - Deploy this software as a service (SaaS, API, or otherwise)
+   - Use model outputs to support or advise on investment or exploration decisions
+
+4. COMMERCIAL LICENSING
+   Commercial use requires a written license agreement. Options include:
+   - Per-project inversion service engagements
+   - Regional screening data pack licenses
+   - Enterprise / SaaS software licenses
+
+   For licensing inquiries, contact the copyright holder via GitHub.
+
+5. NO WARRANTY
+   THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. THE COPYRIGHT
+   HOLDER MAKES NO WARRANTIES REGARDING ACCURACY, COMPLETENESS, OR FITNESS FOR
+   ANY PARTICULAR PURPOSE.
+
+6. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT,
+   INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS
+   SOFTWARE OR ITS OUTPUTS, INCLUDING LOSSES FROM EXPLORATION DECISIONS.
+
+7. OUTPUTS ARE NOT DRILL TARGETS
+   Model outputs represent statistical prospectivity indicators derived from
+   continental-scale public gravity data (~2km resolution). They are NOT drill
+   targets, guarantees of mineralization, or investment recommendations.
+   Independent geological verification is required before any field expenditure.
+
+8. GOVERNING LAW
+   This license shall be governed by applicable law in the copyright holder's
+   jurisdiction.

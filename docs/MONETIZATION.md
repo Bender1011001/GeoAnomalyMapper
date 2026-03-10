@@ -1,6 +1,20 @@
 # Monetization Strategy for GeoAnomalyMapper
 
-You have a "Money Button" in `run_verification.py`. Here is how you turn `FINAL_high_confidence_targets.csv` into cash.
+## First, a hard constraint (License)
+This repository is currently licensed **CC BY-NC 4.0**, and the `README.md` explicitly states that commercial use of the code/model/output target data is prohibited.
+
+If you want to sell anything derived from this repo, you must first do one of:
+1. Re-license (and update `README.md` and `LICENSE`) to a commercial-friendly license you control.
+2. Build a separate commercial implementation (clean-room / new repo) and keep this repo as non-commercial research.
+
+Until then, treat all “monetization” below as product planning only.
+
+## The real product (given public-data resolution limits)
+Public continental datasets are generally too coarse to market as “drill targets”.
+What you *can* sell is **regional screening**, **ranking**, and **workflow acceleration**:
+- “Where should we spend field time next?”
+- “Which polygons/claims should we avoid or prioritize?”
+- “If we add higher-resolution proprietary data, can we localize this into actionable targets?”
 
 ## 1. The "Claim Flipper" (High Effort, High Reward)
 **Concept**: Physically stake the land and sell the claims to junior mining companies.
@@ -12,12 +26,12 @@ You have a "Money Button" in `run_verification.py`. Here is how you turn `FINAL_
 4.  **Sell**: Contact junior explorers in that commodity (e.g., "Nevada Gold Juniors") and offer the claim package for $20k + 2% NSR (Net Smelter Return royalty).
 
 ## 2. The "Data Baron" (Low Effort, Medium Reward)
-**Concept**: Sell the raw data to exploration groups who don't have their own AI teams.
+**Concept**: Sell a *screening pack* (ranked leads + evidence) to exploration groups who don't have their own geophysics/AI pipeline.
 **Revenue Potential**: $500 - $5k per dataset sale.
 
 1.  **Package**: Zip up your `FINAL_*_targets.csv` files with a nice PDF report explaining your methodology (the "AI Advantage").
 2.  **Market**: List on platforms like **DigGeoData** or cold-email exploration managers.
-3.  **Pitch**: "I verified 4,000 AI-generated targets. Here are the top 250 unclaimed ones. Save your geologists 6 months of work for $2,000."
+3.  **Pitch**: "This is a regional screening filter, not drill targets. Here are the top leads + why they’re ranked. Save 1-2 quarters of desk work for $2,000."
 
 ## 3. The "Prospect Generator" (Long Game, Massive Reward)
 **Concept**: You stake it, they mine it. You keep a piece of the action.
@@ -32,13 +46,13 @@ You have a "Money Button" in `run_verification.py`. Here is how you turn `FINAL_
 **Concept**: Turn this script into a website.
 **Revenue Potential**: $50 - $200/month per user.
 
-1.  **Build**: Wrap `verify_visual.py` in a React frontend.
-2.  **Service**: Allow geologists to upload their own CSV of lat/lons.
-3.  **Value**: "Instant automated due diligence." Check land status, claims, and geology in 10 seconds.
+1.  **Build**: Make “pin-first” mapping the core UX: upload points, drop pins, tag, rank, export.
+2.  **Service**: Let users upload their own gravity/mag/geochem rasters (or buy higher-res data and bring it).
+3.  **Value**: Automated due diligence, reproducible scoring, and fast iteration on targets.
 
 ## Immediate Action Plan
 1.  **Open `FINAL_high_confidence_targets.csv`**.
 2.  **Sort by `probability`**.
 3.  **Look at the top 5**. Where are they? (e.g., Near known gold belts in Nevada?).
 4.  **Google Earth Flyover**: Do they look accessible?
-5.  **Go stake the best one.**
+5.  **Decide your SKU**: claim staking, screening packs, or “bring your own data” inversion service.
