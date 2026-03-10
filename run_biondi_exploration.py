@@ -150,6 +150,28 @@ RESOLUTION_PROFILES = {
 # TARGET REGIONS
 # ============================================================
 PHASE_1_TARGETS = [
+    # === VALIDATION TARGETS FIRST ===
+    # These have well-documented underground voids — if we detect them,
+    # the pipeline is working. If we don't, something is still broken.
+    {
+        "name": "Carlsbad Caverns (NM)",
+        "lat": 32.1742,
+        "lon": -104.4459,
+        "buffer_deg": 0.05,
+        "description": "VALIDATION: Big Room is 1200x190m at 230m depth. Largest natural chamber in North America.",
+        "expected_depth_m": 230,
+        "expected_void_type": "natural_cave",
+    },
+    {
+        "name": "Mammoth Cave (KY)",
+        "lat": 37.1870,
+        "lon": -86.1005,
+        "buffer_deg": 0.05,
+        "description": "VALIDATION: World's longest cave system (680km mapped). Passages 30-100m deep in Mississippian limestone.",
+        "expected_depth_m": 100,
+        "expected_void_type": "natural_cave",
+    },
+    # === SPECULATIVE TARGETS ===
     {
         "name": "Great Pyramid of Giza (Khufu)",
         "lat": 29.9792,
@@ -169,33 +191,6 @@ PHASE_1_TARGETS = [
         "expected_void_type": "artificial_cavity",
     },
     {
-        "name": "Carlsbad Caverns (NM)",
-        "lat": 32.1742,
-        "lon": -104.4459,
-        "buffer_deg": 0.05,
-        "description": "Massive natural limestone cave system. Ideal for validating void detection deep underground.",
-        "expected_depth_m": 300,
-        "expected_void_type": "natural_cave",
-    },
-    {
-        "name": "Bingham Canyon Mine (UT)",
-        "lat": 40.5225,
-        "lon": -112.1522,
-        "buffer_deg": 0.05,
-        "description": "Deepest open-pit mine in the world with extensive underground workings.",
-        "expected_depth_m": 1200,
-        "expected_void_type": "mine_workings",
-    },
-    {
-        "name": "San Andreas Fault Observatory at Depth - SAFOD (CA)",
-        "lat": 35.9750,
-        "lon": -120.5520,
-        "buffer_deg": 0.05,
-        "description": "Instrumented borehole intersecting the fault. Good for testing varying density fields.",
-        "expected_depth_m": 3000,
-        "expected_void_type": "fault_zone",
-    },
-    {
         "name": "Menkaure Pyramid (Giza)",
         "lat": 29.9725,
         "lon": 31.1283,
@@ -203,24 +198,6 @@ PHASE_1_TARGETS = [
         "description": "2025 air-filled voids + Biondi subsurface extensions.",
         "expected_depth_m": 100,
         "expected_void_type": "natural_cave",
-    },
-    {
-        "name": "Great Sphinx (Giza)",
-        "lat": 29.9710,
-        "lon": 31.1378,
-        "buffer_deg": 0.1,
-        "description": "Biondi mentions possible chambers beneath.",
-        "expected_depth_m": 300,
-        "expected_void_type": "artificial_cavity",
-    },
-    {
-        "name": "Synthetic Biondi Chambers (Giza-style)",
-        "lat": 29.9792,
-        "lon": 31.1342,
-        "buffer_deg": 0.15,
-        "description": "TEST: 80m chambers + spiral columns exactly as described on JRE",
-        "expected_depth_m": 800,
-        "expected_void_type": "artificial_cavity",
     },
 ]
 

@@ -237,12 +237,35 @@ class VibroInversionPINN(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        """Xavier uniform initialization for stable training."""
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
+        """Proper SIREN initialization to prevent exponential gradient explosion.
+        
+        Xavier uniform is WRONG for Sine activations. With 8 layers of sin(),
+        xavier causes outputs to grow exponentially: layer N output ~ O(N!).
+        This starts the physics loss at ~20,000,000 and immediately explodes to NaN.
+        
+        SIREN paper (Sitzmann et al. 2020) specifies:
+          - First layer: weights ~ U(-1/fan_in, 1/fan_in)
+          - Hidden layers: weights ~ U(-sqrt(6/fan_in)/w0, sqrt(6/fan_in)/w0)
+        This keeps sin() outputs in [-1, 1] across all layers.
+        """
+        import math
+        with torch.no_grad():
+            is_first_linear = True
+            for m in self.modules():
+                if isinstance(m, nn.Linear):
+                    fan_in = m.weight.size(1)
+                    if is_first_linear:
+                        # First layer: uniform(-1/fan_in, 1/fan_in)
+                        bound = 1.0 / fan_in
+                        is_first_linear = False
+                    else:
+                        # Hidden layers: uniform(-sqrt(6/fan_in)/w0, sqrt(6/fan_in)/w0)
+                        # w0 = 1.0 (our Sine activation has no frequency scaling)
+                        bound = math.sqrt(6.0 / fan_in) / 1.0
+                    
+                    m.weight.uniform_(-bound, bound)
+                    if m.bias is not None:
+                        m.bias.uniform_(-bound, bound)
 
     def forward(self, coords: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
