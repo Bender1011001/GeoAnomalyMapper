@@ -95,23 +95,20 @@ DEFAULT_INVERSION_CONFIG = {
     "density_background": 2670.0,     # Mean crustal density (kg/m³)
 
     # Training parameters
-    "epochs": 5000,                   # PINNs need thousands to carve sharp shapes — was 3000
-    "lr": 5e-5,                       # Gentler start — physics loss is ~1M, need stable gradients
+    "epochs": 5000,                   # PINNs need thousands to carve sharp shapes
+    "lr": 1e-4,                       # Higher initial LR — physics warmup makes this safe
     "batch_size_collocation": 512,    # Interior collocation points per micro-batch
     "batch_size_boundary": 256,       # Surface boundary points per micro-batch
-    "gradient_accumulation_steps": 4, # Effective batch = 512*4 = 2048 collocation per optimizer step
-    "physics_weight": 0.001,           # Helmholtz residual weight — scaled DOWN because raw physics
-    # loss starts at ~1.2M. With weight=0.001 → effective ~1200,
-    # comparable to data contribution of ~115 (50.0 × 2.3).
-    "data_weight": 50.0,              # Surface data fit weight — was 10.0
-    # CRITICAL: data_weight=50 prevents "Trivial Collapse" where the PINN
-    # ignores surface observations and predicts uniform 3500 m/s everywhere.
-    # The higher weight forces the AI to trust the satellite data.
+    "gradient_accumulation_steps": 1, # Simplify — 1 step for faster iteration
+    "physics_weight": 0.0001,         # Target Helmholtz residual weight (after warmup)
+    "physics_warmup_epochs": 500,     # Ramp physics_weight from 0→target over this many epochs
+    # CRITICAL: Physics warmup lets the network first learn from SAR data
+    # (data_weight=50) to establish a reasonable wave speed field, THEN
+    # gradually introduce the Helmholtz PDE constraint. Without warmup,
+    # the raw physics loss (~20M) causes NaN within 15 epochs.
+    "data_weight": 50.0,              # Surface data fit weight — forces trust in satellite data
     "regularization_weight": 0.01,    # Smoothness/sparsity weight
-    "deep_prior_weight": 0.001,       # Force c→background at depth — was 0.1
-    # CRITICAL: deep_prior_weight=0.001 stops the AI from erasing deep anomalies.
-    # At 0.1, the penalty for predicting voids at depth was so high that the
-    # PINN learned it was "cheaper" to predict solid rock everywhere.
+    "deep_prior_weight": 0.001,       # Force c→background at depth
 
     # Network architecture
     "hidden_layers": 8,
@@ -119,11 +116,14 @@ DEFAULT_INVERSION_CONFIG = {
     "activation": "swish",
 
     # GPU
-    "use_amp": True,
-    "use_compile": True,              # torch.compile for fused kernels (PyTorch 2.0+)
+    "use_amp": False,                 # DISABLED — AMP float16 causes NaN in 2nd-order autograd
+    "use_compile": False,             # DISABLED — incompatible with dynamic autograd graph
+    "use_float64_physics": True,      # Compute Helmholtz in float64 for numerical stability
     "num_workers": 4,                 # CPU workers for data prep
     "pin_memory": True,               # Pin CPU tensors for faster H2D transfer
     "seed": 42,
+    "max_nan_recoveries": 20,         # More NaN recovery attempts (was 5)
+    "grad_clip_norm": 0.1,            # Tighter gradient clipping (was 1.0)
 }
 
 
@@ -329,6 +329,14 @@ def helmholtz_physics_loss(
     y = y.requires_grad_(True)
     z = z.requires_grad_(True)
 
+    # Optionally upcast to float64 for numerical stability in 2nd-order derivatives
+    if x.dtype == torch.float64:
+        model_was_float32 = next(model.parameters()).dtype == torch.float32
+        if model_was_float32:
+            model.double()
+    else:
+        model_was_float32 = False
+
     coords = torch.cat([x, y, z], dim=-1)
     U_real, U_imag, c = model(coords)
 
@@ -395,9 +403,16 @@ def helmholtz_physics_loss(
     residual_real = laplacian_Ur + helmholtz_term * U_real
     residual_imag = laplacian_Ui + helmholtz_term * U_imag
 
-    # Normalize loss for numerical stability in float32
+    # Normalize loss for numerical stability
     scaling_factor = (c_background / omega) ** 2
-    return torch.mean((residual_real * scaling_factor) ** 2 + (residual_imag * scaling_factor) ** 2)
+    result = torch.mean((residual_real * scaling_factor) ** 2 + (residual_imag * scaling_factor) ** 2)
+
+    # Cast model back to float32 if we temporarily upcasted
+    if model_was_float32:
+        model.float()
+        result = result.float()
+
+    return result
 
 
 def surface_data_loss(
@@ -763,7 +778,11 @@ def train_vibro_pinn(
     # NaN recovery: track best state for rollback
     best_state = None
     nan_recoveries = 0
-    max_nan_recoveries = 5
+    max_nan_recoveries = cfg.get("max_nan_recoveries", 20)
+    grad_clip_norm = cfg.get("grad_clip_norm", 0.1)
+    use_float64_physics = cfg.get("use_float64_physics", True)
+    physics_warmup_epochs = cfg.get("physics_warmup_epochs", 500)
+    target_physics_weight = cfg["physics_weight"]
 
     # GPU-accelerated surface sampler (eliminates CPU bottleneck)
     surface_sampler = SurfaceSamplerGPU(vib_normalized, device)
@@ -776,9 +795,13 @@ def train_vibro_pinn(
 
     # Training loop
     logger.info(f"\nStarting PINN training: {cfg['epochs']} epochs")
-    logger.info(f"  Physics weight: {cfg['physics_weight']}")
+    logger.info(f"  Physics weight: {target_physics_weight} (warmup over {physics_warmup_epochs} epochs)")
     logger.info(f"  Data weight: {cfg['data_weight']}")
     logger.info(f"  Regularization: {cfg['regularization_weight']}")
+    logger.info(f"  Grad clip norm: {grad_clip_norm}")
+    logger.info(f"  Float64 physics: {use_float64_physics}")
+    logger.info(f"  AMP: {use_amp}")
+    logger.info(f"  Max NaN recoveries: {max_nan_recoveries}")
     logger.info(f"  Collocation batch: {cfg['batch_size_collocation']} x {accum_steps} accum = {effective_colloc}")
     logger.info(f"  Surface batch: {cfg['batch_size_boundary']} x {accum_steps} accum = {effective_boundary}")
     logger.info(f"  GPU: {torch.cuda.get_device_name(0) if device.type == 'cuda' else 'CPU'}")
@@ -815,13 +838,25 @@ def train_vibro_pinn(
                 logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: sampling collocation...")
                 sys.stdout.flush()
 
-            # === Physics loss ALWAYS in float32 (2nd-order autograd overflows in float16) ===
+            # === Physics warmup: ramp physics_weight from 0→target over warmup epochs ===
+            if physics_warmup_epochs > 0 and epoch < physics_warmup_epochs:
+                current_physics_weight = target_physics_weight * (epoch / physics_warmup_epochs)
+            else:
+                current_physics_weight = target_physics_weight
+
+            # === Sample collocation points ===
             x_coll, y_coll, z_coll = sample_collocation_points(
                 cfg["batch_size_collocation"], device
             )
 
+            # Upcast to float64 for physics if configured (prevents NaN in 2nd-order autograd)
+            if use_float64_physics:
+                x_coll = x_coll.double()
+                y_coll = y_coll.double()
+                z_coll = z_coll.double()
+
             if verbose:
-                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: computing physics loss...")
+                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: computing physics loss (float64={use_float64_physics})...")
                 if device.type == 'cuda':
                     logger.info(f"    VRAM before physics: {torch.cuda.memory_allocated(0)/(1024**2):.0f} MB")
                 sys.stdout.flush()
@@ -834,7 +869,7 @@ def train_vibro_pinn(
             )
 
             if verbose:
-                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: physics loss = {loss_physics.item():.6f}")
+                logger.info(f"  Epoch {epoch} accum {accum_step+1}/{accum_steps}: physics loss = {loss_physics.item():.6f} (weight={current_physics_weight:.6f})")
                 if device.type == 'cuda':
                     logger.info(f"    VRAM after physics: {torch.cuda.memory_allocated(0)/(1024**2):.0f} MB")
                 sys.stdout.flush()
@@ -874,7 +909,7 @@ def train_vibro_pinn(
                 )
 
             # Total loss (scaled by accumulation steps for gradient averaging)
-            phys_weighted = cfg["physics_weight"] * loss_physics
+            phys_weighted = current_physics_weight * loss_physics
             data_weighted = cfg["data_weight"] * loss_data
             deep_weighted = cfg["deep_prior_weight"] * loss_deep
             reg_weighted = cfg["regularization_weight"] * loss_reg
@@ -942,11 +977,11 @@ def train_vibro_pinn(
         # Optimizer step after all accumulation steps
         if use_amp:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
             scaler.step(optimizer)
             scaler.update()
         else:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
             optimizer.step()
 
         scheduler.step(epoch_loss_total)
