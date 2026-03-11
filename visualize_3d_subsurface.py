@@ -43,7 +43,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 VIZ_DIR = DATA_DIR / "visualization_3d"
 
 DEFAULT_VIZ_CONFIG = {
-    "void_threshold": 0.5,          # Void probability threshold for isosurface
+    "void_threshold": 0.35,         # Lowered for sigmoid mapping (was 0.5)
     "dense_threshold": 0.7,         # Dense body threshold (wave speed > background * factor)
     "min_anomaly_voxels": 10,       # Minimum voxels for a detected anomaly
     "smoothing_sigma": 0.5,         # Gaussian smoothing before isosurface extraction

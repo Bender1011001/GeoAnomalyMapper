@@ -625,7 +625,7 @@ def execute_biondi_pipeline_for_target(
         output_dir=str(viz_out_dir),
         void_probability_path=void_prob_path,
         config={
-            "void_threshold": 0.5,
+            "void_threshold": 0.35,
             "min_anomaly_voxels": 3,
             # FIX: Pass actual PINN domain so visualizer renders at correct scale
             "domain_width_m": adaptive_domain_width,
