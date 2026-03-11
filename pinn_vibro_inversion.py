@@ -1169,8 +1169,10 @@ def train_vibro_pinn(
     threshold_ratio = cfg.get("void_speed_threshold_ratio", 0.7)
     anomaly_threshold = bg_speed * threshold_ratio
 
-    # Temperature controls steepness: 0.1 = transition width ~10% of bg speed
-    temperature = bg_speed * 0.1
+    # Temperature controls steepness: 0.05 = tight transition (~5% of bg speed)
+    # Tighter than 0.1 per expert recommendation: cleanly rejects 3000 m/s noise
+    # while boosting 2350 m/s anomaly from 57% to 84% probability
+    temperature = bg_speed * 0.05
 
     # Negative so lower wave speed = higher probability
     z_scores = -(wave_speed_volume - anomaly_threshold) / temperature

@@ -628,7 +628,7 @@ def run_visualization_pipeline(
         threshold_ratio = cfg.get("void_speed_threshold_ratio", 0.7)
 
         anomaly_threshold = bg_speed * threshold_ratio
-        temperature = bg_speed * 0.1
+        temperature = bg_speed * 0.05
 
         z_scores = -(wave_speed - anomaly_threshold) / temperature
         z_scores = np.clip(z_scores, -20.0, 20.0)
