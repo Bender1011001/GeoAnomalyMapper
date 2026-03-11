@@ -1157,13 +1157,27 @@ def train_vibro_pinn(
     density_background = 0.32 * cfg["background_wave_speed"] / 1000.0 + 0.77
     density_contrast = (density_volume - density_background) * 1000.0  # kg/m³
 
-    # Void probability at each depth (low wave speed = high void probability)
-    void_threshold = cfg["background_wave_speed"] * 0.5
-    void_probability = np.clip(
-        1.0 - (wave_speed_volume - cfg["min_wave_speed"]) /
-        (cfg["background_wave_speed"] - cfg["min_wave_speed"]),
-        0, 1
-    )
+    # ===================================================================
+    # Sigmoid Void Probability Mapping
+    # A drop to 70% of background speed is a geologically massive anomaly
+    # (partial volume / fracture halo). Wyllie's Time-Average Equation
+    # shows that a 6m voxel only needs ~5% void fraction to drop from
+    # 3500 → 2350 m/s. The sigmoid maps this non-linear physical reality
+    # into a [0, 1] classification probability.
+    # ===================================================================
+    bg_speed = cfg["background_wave_speed"]
+    threshold_ratio = cfg.get("void_speed_threshold_ratio", 0.7)
+    anomaly_threshold = bg_speed * threshold_ratio
+
+    # Temperature controls steepness: 0.1 = transition width ~10% of bg speed
+    temperature = bg_speed * 0.1
+
+    # Negative so lower wave speed = higher probability
+    z_scores = -(wave_speed_volume - anomaly_threshold) / temperature
+
+    # Clip to prevent overflow in exp()
+    z_scores = np.clip(z_scores, -20.0, 20.0)
+    void_probability = 1.0 / (1.0 + np.exp(-z_scores))
 
     # Save outputs
     outputs = {}

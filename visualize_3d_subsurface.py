@@ -621,14 +621,18 @@ def run_visualization_pipeline(
     if void_probability_path and os.path.exists(void_probability_path):
         void_prob = np.load(void_probability_path)
     else:
-        # Compute from wave speed
-        logger.info("Computing void probability from wave speed...")
-        bg_speed = cfg["background_wave_speed"]
-        min_speed = cfg.get("min_wave_speed", 300.0)
-        void_prob = np.clip(
-            1.0 - (wave_speed - min_speed) / (bg_speed - min_speed),
-            0, 1
-        )
+        # Compute from wave speed using Sigmoid mapping
+        # (Matches pinn_vibro_inversion.py — see Wyllie's Time-Average Equation)
+        logger.info("Computing void probability from wave speed (Sigmoid mapping)...")
+        bg_speed = cfg.get("background_wave_speed", 3500.0)
+        threshold_ratio = cfg.get("void_speed_threshold_ratio", 0.7)
+
+        anomaly_threshold = bg_speed * threshold_ratio
+        temperature = bg_speed * 0.1
+
+        z_scores = -(wave_speed - anomaly_threshold) / temperature
+        z_scores = np.clip(z_scores, -20.0, 20.0)
+        void_prob = 1.0 / (1.0 + np.exp(-z_scores))
 
     if density_contrast_path and os.path.exists(density_contrast_path):
         density_contrast = np.load(density_contrast_path)
