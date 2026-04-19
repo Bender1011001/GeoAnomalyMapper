@@ -35,24 +35,6 @@ Independent validation used the NURE geochemical database (397,000+ sediment sam
 
 ---
 
-## What You Can Buy
-
-**Regional Screening Packs** — ranked prospectivity leads + evidence bundle per commodity/district.
-Suitable for early-stage teams selecting which districts to enter.
-
-**"Bring Your Own Data" Inversion Service** — you supply higher-resolution gravity/mag, we deliver
-ranked anomalies, uncertainty maps, and an HTML+GeoJSON target package.
-Suitable for juniors with geophysics data but no internal AI inversion pipeline.
-
-**Automated Due Diligence Reports** — submit coordinates, receive a go/no-go desk report:
-MRDS cross-check, geochemical coverage flags, density contrast evidence.
-Suitable for exploration managers screening incoming deal flow.
-
-**Commercial Software License** — deploy the pipeline on your own infrastructure.
-
-For pricing and availability, open a GitHub issue or contact via the profile.
-
----
 
 ## Technical Summary
 

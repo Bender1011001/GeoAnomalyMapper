@@ -95,7 +95,8 @@ DEFAULT_INVERSION_CONFIG = {
     "density_background": 2670.0,     # Mean crustal density (kg/m³)
 
     # Training parameters
-    "epochs": 5000,                   # PINNs need thousands to carve sharp shapes
+    "epochs": 3000,                   # Cap — early stopping handles convergence
+    "early_stopping_patience": 500,   # Stop if no improvement for this many epochs
     "lr": 1e-4,                       # Higher initial LR — physics warmup makes this safe
     "batch_size_collocation": 512,    # Interior collocation points per micro-batch
     "batch_size_boundary": 256,       # Surface boundary points per micro-batch
@@ -868,8 +869,8 @@ def train_vibro_pinn(
         # float64 physics: ~8KB per colloc point (autograd graph in double)
         # float32 + TF32:  ~3KB per colloc point (compile fuses kernels)
         gb_per_unit = 8.0 if use_float64_physics else 3.0
-        max_scale = 8 if use_float64_physics else 16  # float32 can scale higher
-        scale_factor = max(1, min(max_scale, int(free_mem_gb / gb_per_unit)))
+        max_scale = 1 # disabled: 8 if use_float64_physics else 16  # float32 can scale higher
+        scale_factor = 1 # disabled: max(1, min(max_scale, int(free_mem_gb / gb_per_unit)))
         base_colloc = cfg["batch_size_collocation"]
         base_boundary = cfg["batch_size_boundary"]
         cfg["batch_size_collocation"] = base_colloc * scale_factor
@@ -905,6 +906,8 @@ def train_vibro_pinn(
     training_start = time.time()
     loss_history = {"total": [], "physics": [], "data": [], "reg": [], "sparse": [], "deep": []}
     best_loss = float('inf')
+    epochs_without_improvement = 0
+    early_stopping_patience = cfg.get("early_stopping_patience", 500)
 
     model.train()
     loop = tqdm(range(cfg["epochs"]), desc="PINN Training")
@@ -1059,6 +1062,15 @@ def train_vibro_pinn(
         if epoch_loss_total < best_loss:
             best_loss = epoch_loss_total
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        # === EARLY STOPPING ===
+        if epochs_without_improvement >= early_stopping_patience and epoch >= 500:
+            logger.info(f"[EARLY STOP] No improvement for {early_stopping_patience} epochs. "
+                        f"Best loss: {best_loss:.6f} at epoch {epoch - epochs_without_improvement}. Stopping.")
+            break
 
         # === CHECKPOINT SAVING every 500 epochs ===
         if epoch > 0 and epoch % 500 == 0:

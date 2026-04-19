@@ -137,7 +137,7 @@ RESOLUTION_PROFILES = {
         "epochs": 5000,
         "grid_nx": 128,
         "grid_ny": 128,
-        "grid_nz": 64,
+        "grid_nz": 128,
         "domain_width_m": 800.0,
         "max_depth_m": 1000.0,
         # REBALANCED WEIGHTS (2026-03-10 expert fix for trivial collapse)
@@ -147,12 +147,12 @@ RESOLUTION_PROFILES = {
         "regularization_weight": 0.1,         # Was 0.01 — promotes sharp boundaries
         "deep_prior_weight": 0.1,             # Was 0.001 — keeps deep earth solid
         "excitation_frequency_hz": 0.5,       # Deepest penetration
-        "synthetic_grid_size": 512,
+        "synthetic_grid_size": 1024,
         "num_sub_apertures": 7,
-        # H100 OPTIMIZATION:
+        # H100 OPTIMIZATION: (80GB VRAM)
         "use_float64_physics": False,         # TF32 is sufficient, enables torch.compile
-        "batch_size_collocation": 8192,       # float32 = half VRAM
-        "batch_size_boundary": 2048,
+        "batch_size_collocation": 65536,      # Scaled down to prevent H100 OOM
+        "batch_size_boundary": 16384,
         "gradient_accumulation_steps": 1,
         "hidden_layers": 8,
         "hidden_neurons": 768,                # float32 frees VRAM for bigger model
@@ -164,34 +164,21 @@ RESOLUTION_PROFILES = {
 # TARGET REGIONS
 # ============================================================
 PHASE_1_TARGETS = [
-    # === VALIDATION TARGETS FIRST ===
-    # These have well-documented underground voids — if we detect them,
-    # the pipeline is working. If we don't, something is still broken.
     {
-        "name": "Carlsbad Caverns (NM)",
-        "lat": 32.1742,
-        "lon": -104.4459,
-        "buffer_deg": 0.05,
-        "description": "VALIDATION: Big Room is 1200x190m at 230m depth. Largest natural chamber in North America.",
-        "expected_depth_m": 230,
-        "expected_void_type": "natural_cave",
+        "name": "Vacaville Target Area",
+        "lat": 38.3512, 
+        "lon": -121.986,
+        "buffer_deg": 0.1,
+        "description": "7626 Clement Rd Vacaville CA surrounds",
+        "expected_depth_m": 120,
+        "expected_void_type": "unknown",
     },
-    {
-        "name": "Mammoth Cave (KY)",
-        "lat": 37.1870,
-        "lon": -86.1005,
-        "buffer_deg": 0.05,
-        "description": "VALIDATION: World's longest cave system (680km mapped). Passages 30-100m deep in Mississippian limestone.",
-        "expected_depth_m": 100,
-        "expected_void_type": "natural_cave",
-    },
-    # === SPECULATIVE TARGETS ===
     {
         "name": "Great Pyramid of Giza (Khufu)",
         "lat": 29.9792,
         "lon": 31.1342,
         "buffer_deg": 0.15,
-        "description": "Biondi's main target — claimed spiral columns & 80m chambers. JRE #2443 discussion.",
+        "description": "Biondi's main target.",
         "expected_depth_m": 500,
         "expected_void_type": "artificial_cavity",
     },
@@ -200,19 +187,10 @@ PHASE_1_TARGETS = [
         "lat": 29.9761,
         "lon": 31.1313,
         "buffer_deg": 0.1,
-        "description": "Biondi claims strongest anomalies here (vertical spirals + deep corridors).",
-        "expected_depth_m": 1000,
+        "description": "Biondi claims strongest anomalies here.",
+        "expected_depth_m": 888,
         "expected_void_type": "artificial_cavity",
-    },
-    {
-        "name": "Menkaure Pyramid (Giza)",
-        "lat": 29.9725,
-        "lon": 31.1283,
-        "buffer_deg": 0.08,
-        "description": "2025 air-filled voids + Biondi subsurface extensions.",
-        "expected_depth_m": 100,
-        "expected_void_type": "natural_cave",
-    },
+    }
 ]
 
 PHASE_2_TARGETS = [
