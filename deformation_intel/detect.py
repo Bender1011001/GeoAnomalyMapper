@@ -51,6 +51,8 @@ class Anomaly:
     source_volume_rate_m3_yr: Optional[float]
     source_fit_r2: Optional[float]
     time_to_threshold_yr: Optional[float]
+    is_localized: bool
+    void_likelihood: float
     why: str
     context: Dict[str, float] = field(default_factory=dict)
 
@@ -144,6 +146,26 @@ def detect_anomalies(
                 seasonal_dominated_ratio, accel_flag_cm_yr2, pk_sigma,
             )
 
+            # Localized (point-source, possible void) vs regional (aquifer/
+            # tectonic sheet). A real void gives a clean, compact Mogi bowl; a
+            # broad compaction field makes the Mogi fit fail and rail its depth.
+            area_km2 = npx * px_km2
+            depth_railed = (not np.isfinite(mogi.depth_m)) or mogi.depth_m <= 25.0 or mogi.depth_m >= 4500.0
+            good_mogi = (mogi.r2 is not None) and np.isfinite(mogi.r2) and mogi.r2 > 0.4
+            is_localized = bool(good_mogi and (not depth_railed) and area_km2 < 3.0)
+
+            # Broad, non-localized subsidence is regional -> not a void.
+            if kind == "subsidence" and classification != "seasonal_dominated" and not is_localized:
+                classification = "regional_subsidence"
+                why = (f"broad subsidence {peak_v*100:.1f} cm/yr over {area_km2:.2f} km^2; "
+                       f"Mogi point-source fit poor (r2={mogi.r2 if mogi.r2 is not None else float('nan'):.2f}, "
+                       f"depth {'railed' if depth_railed else 'ok'}) — regional aquifer/tectonic, not a void")
+                conf = min(conf, 0.6)
+
+            void_likelihood = _void_likelihood(
+                kind, classification, is_localized, good_mogi, mogi.depth_m, seasonal_amp, peak_v,
+            )
+
             last_cum = float(np.nanmean(series[-3:])) if finite.size >= 3 else np.nan
             target = last_cum - forecast_threshold_cm / 100.0 if kind == "subsidence" else last_cum + forecast_threshold_cm / 100.0
             ttt = time_to_threshold(last_cum, pfit.velocity_m_yr, pfit.accel_m_yr2, target)
@@ -172,18 +194,37 @@ def detect_anomalies(
                 source_volume_rate_m3_yr=None if vol_rate is None else round(vol_rate, 0),
                 source_fit_r2=None if not np.isfinite(mogi.r2) else round(mogi.r2, 2),
                 time_to_threshold_yr=None if not np.isfinite(ttt) else round(float(ttt), 1),
+                is_localized=is_localized,
+                void_likelihood=round(void_likelihood, 2),
                 why=why, context=ctx,
             ))
 
-    # rank: accelerating subsidence first, then by sigma*|velocity|
+    # rank: void-likelihood first (localized, void-plausible), then signal.
     def _priority(a: Anomaly):
-        accel_bonus = 2.0 if a.classification == "accelerating_subsidence" else 0.0
-        return -(accel_bonus + a.sigma * abs(a.peak_velocity_cm_yr) / 10.0)
+        return -(2.0 * a.void_likelihood + a.sigma * abs(a.peak_velocity_cm_yr) / 20.0)
 
     anomalies.sort(key=_priority)
     for i, a in enumerate(anomalies, 1):
         a.rank = i
     return anomalies
+
+
+def _void_likelihood(kind, classification, is_localized, good_mogi, depth_m,
+                     seasonal_amp_m, peak_v_m_yr) -> float:
+    """0..1 heuristic that a subsidence anomaly reflects a subsurface VOID
+    (localized collapse) rather than aquifer/tectonic/seasonal processes."""
+    if kind == "uplift" or classification in ("seasonal_dominated", "regional_subsidence"):
+        return 0.05 if classification == "regional_subsidence" else 0.1
+    score = 0.0
+    if is_localized:
+        score += 0.4
+    if classification == "accelerating_subsidence":
+        score += 0.3
+    if good_mogi and np.isfinite(depth_m) and 30.0 <= depth_m <= 800.0:
+        score += 0.2   # void-plausible source depth with a real point-source fit
+    if abs(peak_v_m_yr) >= 0.03:
+        score += 0.1
+    return float(min(score, 1.0))
 
 
 def _classify(kind, peak_v_m_yr, accel_m_yr2, seasonal_amp_m, pfit,

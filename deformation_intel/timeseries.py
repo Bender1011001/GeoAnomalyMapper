@@ -156,14 +156,15 @@ def fit_pixel(
         s, c = float(coef[3]), float(coef[4])
         seasonal_amp = float(np.hypot(s, c))
 
-    # velocity reported at the LAST epoch (most decision-relevant): d/dt of
-    # intercept + slope*tc + quad*tc^2 == slope + 2*quad*tc, tc at t_max.
-    tc_last = tt.max() - tt.mean()
-    velocity_last = slope + 2.0 * quad * tc_last
+    # velocity = robust MEAN rate over the record (the linear slope). Reporting
+    # the quadratic value at the last epoch amplifies end-point noise and, on
+    # sparse/noisy series, produces spurious extreme rates. Acceleration (the
+    # quadratic curvature) separately captures "getting worse over time".
+    velocity_mean = slope
     accel = 2.0 * quad  # m/yr^2
 
     fit = PixelFit(
-        velocity_m_yr=velocity_last,
+        velocity_m_yr=velocity_mean,
         accel_m_yr2=accel,
         seasonal_amp_m=seasonal_amp,
         residual_rmse_m=rmse,
@@ -275,10 +276,9 @@ def fit_cube(
             sst = np.sum((yv - yv.mean()) ** 2)
             r2[j] = 1.0 - np.sum(res**2) / sst if sst > 0 else np.nan
 
-    tc_last = t.max() - t.mean()
     slope = coefs[1]
     quad = coefs[2]
-    velocity_last = slope + 2.0 * quad * tc_last
+    velocity_mean = slope  # robust mean rate over the record (see fit_pixel)
     accel = 2.0 * quad
     if seasonal:
         seasonal_amp = np.hypot(coefs[3], coefs[4])
@@ -289,7 +289,7 @@ def fit_cube(
         return a.reshape(H, W)
 
     return {
-        "velocity_m_yr": rs(velocity_last),
+        "velocity_m_yr": rs(velocity_mean),
         "accel_m_yr2": rs(accel),
         "seasonal_amp_m": rs(seasonal_amp),
         "residual_rmse_m": rs(rmse),

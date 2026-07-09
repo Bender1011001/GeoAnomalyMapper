@@ -74,6 +74,42 @@ def test_quiet_cube_yields_no_anomalies():
     assert anomalies == []
 
 
+def test_localized_bowl_has_high_void_likelihood():
+    cube = _synthetic_cube()
+    anomalies = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=5,
+                                 min_sigma=3.0)
+    top = anomalies[0]
+    assert top.is_localized is True
+    assert top.void_likelihood >= 0.6      # clean Mogi bowl -> void-plausible
+    assert top.classification == "accelerating_subsidence"
+
+
+def test_broad_regional_field_is_not_a_void():
+    # A broad, monotonic subsidence RAMP across the whole AOI (aquifer sheet):
+    # accelerating in time but no localized point source -> regional, low void.
+    grid, n = 60, 50
+    x0, y0 = 600000.0, 4245000.0
+    x = x0 + (np.arange(grid)) * 30.0
+    y = y0 + (np.arange(grid)) * 30.0
+    t = 2016.5 + np.linspace(0, 9.0, n)
+    tc = t - t[0]
+    ramp = np.linspace(0, 1, grid)[None, :] * np.ones((grid, 1))  # smooth W->E ramp
+    rng = np.random.default_rng(4)
+    cube_arr = np.empty((n, grid, grid))
+    for i in range(n):
+        amp = -(0.03 * tc[i] + 0.004 * tc[i] ** 2)  # accelerating basin-wide
+        cube_arr[i] = ramp * amp + 0.002 * rng.standard_normal((grid, grid))
+    cube = {"cube": cube_arr, "t": t, "x": x, "y": y,
+            "crs_wkt": "EPSG:32610", "frame": "TEST"}
+    anomalies = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=6,
+                                 min_sigma=3.0)
+    # Whatever is flagged should be regional (poor point-source fit), not void.
+    for a in anomalies:
+        if a.kind == "subsidence":
+            assert a.void_likelihood <= 0.4
+            assert a.classification in ("regional_subsidence", "seasonal_dominated")
+
+
 def test_context_sampler_attaches_annotations():
     cube = _synthetic_cube()
     called = {}
