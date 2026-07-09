@@ -21,19 +21,23 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 
 def _resolve_data_root() -> Path:
-    """Return the configured data directory without creating it at import time."""
+    """Return the configured data directory, expanding user overrides with validation."""
     custom = os.environ.get("GEOANOMALYMAPPER_DATA_DIR")
     if custom:
         data_path = Path(custom).expanduser().resolve()
-
-        if data_path.exists():
-            if not data_path.is_dir():
-                raise NotADirectoryError(f"Configured data path is not a directory: {data_path}")
-            if not os.access(data_path, os.W_OK):
-                raise PermissionError(f"Data directory is not writable: {data_path}")
-        else:
-            logger.info(f"Configured data directory will be created on first write: {data_path}")
-
+        
+        # Validate the path exists
+        if not data_path.exists():
+            logger.warning(f"Data directory does not exist: {data_path}. Creating it.")
+            try:
+                data_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                raise PermissionError(f"Cannot create data directory {data_path}: {e}")
+        
+        # Check if writable
+        if not os.access(data_path, os.W_OK):
+            raise PermissionError(f"Data directory is not writable: {data_path}")
+        
         logger.info(f"Using custom data directory: {data_path}")
         return data_path
     return REPO_ROOT / "data"

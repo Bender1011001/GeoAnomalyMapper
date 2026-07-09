@@ -45,13 +45,14 @@ Usage:
     python pinn_vibro_inversion.py --vibration vib.npy --depth 2000 --epochs 5000
 """
 
+import os
 import sys
 import time
 import logging
 import argparse
 import traceback
 from pathlib import Path
-from typing import Any, Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict
 
 import numpy as np
 import torch
@@ -60,8 +61,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 
-from json_utils import dump_strict_json, to_strict_jsonable
-from project_paths import DATA_DIR
+from project_paths import DATA_DIR, OUTPUTS_DIR, ensure_directories
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -126,95 +126,6 @@ DEFAULT_INVERSION_CONFIG = {
     "max_nan_recoveries": 20,         # More NaN recovery attempts (was 5)
     "grad_clip_norm": 0.1,            # Tighter gradient clipping (was 1.0)
 }
-
-
-LOSS_HISTORY_TERMS = ("physics", "data", "sparse", "reg", "deep", "surface_prior", "sommerfeld")
-
-
-def _loss_term_configured_flags(
-    cfg: Dict[str, Any],
-    surface_prior_map_supplied: bool,
-) -> Dict[str, bool]:
-    """Return static configured/enabled flags for each loss component."""
-    flags = {
-        "physics": float(cfg.get("physics_weight", 0.0)) > 0.0,
-        "data": float(cfg.get("data_weight", 0.0)) > 0.0,
-        "sparse": float(cfg.get("sparsity_weight", 0.0)) > 0.0,
-        "reg": float(cfg.get("regularization_weight", 0.0)) > 0.0,
-        "deep": float(cfg.get("deep_prior_weight", 0.0)) > 0.0,
-        # Configured means the run requested a non-zero prior weight. The
-        # per-epoch active flag below records whether a map was also available.
-        "surface_prior": float(cfg.get("surface_prior_weight", 0.0)) > 0.0,
-        # Sommerfeld radiation BC is always active when physics is active
-        "sommerfeld": float(cfg.get("physics_weight", 0.0)) > 0.0,
-    }
-    flags["surface_prior_map_supplied"] = bool(surface_prior_map_supplied)
-    return flags
-
-
-def _initialize_loss_history(
-    cfg: Dict[str, Any],
-    surface_prior_map_supplied: bool,
-    surface_prior_enabled: bool,
-) -> Dict[str, Any]:
-    """Create a loss-history structure with legacy arrays plus observability metadata.
-
-    Top-level term arrays retain the legacy JSON shape. Nested active/weight
-    arrays distinguish inactive terms from active terms whose raw value is zero.
-    """
-    configured_flags = _loss_term_configured_flags(cfg, surface_prior_map_supplied)
-    history: Dict[str, Any] = {
-        "schema_version": 2,
-        "epoch": [],
-        "total": [],
-        "weighted_total": [],
-        "configured": {term: bool(configured_flags[term]) for term in LOSS_HISTORY_TERMS},
-        "active": {term: [] for term in LOSS_HISTORY_TERMS},
-        "weights": {term: [] for term in LOSS_HISTORY_TERMS},
-        "weighted": {term: [] for term in LOSS_HISTORY_TERMS},
-        "metadata": {
-            "terms": list(LOSS_HISTORY_TERMS),
-            "surface_prior_map_supplied": bool(surface_prior_map_supplied),
-            "surface_prior_enabled": bool(surface_prior_enabled),
-            "inactive_terms_record_raw_zero_with_active_false": True,
-            "raw_term_arrays_are_unweighted": True,
-        },
-    }
-    for term in LOSS_HISTORY_TERMS:
-        history[term] = []
-    return history
-
-
-def _append_loss_history(
-    history: Dict[str, Any],
-    epoch: int,
-    raw_losses: Dict[str, float],
-    weights: Dict[str, float],
-    active: Dict[str, bool],
-) -> None:
-    """Append one epoch/iteration of loss observability to history in-place."""
-    weighted_total = 0.0
-    history["epoch"].append(int(epoch))
-
-    for term in LOSS_HISTORY_TERMS:
-        raw_value = float(raw_losses.get(term, 0.0))
-        term_weight = float(weights.get(term, 0.0))
-        is_active = bool(active.get(term, False))
-        weighted_value = raw_value * term_weight if is_active else 0.0
-
-        history[term].append(raw_value)
-        history["weights"][term].append(term_weight)
-        history["active"][term].append(is_active)
-        history["weighted"][term].append(float(weighted_value))
-        weighted_total += weighted_value
-
-    history["weighted_total"].append(float(weighted_total))
-    history["total"].append(float(raw_losses.get("total", weighted_total)))
-
-
-def _loss_history_to_jsonable(value: Any) -> Any:
-    """Recursively convert loss-history data to plain JSON-safe Python types."""
-    return to_strict_jsonable(value)
 
 
 # ============================================================
@@ -295,7 +206,7 @@ class VibroInversionPINN(nn.Module):
         self.c_max = c_max
 
         # Fourier positional encoding
-        self.fourier = FourierFeatures(3, num_frequencies, sigma=1.5)
+        self.fourier = FourierFeatures(3, num_frequencies, sigma=10.0)
         input_dim = 2 * num_frequencies
 
         # Shared trunk with residual connections
@@ -328,18 +239,31 @@ class VibroInversionPINN(nn.Module):
 
     def _init_weights(self):
         """Proper SIREN initialization to prevent exponential gradient explosion.
-
-        AUDIT FIX (1.4): All layers (including the first) use hidden-layer init
-        bounds sqrt(6/fan_in)/w0 because the first linear layer receives
-        FourierFeatures output (values in [-1, 1]), not raw coordinates.
-        Using 1/fan_in for the first layer caused vanishing gradients.
+        
+        Xavier uniform is WRONG for Sine activations. With 8 layers of sin(),
+        xavier causes outputs to grow exponentially: layer N output ~ O(N!).
+        This starts the physics loss at ~20,000,000 and immediately explodes to NaN.
+        
+        SIREN paper (Sitzmann et al. 2020) specifies:
+          - First layer: weights ~ U(-1/fan_in, 1/fan_in)
+          - Hidden layers: weights ~ U(-sqrt(6/fan_in)/w0, sqrt(6/fan_in)/w0)
+        This keeps sin() outputs in [-1, 1] across all layers.
         """
         import math
         with torch.no_grad():
+            is_first_linear = True
             for m in self.modules():
                 if isinstance(m, nn.Linear):
                     fan_in = m.weight.size(1)
-                    bound = math.sqrt(6.0 / fan_in) / 1.0
+                    if is_first_linear:
+                        # First layer: uniform(-1/fan_in, 1/fan_in)
+                        bound = 1.0 / fan_in
+                        is_first_linear = False
+                    else:
+                        # Hidden layers: uniform(-sqrt(6/fan_in)/w0, sqrt(6/fan_in)/w0)
+                        # w0 = 1.0 (our Sine activation has no frequency scaling)
+                        bound = math.sqrt(6.0 / fan_in) / 1.0
+                    
                     m.weight.uniform_(-bound, bound)
                     if m.bias is not None:
                         m.bias.uniform_(-bound, bound)
@@ -429,25 +353,16 @@ def helmholtz_physics_loss(
     y = y.requires_grad_(True)
     z = z.requires_grad_(True)
 
-    # AUDIT FIX (1.1): NEVER cast the model to double/float. Doing so creates
-    # new parameter tensors that the Adam optimizer does not track, silently
-    # zeroing all physics gradients (the "trivial collapse" bug).
-    #
-    # Instead: keep the model in float32, forward-pass with float32 coords,
-    # then conditionally upcast the OUTPUT tensors to float64 for numerically
-    # stable 2nd-order autograd derivatives.
-    coords_f32 = torch.cat([x.float(), y.float(), z.float()], dim=-1)
-    U_real_f32, U_imag_f32, c_f32 = model(coords_f32)
-
-    # Conditionally upcast outputs to float64 for stable 2nd-order derivatives.
+    # Optionally upcast to float64 for numerical stability in 2nd-order derivatives
     if x.dtype == torch.float64:
-        U_real = U_real_f32.to(torch.float64)
-        U_imag = U_imag_f32.to(torch.float64)
-        c = c_f32.to(torch.float64)
+        model_was_float32 = next(model.parameters()).dtype == torch.float32
+        if model_was_float32:
+            model.double()
     else:
-        U_real = U_real_f32
-        U_imag = U_imag_f32
-        c = c_f32
+        model_was_float32 = False
+
+    coords = torch.cat([x, y, z], dim=-1)
+    U_real, U_imag, c = model(coords)
 
     # Chain-rule scaling: maps normalized gradients to physical space
     # x,y ∈ [-1, 1] maps to [-domain_width/2, domain_width/2], so scale = 2/domain_width
@@ -499,9 +414,6 @@ def helmholtz_physics_loss(
         if d2U_dz2 is None:
             d2U_dz2 = torch.zeros_like(U)
 
-        # Free intermediate first-order gradients from graph memory
-        del dU_dx, dU_dy, dU_dz
-
         # Apply chain-rule scaling to convert normalized → physical gradients
         return (d2U_dx2 + d2U_dy2) * (scale_xy ** 2) + d2U_dz2 * (scale_z ** 2)
 
@@ -519,7 +431,12 @@ def helmholtz_physics_loss(
     scaling_factor = (c_background / omega) ** 2
     result = torch.mean((residual_real * scaling_factor) ** 2 + (residual_imag * scaling_factor) ** 2)
 
-    return result.float() if x.dtype == torch.float64 else result
+    # Cast model back to float32 if we temporarily upcasted
+    if model_was_float32:
+        model.float()
+        result = result.float()
+
+    return result
 
 
 def surface_data_loss(
@@ -560,15 +477,21 @@ def global_sparsity_loss(
     c_background: float = 3500.0,
 ) -> torch.Tensor:
     """
-    Smooth L1 Sparsity Prior: replaces the Cauchy prior that caused void collapse.
+    Robust Cauchy Prior: replaces the old L1 sparsity that caused trivial collapse.
 
-    Smooth L1 provides a quadratic penalty for tiny deviations (allowing for 
-    micro-noise fitting) but a strictly linear penalty for large deviations,
-    firmly preventing the optimizer from making the entire domain a void.
+    The Cauchy distribution's heavy tails mean:
+    - Small deviations from background (noise) → aggressively penalized
+    - Large deviations (real voids at 343 m/s) → gradient FLATTENS OUT,
+      allowing the model to predict genuine anomalies without exploding loss.
+
+    With gamma=0.05, the prior flattens for deviations > 5% from background.
+    A void (343 vs 3500 m/s = 90% deviation) gets essentially the same
+    penalty as a 10% deviation, unlike L1 which scales linearly forever.
     """
     _, _, c_pred = model(coords)
-    deviation = (c_pred - c_background) / c_background
-    return F.smooth_l1_loss(deviation, torch.zeros_like(deviation), beta=0.05)
+    deviation = torch.abs(c_pred - c_background) / c_background
+    gamma = 0.05  # Flattens out heavily after 5% deviation
+    return torch.mean(gamma * torch.log1p((deviation / gamma) ** 2))
 
 
 def deep_boundary_loss(
@@ -587,79 +510,6 @@ def deep_boundary_loss(
     return F.mse_loss(c_pred, torch.full_like(c_pred, c_background)) / (c_background ** 2)
 
 
-def surface_prior_loss(
-    model: VibroInversionPINN,
-    coords: torch.Tensor,
-    surface_anomaly_lut: torch.Tensor,
-    c_background: float = 3500.0,
-) -> torch.Tensor:
-    """Cap 4: Embedding-derived spatial prior for the PINN sparsity term.
-
-    Where the surface embedding anomaly score is high (something unusual is
-    happening at the surface), we *reduce* the penalty for wave-speed deviation
-    from background. This tells the network: "it is OK to predict a void or
-    anomalous density under this surface pixel."
-
-    Where the surface is normal (low anomaly score), the penalty is at its
-    maximum, keeping the PINN conservative in featureless terrain.
-
-    surface_anomaly_lut: 1-D tensor of shape (N,) corresponding to the N coords
-        rows passed in. Values in [0, 1]: 0 = normal surface, 1 = maximum anomaly.
-        These are bilinearly sampled from the 2-D anomaly map before being passed
-        here (see _sample_anomaly_for_coords helper).
-    """
-    _, _, c_pred = model(coords)
-    deviation = (c_pred - c_background) / c_background
-    base_sparsity = F.smooth_l1_loss(deviation, torch.zeros_like(deviation), beta=0.05, reduction='none')
-
-    # AUDIT FIX (2.3): Apply exponential depth decay to prevent columnar hallucinations.
-    z_depth = coords[:, 2].clamp(0.0, 1.0)
-    depth_decay = torch.exp(-3.0 * z_depth)
-
-    # Ensure consistent tensor dimensions
-    if surface_anomaly_lut.dim() == 1:
-        surface_anomaly_lut = surface_anomaly_lut.unsqueeze(-1)
-    if depth_decay.dim() == 1:
-        depth_decay = depth_decay.unsqueeze(-1)
-
-    anomaly_weight = 1.0 - (surface_anomaly_lut.clamp(0.0, 1.0) * depth_decay)
-    return torch.mean(anomaly_weight * base_sparsity)
-
-
-def _sample_anomaly_for_coords(
-    surface_anomaly_map: np.ndarray,
-    x_norm: torch.Tensor,
-    y_norm: torch.Tensor,
-    device: torch.device,
-) -> torch.Tensor:
-    """Bilinearly sample a 2-D anomaly map at normalized (x, y) coords.
-
-    x_norm, y_norm: (N, 1) tensors with values in [-1, 1] matching the PINN
-    coordinate convention. Returns a (N,) float32 tensor of anomaly scores.
-    """
-    H, W = surface_anomaly_map.shape
-    # Convert normalised coords to pixel indices (floating point)
-    col_f = ((x_norm.detach().float().squeeze(-1) + 1.0) / 2.0 * (W - 1)).clamp(0, W - 1)
-    row_f = ((y_norm.detach().float().squeeze(-1) + 1.0) / 2.0 * (H - 1)).clamp(0, H - 1)
-    col0 = col_f.long().clamp(0, W - 2)
-    row0 = row_f.long().clamp(0, H - 2)
-    col1 = (col0 + 1).clamp(0, W - 1)
-    row1 = (row0 + 1).clamp(0, H - 1)
-    wc = col_f - col0.float()  # fractional part
-    wr = row_f - row0.float()
-    # Flatten map to tensor for indexing
-    amap = torch.tensor(surface_anomaly_map, dtype=torch.float32, device=device)
-    v00 = amap[row0, col0]
-    v10 = amap[row1, col0]
-    v01 = amap[row0, col1]
-    v11 = amap[row1, col1]
-    sampled = (v00 * (1 - wr) * (1 - wc)
-               + v10 * wr * (1 - wc)
-               + v01 * (1 - wr) * wc
-               + v11 * wr * wc)
-    return sampled.clamp(0.0, 1.0)
-
-
 def sample_deep_points(
     batch_size: int,
     device: torch.device,
@@ -675,158 +525,10 @@ def sample_deep_points(
     return torch.cat([x, y, z], dim=-1)
 
 
-def sample_sommerfeld_points(
-    batch_size: int,
-    device: torch.device,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Sample points and outward normals on the 5 non-surface boundary faces.
-
-    The surface (z=0) is excluded because it has its own data-loss boundary
-    condition from the SAR vibration map.
-
-    Returns
-    -------
-    x, y, z : torch.Tensor  (N, 1) coordinates on boundary faces
-    nx, ny, nz : torch.Tensor  (N, 1) outward-pointing unit normals
-    """
-    n_pts = max(1, batch_size // 5)
-
-    # x = -1 face (Left)
-    x1 = torch.full((n_pts, 1), -1.0, device=device)
-    y1 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    z1 = torch.rand(n_pts, 1, device=device)
-    nx1 = torch.full((n_pts, 1), -1.0, device=device)
-    ny1 = torch.zeros(n_pts, 1, device=device)
-    nz1 = torch.zeros(n_pts, 1, device=device)
-
-    # x = 1 face (Right)
-    x2 = torch.full((n_pts, 1), 1.0, device=device)
-    y2 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    z2 = torch.rand(n_pts, 1, device=device)
-    nx2 = torch.full((n_pts, 1), 1.0, device=device)
-    ny2 = torch.zeros(n_pts, 1, device=device)
-    nz2 = torch.zeros(n_pts, 1, device=device)
-
-    # y = -1 face (Front)
-    x3 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    y3 = torch.full((n_pts, 1), -1.0, device=device)
-    z3 = torch.rand(n_pts, 1, device=device)
-    nx3 = torch.zeros(n_pts, 1, device=device)
-    ny3 = torch.full((n_pts, 1), -1.0, device=device)
-    nz3 = torch.zeros(n_pts, 1, device=device)
-
-    # y = 1 face (Back)
-    x4 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    y4 = torch.full((n_pts, 1), 1.0, device=device)
-    z4 = torch.rand(n_pts, 1, device=device)
-    nx4 = torch.zeros(n_pts, 1, device=device)
-    ny4 = torch.full((n_pts, 1), 1.0, device=device)
-    nz4 = torch.zeros(n_pts, 1, device=device)
-
-    # z = 1 face (Bottom)
-    x5 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    y5 = 2 * torch.rand(n_pts, 1, device=device) - 1
-    z5 = torch.full((n_pts, 1), 1.0, device=device)
-    nx5 = torch.zeros(n_pts, 1, device=device)
-    ny5 = torch.zeros(n_pts, 1, device=device)
-    nz5 = torch.full((n_pts, 1), 1.0, device=device)
-
-    x = torch.cat([x1, x2, x3, x4, x5], dim=0)
-    y = torch.cat([y1, y2, y3, y4, y5], dim=0)
-    z = torch.cat([z1, z2, z3, z4, z5], dim=0)
-    nx = torch.cat([nx1, nx2, nx3, nx4, nx5], dim=0)
-    ny = torch.cat([ny1, ny2, ny3, ny4, ny5], dim=0)
-    nz = torch.cat([nz1, nz2, nz3, nz4, nz5], dim=0)
-
-    return x, y, z, nx, ny, nz
-
-
-def sommerfeld_boundary_loss(
-    model: VibroInversionPINN,
-    x: torch.Tensor,
-    y: torch.Tensor,
-    z: torch.Tensor,
-    nx: torch.Tensor,
-    ny: torch.Tensor,
-    nz: torch.Tensor,
-    omega: float = 31.416,
-    domain_width_m: float = 5000.0,
-    max_depth_m: float = 2000.0,
-) -> torch.Tensor:
-    """Sommerfeld radiation condition on the 5 non-surface boundaries.
-
-    Enforces: ∇U · n̂ - i(ω/c)U = 0
-
-    This prevents the computational domain from acting as a perfect acoustic
-    mirror, which would create standing wave artifacts and cause the PINN to
-    hallucinate voids at resonance nodes.
-
-    For the complex wavefield U = U_real + iU_imag, the real/imag components
-    of the Sommerfeld residual are:
-        Real: ∂U_real/∂n + (ω/c) * U_imag = 0
-        Imag: ∂U_imag/∂n - (ω/c) * U_real = 0
-
-    Parameters
-    ----------
-    model : VibroInversionPINN
-    x, y, z : torch.Tensor  (N, 1) boundary point coordinates
-    nx, ny, nz : torch.Tensor  (N, 1) outward-pointing unit normals
-    omega : float  angular frequency
-    domain_width_m, max_depth_m : float  for chain-rule scaling
-    """
-    x = x.requires_grad_(True)
-    y = y.requires_grad_(True)
-    z = z.requires_grad_(True)
-
-    coords_f32 = torch.cat([x.float(), y.float(), z.float()], dim=-1)
-    U_real_f32, U_imag_f32, c_f32 = model(coords_f32)
-
-    if x.dtype == torch.float64:
-        U_real = U_real_f32.to(torch.float64)
-        U_imag = U_imag_f32.to(torch.float64)
-        c = c_f32.to(torch.float64)
-    else:
-        U_real = U_real_f32
-        U_imag = U_imag_f32
-        c = c_f32
-
-    scale_xy = 2.0 / domain_width_m
-    scale_z = 1.0 / max_depth_m
-
-    def compute_grad_dot_n(U):
-        """Compute ∇U · n̂ with chain-rule physical scaling."""
-        dU_dx = torch.autograd.grad(U, x, grad_outputs=torch.ones_like(U), create_graph=True, retain_graph=True, allow_unused=True)[0]
-        dU_dy = torch.autograd.grad(U, y, grad_outputs=torch.ones_like(U), create_graph=True, retain_graph=True, allow_unused=True)[0]
-        dU_dz = torch.autograd.grad(U, z, grad_outputs=torch.ones_like(U), create_graph=True, retain_graph=True, allow_unused=True)[0]
-
-        if dU_dx is None:
-            dU_dx = torch.zeros_like(U)
-        if dU_dy is None:
-            dU_dy = torch.zeros_like(U)
-        if dU_dz is None:
-            dU_dz = torch.zeros_like(U)
-
-        dU_dn = (dU_dx * scale_xy) * nx + (dU_dy * scale_xy) * ny + (dU_dz * scale_z) * nz
-        return dU_dn
-
-    dU_real_dn = compute_grad_dot_n(U_real)
-    dU_imag_dn = compute_grad_dot_n(U_imag)
-
-    k = omega / (c + 1e-8)
-    # Sommerfeld residuals: ∂U_r/∂n + k*U_i = 0 and ∂U_i/∂n - k*U_r = 0
-    residual_real = dU_real_dn + k * U_imag
-    residual_imag = dU_imag_dn - k * U_real
-
-    result = torch.mean(residual_real ** 2 + residual_imag ** 2)
-    return result.float() if x.dtype == torch.float64 else result
-
-
 def tv_regularization(
     model: VibroInversionPINN,
     coords: torch.Tensor,
     c_background: float = 3500.0,
-    domain_width_m: float = 800.0,
-    max_depth_m: float = 1000.0,
 ) -> torch.Tensor:
     """
     Total Variation (TV) regularization on wave speed.
@@ -834,14 +536,6 @@ def tv_regularization(
     Unlike L1 sparsity which just penalizes deviation from background,
     TV encourages SHARP geological boundaries rather than blurry ones.
     This is physically correct — real geological layers have abrupt transitions.
-
-    AUDIT FIX (1.3): create_graph was False, making TV contribute zero gradients.
-    The comment said "saves ~40% VRAM" but in reality it made the entire TV
-    regularization term dead — loss.backward() could not propagate through it.
-
-    AUDIT FIX (2.2): Gradients are now scaled to physical coordinates. Without
-    this, vertical gradients (Z spans max_depth_m) are penalized differently per
-    physical meter than horizontal gradients (X/Y span domain_width_m).
 
     Parameters
     ----------
@@ -851,10 +545,6 @@ def tv_regularization(
         (N, 3) sample coordinates (must have requires_grad enabled).
     c_background : float
         Background wave speed (unused, kept for API compatibility).
-    domain_width_m : float
-        Physical domain width in meters (for x,y gradient scaling).
-    max_depth_m : float
-        Physical max depth in meters (for z gradient scaling).
 
     Returns
     -------
@@ -865,19 +555,9 @@ def tv_regularization(
     _, _, c_pred = model(coords)
     grad_c = torch.autograd.grad(
         c_pred, coords, grad_outputs=torch.ones_like(c_pred),
-        create_graph=True  # AUDIT FIX: must be True for TV to contribute gradients
+        create_graph=False  # No need for 2nd-order grads through regularizer — saves ~40% VRAM
     )[0]
-    # AUDIT FIX (2.2): Scale gradients to physical space so the TV norm is
-    # isotropic per physical meter. Without this, z-gradients are penalized
-    # disproportionately when max_depth != domain_width.
-    scale_xy = 2.0 / domain_width_m  # normalized [-1,1] → physical meters
-    scale_z = 1.0 / max_depth_m      # normalized [0,1] → physical meters
-    phys_scale = torch.tensor(
-        [scale_xy, scale_xy, scale_z],
-        device=coords.device, dtype=coords.dtype,
-    )
-    grad_c_phys = grad_c * phys_scale
-    return torch.mean(torch.sqrt(torch.sum(grad_c_phys**2, dim=-1) + 1e-8))
+    return torch.mean(torch.sqrt(torch.sum(grad_c**2, dim=-1) + 1e-8))
 
 
 # ============================================================
@@ -1014,6 +694,34 @@ def sample_surface_points(
     return coords, values
 
 
+def sample_deep_points(
+    batch_size: int,
+    device: torch.device,
+    z_min: float = 0.8,
+) -> torch.Tensor:
+    """
+    Sample points near the maximum depth for the deep boundary condition.
+
+    Parameters
+    ----------
+    batch_size : int
+        Number of deep points.
+    device : torch.device
+        Target device.
+    z_min : float
+        Minimum normalized depth (0.8 = bottom 20% of domain).
+
+    Returns
+    -------
+    coords : torch.Tensor
+        (batch_size, 3) coordinates near max depth.
+    """
+    x = 2 * torch.rand(batch_size, 1, device=device) - 1
+    y = 2 * torch.rand(batch_size, 1, device=device) - 1
+    z = z_min + (1.0 - z_min) * torch.rand(batch_size, 1, device=device)
+    return torch.cat([x, y, z], dim=-1)
+
+
 # ============================================================
 # 5. Training Loop
 # ============================================================
@@ -1022,7 +730,6 @@ def train_vibro_pinn(
     output_dir: str,
     config: Optional[Dict] = None,
     frequency_map: Optional[np.ndarray] = None,
-    surface_anomaly_map: Optional[np.ndarray] = None,
 ) -> Dict[str, str]:
     """
     Train the Helmholtz PINN to invert surface vibrations into 3D structure.
@@ -1036,13 +743,8 @@ def train_vibro_pinn(
     config : dict, optional
         Override default configuration.
     frequency_map : np.ndarray, optional
-        2D array of dominant vibration frequencies.
-    surface_anomaly_map : np.ndarray, optional
-        Cap 4: 2-D float32 array (H, W) of surface embedding anomaly scores
-        in [0, 1]. When provided, the sparsity prior is spatially modulated so
-        that the PINN is permitted to predict larger wave-speed deviations
-        (voids) under anomalous surface pixels. Requires config key
-        'surface_prior_weight' (default 0.0 disables even when map is given).
+        2D array of dominant vibration frequencies. If provided, uses
+        spatially-varying omega instead of a single frequency.
 
     Returns
     -------
@@ -1053,13 +755,6 @@ def train_vibro_pinn(
     cfg = DEFAULT_INVERSION_CONFIG.copy()
     if config:
         cfg.update(config)
-
-    if frequency_map is not None:
-        logger.warning(
-            "frequency_map was supplied but is not used by the inversion; "
-            "excitation frequency comes from config 'excitation_frequency_hz' "
-            f"({cfg['excitation_frequency_hz']} Hz)"
-        )
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -1080,24 +775,18 @@ def train_vibro_pinn(
     # FIX: Smooth the SAR speckle noise so the Laplacian doesn't explode!
     from scipy.ndimage import gaussian_filter
     logger.info("Applying Gaussian filter to suppress SAR high-frequency speckle...")
-    # A sigma of 4.0 smooths out the microscopic noise the network is abusing
-    vib_map = gaussian_filter(vib_map, sigma=4.0)
+    # A sigma of 2.0 smooths out the microscopic noise the network is abusing
+    vib_map = gaussian_filter(vib_map, sigma=2.0)
 
-    # AUDIT FIX (1.2): Replace Z-score normalization with max-abs positive scaling.
-    # The surface_data_loss fits |U| = sqrt(U_real² + U_imag²) to targets.
-    # |U| is strictly non-negative, so targets MUST also be non-negative.
-    # Z-score makes ~50% of targets negative → network minimizes MSE by
-    # crushing U to zero wherever targets are negative → hallucinated rock
-    # barriers (the "dead zone" artifact).
-    vib_abs_max = np.nanmax(np.abs(vib_map))
-    if vib_abs_max < 1e-8:
-        vib_abs_max = 1.0
-    vib_normalized = vib_map / vib_abs_max
+    # Normalize vibration map
+    vib_mean = np.nanmean(vib_map)
+    vib_std = np.nanstd(vib_map)
+    if vib_std < 1e-8:
+        vib_std = 1.0
+    vib_normalized = (vib_map - vib_mean) / vib_std
     vib_normalized = np.nan_to_num(vib_normalized, nan=0.0)
-    vib_normalized = np.clip(vib_normalized, 0.0, None)  # Enforce non-negative
 
-    logger.info(f"Vibration map: {vib_map.shape}, max_abs={vib_abs_max:.6f}, "
-                f"normalized range=[{vib_normalized.min():.4f}, {vib_normalized.max():.4f}]")
+    logger.info(f"Vibration map: {vib_map.shape}, mean={vib_mean:.6f}, std={vib_std:.6f}")
 
     # Device setup
     if torch.cuda.is_available():
@@ -1144,7 +833,7 @@ def train_vibro_pinn(
     if hasattr(torch, 'compile') and device.type == 'cuda' and not use_float64_physics:
         try:
             model = torch.compile(model, mode='default')
-            logger.info("torch.compile enabled (default mode - compatible with autograd.grad)")
+            logger.info("torch.compile enabled (default mode — compatible with autograd.grad)")
         except Exception as e:
             logger.warning(f"torch.compile failed, continuing without: {e}")
     else:
@@ -1176,9 +865,12 @@ def train_vibro_pinn(
         gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         model_mem_gb = sum(p.numel() * p.element_size() for p in model.parameters()) / (1024**3)
         free_mem_gb = gpu_mem_gb - model_mem_gb - 1.0  # Leave 1GB headroom
-        # Auto-scaling disabled: fixed batch sizes proved more stable than
-        # VRAM-derived scaling (previously max(1, min(8-16, free_gb/unit))).
-        scale_factor = 1
+        # Memory per unit depends on precision mode:
+        # float64 physics: ~8KB per colloc point (autograd graph in double)
+        # float32 + TF32:  ~3KB per colloc point (compile fuses kernels)
+        gb_per_unit = 8.0 if use_float64_physics else 3.0
+        max_scale = 1 # disabled: 8 if use_float64_physics else 16  # float32 can scale higher
+        scale_factor = 1 # disabled: max(1, min(max_scale, int(free_mem_gb / gb_per_unit)))
         base_colloc = cfg["batch_size_collocation"]
         base_boundary = cfg["batch_size_boundary"]
         cfg["batch_size_collocation"] = base_colloc * scale_factor
@@ -1211,31 +903,8 @@ def train_vibro_pinn(
         logger.info(f"  GPU Memory: {gpu_mem:.1f} GB")
     sys.stdout.flush()
 
-    # Cap 4: Normalise the surface anomaly map to [0,1] if supplied
-    _surface_prior_weight = float(cfg.get("surface_prior_weight", 0.0))
-    _use_surface_prior = surface_anomaly_map is not None and _surface_prior_weight > 0.0
-    if _use_surface_prior:
-        _amap = surface_anomaly_map.astype(np.float32)
-        _amap_min, _amap_max = float(np.nanmin(_amap)), float(np.nanmax(_amap))
-        if _amap_max > _amap_min:
-            _amap = (_amap - _amap_min) / (_amap_max - _amap_min)
-        _amap = np.nan_to_num(_amap, nan=0.0).clip(0.0, 1.0)
-        logger.info(
-            f"Cap 4 surface prior ENABLED: weight={_surface_prior_weight:.4f}, "
-            f"anomaly map shape={_amap.shape}, "
-            f"anomalous fraction (>0.5): {(_amap > 0.5).mean():.3f}"
-        )
-    else:
-        _amap = None
-        if surface_anomaly_map is not None:
-            logger.info("Cap 4 surface prior map supplied but surface_prior_weight=0 - skipping.")
-
     training_start = time.time()
-    loss_history = _initialize_loss_history(
-        cfg,
-        surface_prior_map_supplied=surface_anomaly_map is not None,
-        surface_prior_enabled=_use_surface_prior,
-    )
+    loss_history = {"total": [], "physics": [], "data": [], "reg": [], "sparse": [], "deep": []}
     best_loss = float('inf')
     epochs_without_improvement = 0
     early_stopping_patience = cfg.get("early_stopping_patience", 500)
@@ -1256,17 +925,14 @@ def train_vibro_pinn(
         epoch_loss_reg = 0.0
         epoch_loss_total = 0.0
 
-        # === Physics warmup: ramp physics_weight from 0→target over warmup epochs ===
-        if physics_warmup_epochs > 0 and epoch < physics_warmup_epochs:
-            current_physics_weight = target_physics_weight * (epoch / physics_warmup_epochs)
-        else:
-            current_physics_weight = target_physics_weight
-
-        epoch_loss_deep = 0.0
-        epoch_loss_surface_prior = 0.0
-        epoch_loss_sommerfeld = 0.0
-
         for accum_step in range(accum_steps):
+
+
+            # === Physics warmup: ramp physics_weight from 0→target over warmup epochs ===
+            if physics_warmup_epochs > 0 and epoch < physics_warmup_epochs:
+                current_physics_weight = target_physics_weight * (epoch / physics_warmup_epochs)
+            else:
+                current_physics_weight = target_physics_weight
 
             # === Sample collocation points ===
             x_coll, y_coll, z_coll = sample_collocation_points(
@@ -1308,11 +974,9 @@ def train_vibro_pinn(
                     model, reg_coords, cfg["background_wave_speed"]
                 )
 
-                # 4. TV regularization (AUDIT FIX: pass domain params for physical scaling)
+                # 4. TV regularization (uses detached coords, no create_graph)
                 loss_reg = tv_regularization(
-                    model, reg_coords, cfg["background_wave_speed"],
-                    domain_width_m=cfg["domain_width_m"],
-                    max_depth_m=cfg["max_depth_m"],
+                    model, reg_coords, cfg["background_wave_speed"]
                 )
 
                 # 5. Deep boundary loss: enforce background at bottom 20% of domain
@@ -1321,48 +985,14 @@ def train_vibro_pinn(
                     model, deep_coords, cfg["background_wave_speed"]
                 )
 
-                # 6. Cap 4: Surface embedding prior (only if map + weight provided)
-                if _use_surface_prior:
-                    anomaly_vals = _sample_anomaly_for_coords(
-                        _amap,
-                        x_coll.float(),
-                        y_coll.float(),
-                        device,
-                    )
-                    loss_surface_prior = surface_prior_loss(
-                        model,
-                        torch.cat([x_coll.float(), y_coll.float(), z_coll.float()], dim=-1),
-                        anomaly_vals,
-                        cfg["background_wave_speed"],
-                    )
-                else:
-                    loss_surface_prior = torch.zeros(1, device=device)
-
-            # 7. Sommerfeld radiation boundary condition (outside AMP context)
-            x_b, y_b, z_b, nx_b, ny_b, nz_b = sample_sommerfeld_points(
-                cfg["batch_size_boundary"], device
-            )
-            if use_float64_physics:
-                x_b, y_b, z_b = x_b.double(), y_b.double(), z_b.double()
-                nx_b, ny_b, nz_b = nx_b.double(), ny_b.double(), nz_b.double()
-
-            loss_sommerfeld = sommerfeld_boundary_loss(
-                model, x_b, y_b, z_b, nx_b, ny_b, nz_b,
-                omega,
-                domain_width_m=cfg["domain_width_m"],
-                max_depth_m=cfg["max_depth_m"],
-            )
-
             # Total loss (scaled by accumulation steps for gradient averaging)
             phys_weighted = current_physics_weight * loss_physics
             data_weighted = cfg["data_weight"] * loss_data
             sparse_weighted = cfg.get("sparsity_weight", 0.01) * loss_sparse
             reg_weighted = cfg["regularization_weight"] * loss_reg
             deep_weighted = cfg.get("deep_prior_weight", 0.1) * loss_deep
-            prior_weighted = _surface_prior_weight * loss_surface_prior
-            sommerfeld_weighted = current_physics_weight * loss_sommerfeld
-
-            loss_unscaled = phys_weighted + data_weighted + sparse_weighted + reg_weighted + deep_weighted + prior_weighted + sommerfeld_weighted
+            
+            loss_unscaled = phys_weighted + data_weighted + sparse_weighted + reg_weighted + deep_weighted
             loss = loss_unscaled / accum_steps
 
 
@@ -1378,14 +1008,11 @@ def train_vibro_pinn(
             _sparse_val = loss_sparse.item()
             _reg_val = loss_reg.item()
             _deep_val = loss_deep.item()
-            _prior_val = loss_surface_prior.item()
-            _sommerfeld_val = loss_sommerfeld.item()
             _loss_val = loss.item()
 
-            del loss, loss_unscaled, phys_weighted, data_weighted, sparse_weighted, reg_weighted, deep_weighted, prior_weighted, sommerfeld_weighted
-            del loss_physics, loss_data, loss_sparse, loss_reg, loss_deep, loss_surface_prior, loss_sommerfeld
+            del loss, loss_unscaled, phys_weighted, data_weighted, sparse_weighted, reg_weighted, deep_weighted
+            del loss_physics, loss_data, loss_sparse, loss_reg, loss_deep
             del x_coll, y_coll, z_coll, surface_coords, surface_values, reg_coords, deep_coords
-            del x_b, y_b, z_b, nx_b, ny_b, nz_b
             # NOTE: Removed torch.cuda.empty_cache() — it syncs CPU-GPU and costs
             # ~50-100ms per call. PyTorch's caching allocator reuses memory fine.
 
@@ -1394,16 +1021,13 @@ def train_vibro_pinn(
             epoch_loss_data += _data_val / accum_steps
             epoch_loss_sparse += _sparse_val / accum_steps
             epoch_loss_reg += _reg_val / accum_steps
-            epoch_loss_deep += _deep_val / accum_steps
-            epoch_loss_surface_prior += _prior_val / accum_steps
-            epoch_loss_sommerfeld += _sommerfeld_val / accum_steps
             epoch_loss_total += _loss_val
 
         # === NaN detection and rollback ===
         if not np.isfinite(epoch_loss_total):
             nan_recoveries += 1
             if nan_recoveries > max_nan_recoveries:
-                logger.error(f"NaN loss after {max_nan_recoveries} recoveries - aborting.")
+                logger.error(f"NaN loss after {max_nan_recoveries} recoveries — aborting.")
                 break
             logger.warning(f"NaN detected at epoch {epoch}! Recovery {nan_recoveries}/{max_nan_recoveries}")
             if best_state is not None:
@@ -1428,48 +1052,12 @@ def train_vibro_pinn(
 
         scheduler.step(epoch_loss_total)
 
-        # Record every completed epoch with raw, weighted, active, and weight fields.
-        epoch_weights = {
-            "physics": current_physics_weight,
-            "data": cfg["data_weight"],
-            "sparse": cfg.get("sparsity_weight", 0.01),
-            "reg": cfg["regularization_weight"],
-            "deep": cfg.get("deep_prior_weight", 0.1),
-            "surface_prior": _surface_prior_weight,
-            "sommerfeld": current_physics_weight,
-        }
-        epoch_active = {
-            "physics": target_physics_weight > 0.0,
-            "data": cfg["data_weight"] > 0.0,
-            "sparse": cfg.get("sparsity_weight", 0.01) > 0.0,
-            "reg": cfg["regularization_weight"] > 0.0,
-            "deep": cfg.get("deep_prior_weight", 0.1) > 0.0,
-            "surface_prior": _use_surface_prior,
-            "sommerfeld": target_physics_weight > 0.0,
-        }
-        _append_loss_history(
-            loss_history,
-            epoch=epoch,
-            raw_losses={
-                "total": epoch_loss_total,
-                "physics": epoch_loss_physics,
-                "data": epoch_loss_data,
-                "sparse": epoch_loss_sparse,
-                "reg": epoch_loss_reg,
-                "deep": epoch_loss_deep,
-                "surface_prior": epoch_loss_surface_prior,
-                "sommerfeld": epoch_loss_sommerfeld,
-            },
-            weights=epoch_weights,
-            active=epoch_active,
-        )
-
-        # Loss weights change while physics ramps up, so pre-warmup totals are
-        # not comparable to post-warmup ones. Reset the baseline once the
-        # warmup finishes; before that, best_state still serves NaN rollback.
-        if physics_warmup_epochs > 0 and epoch == physics_warmup_epochs:
-            best_loss = float('inf')
-            epochs_without_improvement = 0
+        # Record
+        loss_history["total"].append(epoch_loss_total)
+        loss_history["physics"].append(epoch_loss_physics)
+        loss_history["data"].append(epoch_loss_data)
+        loss_history["reg"].append(epoch_loss_reg)
+        loss_history["sparse"].append(epoch_loss_sparse)
 
         if epoch_loss_total < best_loss:
             best_loss = epoch_loss_total
@@ -1492,7 +1080,7 @@ def train_vibro_pinn(
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'best_loss': best_loss,
-                'loss_history': _loss_history_to_jsonable(loss_history),
+                'loss_history': {k: v[:] for k, v in loss_history.items()},
                 'nan_recoveries': nan_recoveries,
             }
             torch.save(ckpt, ckpt_path)
@@ -1509,7 +1097,6 @@ def train_vibro_pinn(
             logger.info(
                 f"[E{epoch:04d}] phys={epoch_loss_physics:.4f} "
                 f"data={epoch_loss_data:.4f} sparse={epoch_loss_sparse:.4f} "
-                f"deep={epoch_loss_deep:.4f} surface_prior={epoch_loss_surface_prior:.4f} "
                 f"total={epoch_loss_total:.6f} lr={optimizer.param_groups[0]['lr']:.2e} "
                 f"grad_norm={total_grad_norm:.4f}"
             )
@@ -1526,8 +1113,6 @@ def train_vibro_pinn(
                 phys=f"{epoch_loss_physics:.4f}",
                 data=f"{epoch_loss_data:.4f}",
                 sparse=f"{epoch_loss_sparse:.4f}",
-                deep=f"{epoch_loss_deep:.4f}",
-                surface=f"{epoch_loss_surface_prior:.4f}",
                 lr=f"{optimizer.param_groups[0]['lr']:.2e}",
                 mem=mem_info,
             )
@@ -1540,12 +1125,6 @@ def train_vibro_pinn(
 
     training_time = time.time() - training_start
     logger.info(f"\nTraining complete in {training_time:.1f}s (best loss: {best_loss:.6f})")
-
-    # Extract volumes from the best checkpoint, not whatever weights the last
-    # (possibly non-improving or early-stopped) epoch left behind.
-    if best_state is not None:
-        model.load_state_dict(best_state)
-        logger.info("Restored best checkpoint weights for volume extraction")
 
     # ============================================================
     # 6. Extract 3D Volume
@@ -1667,8 +1246,9 @@ def train_vibro_pinn(
 
     # Save loss history (JSON for reliable serialization — npy scalar bug fixed)
     loss_path = Path(output_dir) / "loss_history.json"
+    import json as _json
     with open(loss_path, 'w') as _f:
-        dump_strict_json(loss_history, _f, indent=2)
+        _json.dump({k: [float(x) for x in v] for k, v in loss_history.items()}, _f)
     outputs["loss_history"] = str(loss_path)
 
     # Log summary
@@ -1678,7 +1258,7 @@ def train_vibro_pinn(
     logger.info(f"  Volume shape: ({nz}, {ny}, {nx})")
     logger.info(f"  Depth range: 0 to {max_depth:.0f} m")
     logger.info(f"  Wave speed: [{wave_speed_volume.min():.0f}, {wave_speed_volume.max():.0f}] m/s")
-    logger.info(f"  Density contrast: [{density_contrast.min():.0f}, {density_contrast.max():.0f}] kg/m^3")
+    logger.info(f"  Density contrast: [{density_contrast.min():.0f}, {density_contrast.max():.0f}] kg/m³")
     logger.info(f"  Max void probability: {void_probability.max():.4f}")
     logger.info(f"  Voxels with void_prob > 0.5: {(void_probability > 0.5).sum()}")
     logger.info(f"  Voxels with void_prob > 0.8: {(void_probability > 0.8).sum()}")
@@ -1700,21 +1280,19 @@ if __name__ == "__main__":
     )
     parser.add_argument("--frequency", default=None, help="Optional frequency map")
     parser.add_argument("--output-dir", default=None, help="Output directory")
-    parser.add_argument("--depth", type=float, default=DEFAULT_INVERSION_CONFIG['max_depth_m'], help=f"Max depth in meters (default: {DEFAULT_INVERSION_CONFIG['max_depth_m']})")
-    parser.add_argument("--epochs", type=int, default=DEFAULT_INVERSION_CONFIG['epochs'], help=f"Training epochs (default: {DEFAULT_INVERSION_CONFIG['epochs']})")
-    parser.add_argument("--lr", type=float, default=DEFAULT_INVERSION_CONFIG['lr'], help=f"Learning rate (default: {DEFAULT_INVERSION_CONFIG['lr']})")
-    parser.add_argument("--freq-hz", type=float, default=DEFAULT_INVERSION_CONFIG['excitation_frequency_hz'], help=f"Excitation frequency in Hz (default: {DEFAULT_INVERSION_CONFIG['excitation_frequency_hz']})")
-    parser.add_argument("--nx", type=int, default=DEFAULT_INVERSION_CONFIG['grid_nx'], help=f"X grid resolution (default: {DEFAULT_INVERSION_CONFIG['grid_nx']})")
-    parser.add_argument("--ny", type=int, default=DEFAULT_INVERSION_CONFIG['grid_ny'], help=f"Y grid resolution (default: {DEFAULT_INVERSION_CONFIG['grid_ny']})")
-    parser.add_argument("--nz", type=int, default=DEFAULT_INVERSION_CONFIG['grid_nz'], help=f"Z/depth grid resolution (default: {DEFAULT_INVERSION_CONFIG['grid_nz']})")
-    parser.add_argument("--hidden-layers", type=int, default=DEFAULT_INVERSION_CONFIG["hidden_layers"])
-    parser.add_argument("--hidden-neurons", type=int, default=DEFAULT_INVERSION_CONFIG["hidden_neurons"])
-    parser.add_argument("--wave-speed-bg", type=float, default=DEFAULT_INVERSION_CONFIG['background_wave_speed'], help=f"Background wave speed in m/s (default: {DEFAULT_INVERSION_CONFIG['background_wave_speed']})")
-    parser.add_argument("--domain-width", type=float, default=DEFAULT_INVERSION_CONFIG['domain_width_m'], help=f"Horizontal domain width in meters (default: {DEFAULT_INVERSION_CONFIG['domain_width_m']})")
-    parser.add_argument("--surface-prior-weight", type=float, default=0.0, help="Embedding surface-prior loss weight; requires API-supplied surface_anomaly_map (default: 0.0)")
-    parser.add_argument("--batch-colloc", type=int, default=None, help=f"Collocation batch size (default: {DEFAULT_INVERSION_CONFIG['batch_size_collocation']})")
-    parser.add_argument("--batch-boundary", type=int, default=None, help=f"Boundary batch size (default: {DEFAULT_INVERSION_CONFIG['batch_size_boundary']})")
-    parser.add_argument("--accum-steps", type=int, default=None, help=f"Gradient accumulation steps (default: {DEFAULT_INVERSION_CONFIG['gradient_accumulation_steps']})")
+    parser.add_argument("--depth", type=float, default=2000.0, help="Max depth (m)")
+    parser.add_argument("--epochs", type=int, default=3000, help="Training epochs")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--freq-hz", type=float, default=5.0, help="Excitation frequency (Hz)")
+    parser.add_argument("--nx", type=int, default=64, help="X grid resolution")
+    parser.add_argument("--ny", type=int, default=64, help="Y grid resolution")
+    parser.add_argument("--nz", type=int, default=32, help="Z grid resolution")
+    parser.add_argument("--hidden-layers", type=int, default=6)
+    parser.add_argument("--hidden-neurons", type=int, default=256)
+    parser.add_argument("--wave-speed-bg", type=float, default=3500.0, help="Background wave speed (m/s)")
+    parser.add_argument("--batch-colloc", type=int, default=None, help="Collocation batch size (default: 65536)")
+    parser.add_argument("--batch-boundary", type=int, default=None, help="Boundary batch size (default: 16384)")
+    parser.add_argument("--accum-steps", type=int, default=None, help="Gradient accumulation steps (default: 4)")
 
     args = parser.parse_args()
 
@@ -1754,11 +1332,9 @@ if __name__ == "__main__":
         "grid_nx": args.nx,
         "grid_ny": args.ny,
         "grid_nz": args.nz,
-        "domain_width_m": args.domain_width,
         "hidden_layers": args.hidden_layers,
         "hidden_neurons": args.hidden_neurons,
         "background_wave_speed": args.wave_speed_bg,
-        "surface_prior_weight": args.surface_prior_weight,
     }
     if args.batch_colloc is not None:
         config["batch_size_collocation"] = args.batch_colloc

@@ -1,0 +1,2 @@
+id,centroid_m,depth_m,volume_m3,mean_void_probability,void_evidence_score,deep_target_score,fused_confidence_score,deep_target_rank
+1,"[55.0, 20.0, 60.0]",60.0,500.0,0.62,0.45,0.39,0.39,1

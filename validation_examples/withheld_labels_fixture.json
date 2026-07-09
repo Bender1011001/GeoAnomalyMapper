@@ -1,0 +1,28 @@
+{
+    "schema_version": "blind-validation-labels-v1",
+    "validation_id": "safe_fixture_blind_validation_v1",
+    "description": "Safe synthetic withheld-label fixture for unit and CLI smoke tests only.",
+    "labels": [
+        {
+            "target_id": "fixture_positive_site",
+            "site_class": "positive",
+            "known_voids": [
+                {
+                    "void_id": "fixture_void_a",
+                    "offset_m": [
+                        10.0,
+                        -10.0
+                    ],
+                    "depth_m": 120.0,
+                    "horizontal_tolerance_m": 25.0,
+                    "depth_tolerance_m": 25.0
+                }
+            ]
+        },
+        {
+            "target_id": "fixture_negative_control",
+            "site_class": "negative",
+            "known_voids": []
+        }
+    ]
+}

@@ -9,6 +9,7 @@ data/
 *.kmz
 *.kml
 *.csv
+!validation_examples/fixture_candidates/*.csv
 # Python
 __pycache__/
 *.py[cod]
@@ -97,3 +98,7 @@ validation_results/
 mrds_data/
 mrds_data/**
 biondi_results_new.zip
+
+# Large local result artifacts (exceed/approach GitHub limits; regenerable)
+results_archive.zip
+results_extracted/

@@ -50,8 +50,7 @@ import torch
 import torch.nn.functional as F
 from scipy.signal import windows
 
-from json_utils import dump_strict_json
-from project_paths import DATA_DIR
+from project_paths import DATA_DIR, PROCESSED_DIR, ensure_directories
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -96,17 +95,6 @@ def apply_gaussian_filter(tensor: torch.Tensor, sigma: float) -> torch.Tensor:
 # ============================================================
 VIBROMETRY_DIR = DATA_DIR / "vibrometry"
 VIBROMETRY_OUTPUTS = VIBROMETRY_DIR / "outputs"
-
-# Sentinel-1 IW mode azimuth FM rate (Hz/s). Sub-apertures are separated in
-# Doppler frequency; the equivalent time separation between sub-aperture
-# centers is delta_f_D / |K_a|. Shared by the velocity conversion, the
-# frequency-map estimator, and the synthetic generator so encode/decode agree.
-SENTINEL1_IW_AZIMUTH_FM_RATE_HZ_S = 2020.0
-
-def sub_aperture_time_separation_s(prf_hz: float, num_sub_apertures: int) -> float:
-    """Time separation between adjacent sub-aperture centers (seconds)."""
-    delta_fd = prf_hz / num_sub_apertures
-    return delta_fd / SENTINEL1_IW_AZIMUTH_FM_RATE_HZ_S
 
 DEFAULT_VIBROMETRY_CONFIG = {
     "num_sub_apertures": 5,           # Number of azimuth sub-bands
@@ -216,13 +204,17 @@ def compute_sub_aperture_interferograms(
     phase_diffs = torch.zeros((num_pairs, h, w), dtype=torch.float32, device=device)
     coherence_maps = torch.zeros((num_pairs, h, w), dtype=torch.float32, device=device)
 
+    # Neighborhood size for coherence estimation
+    coh_window = 5
+    half_w = float(coh_window // 2)
+
     half_w = 2.5  # Gaussian sigma for multi-look smoothing
 
     for i in range(num_pairs):
         # Complex interferogram = S_i * conj(S_{i+1})
         interferogram = sub_apertures[i] * torch.conj(sub_apertures[i + 1])
 
-        # CRITICAL FIX: Multi-looking - smooth complex interferogram BEFORE angle extraction.
+        # CRITICAL FIX: Multi-looking — smooth complex interferogram BEFORE angle extraction.
         # Taking angle of raw interferogram yields pure white noise due to radar speckle.
         # Complex smoothing acts as amplitude-weighted phase filtering.
         interferogram_smooth = apply_gaussian_filter(interferogram, half_w)
@@ -247,10 +239,7 @@ def phase_to_vibration_velocity(
     """
     Convert sub-aperture phase differences directly to vibration velocity on GPU.
     """
-    # AUDIT FIX (2.4): Sub-apertures are separated in Doppler frequency, not
-    # time. The PRF-based formula was physically incorrect for Sentinel-1 IW.
-    delta_t = sub_aperture_time_separation_s(prf_hz, num_sub_apertures)
-    conv_factor = radar_wavelength_m / (4 * np.pi * delta_t)
+    conv_factor = (radar_wavelength_m * prf_hz) / (4 * np.pi * num_sub_apertures)
     velocity_pairs = phase_diffs * conv_factor
 
     valid_mask = coherence_maps >= coherence_threshold
@@ -284,9 +273,7 @@ def compute_vibration_frequency_map(
     freq_map = torch.zeros((h, w), dtype=torch.float32, device=device)
 
     pad_len = max(64, n_sub * 16)
-    # Sampling rate between sub-aperture centers, consistent with
-    # phase_to_vibration_velocity (Doppler separation mapped to time via K_a).
-    temporal_sampling_rate = 1.0 / sub_aperture_time_separation_s(prf_hz, num_sub_apertures)
+    temporal_sampling_rate = prf_hz / num_sub_apertures
     freqs = torch.fft.fftfreq(pad_len, d=1.0 / temporal_sampling_rate).to(device)
     freqs_valid = torch.abs(freqs[:pad_len // 2 + 1]).float()
 
@@ -358,9 +345,6 @@ def run_vibrometry_pipeline(
     if config:
         cfg.update(config)
 
-    if int(cfg["num_sub_apertures"]) < 2:
-        raise ValueError("num_sub_apertures must be at least 2 for interferometric phase tracking")
-
     if output_dir is None:
         output_dir = str(VIBROMETRY_OUTPUTS)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -375,7 +359,7 @@ def run_vibrometry_pipeline(
         )
     logger.info(f"SLC shape: {slc_data.shape}, dtype: {slc_data.dtype}")
 
-    # Crop large bursts to avoid OOM - 4096x4096 is still >>800m domain
+    # Crop large bursts to avoid OOM — 4096x4096 is still >>800m domain
     max_dim = 4096
     if slc_data.shape[0] > max_dim or slc_data.shape[1] > max_dim:
         h_orig, w_orig = slc_data.shape
@@ -461,6 +445,7 @@ def run_vibrometry_pipeline(
     if georef_tif and os.path.exists(georef_tif):
         try:
             import rasterio
+            from rasterio.enums import Resampling
 
             with rasterio.open(georef_tif) as ref:
                 profile = ref.profile.copy()
@@ -524,8 +509,6 @@ def generate_synthetic_vibration_test(
     grid_size: int = 512,
     num_anomalies: int = 3,
     noise_level: float = 0.1,
-    num_sub_apertures: int = 5,
-    overlap_fraction: float = 0.3,
 ) -> str:
     """
     Generate a synthetic SLC-like dataset with embedded vibration anomalies
@@ -553,62 +536,33 @@ def generate_synthetic_vibration_test(
     str
         Path to the saved synthetic SLC file and ground truth file.
     """
-    if grid_size < 8:
-        raise ValueError("grid_size must be at least 8 pixels for bounded synthetic anomalies")
-    if num_anomalies < 0:
-        raise ValueError("num_anomalies must be non-negative")
-
-    seed = 42
-    rng = np.random.default_rng(seed)
+    np.random.seed(42)
 
     # Generate base complex SAR backscatter (speckle)
     # Follows Rayleigh-distributed amplitude with uniform phase
-    amplitude = rng.rayleigh(scale=1.0, size=(grid_size, grid_size)).astype(np.float32)
-    base_phase = rng.uniform(-np.pi, np.pi, size=(grid_size, grid_size)).astype(np.float32)
+    amplitude = np.random.rayleigh(scale=1.0, size=(grid_size, grid_size)).astype(np.float32)
+    base_phase = np.random.uniform(-np.pi, np.pi, size=(grid_size, grid_size)).astype(np.float32)
 
     # Create known anomaly locations with vibration signatures
     anomaly_mask = np.zeros((grid_size, grid_size), dtype=np.float32)
-    anomaly_core_mask = np.zeros((grid_size, grid_size), dtype=bool)
     ground_truth = []
-    placed_anomalies = []
-
-    max_radius = max(1, min(50, grid_size // 10))
-    min_radius = max(1, min(10, max_radius, grid_size // 16))
-    yy, xx = np.ogrid[:grid_size, :grid_size]
 
     for i in range(num_anomalies):
-        # Size is constrained relative to the grid so small fixtures do not saturate.
-        radius = int(rng.integers(min_radius, max_radius + 1))
-        edge_margin = min(max(radius + 1, grid_size // 8), max(1, grid_size // 2 - 1))
+        # Random position (avoid edges)
+        cy = np.random.randint(grid_size // 4, 3 * grid_size // 4)
+        cx = np.random.randint(grid_size // 4, 3 * grid_size // 4)
 
-        # Deterministic random placement, with best-effort spacing to reduce overlap.
-        cy = cx = grid_size // 2
-        for _ in range(100):
-            low = edge_margin
-            high = max(edge_margin + 1, grid_size - edge_margin)
-            candidate_y = int(rng.integers(low, high))
-            candidate_x = int(rng.integers(low, high))
-            if all(
-                np.hypot(candidate_y - other["center_y"], candidate_x - other["center_x"])
-                >= radius + other["radius"] + 1
-                for other in placed_anomalies
-            ):
-                cy, cx = candidate_y, candidate_x
-                break
-        else:
-            cy = int(rng.integers(edge_margin, max(edge_margin + 1, grid_size - edge_margin)))
-            cx = int(rng.integers(edge_margin, max(edge_margin + 1, grid_size - edge_margin)))
+        # Random size (10-50 pixels radius)
+        radius = np.random.randint(10, 50)
 
         # Random vibration amplitude (0.1 to 1.0 mm/s)
-        vib_amplitude = float(rng.uniform(0.1, 1.0))
+        vib_amplitude = np.random.uniform(0.1, 1.0)
 
         # Random vibration frequency (1-20 Hz)
-        vib_freq = float(rng.uniform(1.0, 20.0))
-
-        # Deterministic synthetic depth metadata only; the SLC fixture remains 2D.
-        depth_m = float(rng.uniform(50.0, 1000.0))
+        vib_freq = np.random.uniform(1.0, 20.0)
 
         # Create circular anomaly
+        yy, xx = np.ogrid[:grid_size, :grid_size]
         dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
         mask = dist <= radius
 
@@ -617,86 +571,38 @@ def generate_synthetic_vibration_test(
         falloff[dist <= radius * 0.8] = 1.0
         falloff[dist > radius * 1.5] = 0.0
 
-        contribution = (falloff * vib_amplitude).astype(np.float32)
-        anomaly_mask = np.maximum(anomaly_mask, contribution)
-        anomaly_core_mask |= mask
-
-        active_mask = contribution > 0.05
-        coverage_fraction = float(active_mask.sum() / active_mask.size)
+        anomaly_mask += falloff * vib_amplitude
 
         ground_truth.append({
             "id": i,
             "center_y": cy,
             "center_x": cx,
             "radius": radius,
-            "center_px": [cy, cx],
-            "radius_px": radius,
-            "depth_m": depth_m,
             "vibration_amplitude_mm_s": vib_amplitude,
             "vibration_frequency_hz": vib_freq,
-            "coverage_fraction": coverage_fraction,
         })
-        placed_anomalies.append({"center_y": cy, "center_x": cx, "radius": radius})
 
         logger.info(
             f"  Anomaly {i}: center=({cy},{cx}), r={radius}, "
             f"amp={vib_amplitude:.2f}mm/s, freq={vib_freq:.1f}Hz"
         )
 
-    # Convert vibration amplitude to a phase step between adjacent synthetic
-    # sub-apertures. A static phase perturbation is not a valid positive control
-    # for the Doppler algorithm because every sub-band observes the same phase;
-    # the signal below is encoded as sub-aperture phase evolution and then packed
-    # into azimuth Doppler bands matching extract_doppler_sub_apertures().
+    # Convert vibration amplitude to phase modulation
+    # phase_modulation ∝ vibration_velocity / (λ * PRF / N_sub)
     wavelength = 0.0555
     prf = 486.486
-    n_sub = int(num_sub_apertures)
-    if n_sub < 2:
-        raise ValueError("num_sub_apertures must be at least 2")
-    if not 0.0 <= overlap_fraction < 1.0:
-        raise ValueError("overlap_fraction must be in [0, 1)")
+    n_sub = 5
+    phase_modulation = anomaly_mask * (4 * np.pi * n_sub) / (wavelength * prf) * 1e-3
 
-    # Encode the planted vibration velocity (mm/s) as the phase step between
-    # adjacent sub-apertures using the SAME time separation the decoder
-    # (phase_to_vibration_velocity) assumes, so recovered amplitudes are
-    # comparable to the planted ones: delta_phi = v * 4*pi*delta_t / lambda.
-    delta_t = sub_aperture_time_separation_s(prf, n_sub)
-    phase_step = anomaly_mask * 1e-3 * (4 * np.pi * delta_t) / wavelength
-    sub_offsets = np.arange(n_sub, dtype=np.float32) - (n_sub - 1) / 2.0
-    sub_images = []
-    for offset in sub_offsets:
-        phase_noise = (noise_level * rng.standard_normal((grid_size, grid_size))).astype(np.float32)
-        sub_phase = base_phase + offset * phase_step + phase_noise
-        sub_images.append((amplitude * np.exp(1j * sub_phase)).astype(np.complex64))
+    # Apply vibration as modulated phase on top of base phase
+    total_phase = base_phase + phase_modulation
 
-    step_fraction = 1.0 - float(overlap_fraction)
-    band_size = int(grid_size / (1 + step_fraction * (n_sub - 1)))
-    step_size = int(band_size * step_fraction)
-    band_size = max(band_size, 16)
-    step_size = max(step_size, 8)
-    taper = windows.kaiser(band_size, beta=5.0).astype(np.float32)
+    # Add noise
+    noise_phase = noise_level * np.random.randn(grid_size, grid_size).astype(np.float32)
+    total_phase += noise_phase
 
-    doppler_spectrum = np.zeros((grid_size, grid_size), dtype=np.complex64)
-    for i, sub_img in enumerate(sub_images):
-        center = int(grid_size / 2 - band_size / 2 + (i - (n_sub - 1) / 2) * step_size)
-        start = max(0, center)
-        end = min(grid_size, start + band_size)
-        actual_size = end - start
-
-        window = np.zeros(grid_size, dtype=np.float32)
-        if actual_size == band_size:
-            window[start:end] = taper
-        elif actual_size > 0:
-            partial_taper = taper[:actual_size] if start == 0 else taper[-actual_size:]
-            window[start:end] = partial_taper
-
-        sub_spectrum = np.fft.fftshift(np.fft.fft(sub_img, axis=0), axes=0)
-        doppler_spectrum += (sub_spectrum * window[:, None]).astype(np.complex64)
-
-    slc_synthetic = np.fft.ifft(np.fft.ifftshift(doppler_spectrum, axes=0), axis=0).astype(np.complex64)
-    mean_amp = float(np.mean(np.abs(slc_synthetic)))
-    if mean_amp > 1e-8:
-        slc_synthetic = (slc_synthetic / mean_amp * float(np.mean(amplitude))).astype(np.complex64)
+    # Reconstruct complex SLC
+    slc_synthetic = (amplitude * np.exp(1j * total_phase)).astype(np.complex64)
 
     # Save SLC
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -707,45 +613,11 @@ def generate_synthetic_vibration_test(
     gt_path = output_path.replace(".npy", "_ground_truth.npy")
     np.save(gt_path, anomaly_mask)
 
-    metadata = {
-        "schema_version": 1,
-        "seed": seed,
-        "grid_size": grid_size,
-        "num_anomalies_requested": num_anomalies,
-        "num_anomalies": len(ground_truth),
-        "noise_level": noise_level,
-        "synthetic_doppler_model": "sub_aperture_phase_evolution",
-        "num_sub_apertures": n_sub,
-        "overlap_fraction": float(overlap_fraction),
-        "phase_step_min_rad": float(phase_step.min()),
-        "phase_step_max_rad": float(phase_step.max()),
-        "radius_bounds_px": [min_radius, max_radius],
-        "anomaly_mask_path": gt_path,
-        "anomaly_mask_dtype": str(anomaly_mask.dtype),
-        "mask_min": float(anomaly_mask.min()),
-        "mask_max": float(anomaly_mask.max()),
-        "mask_mean": float(anomaly_mask.mean()),
-        "active_coverage_fraction": float((anomaly_mask > 0.05).sum() / anomaly_mask.size),
-        "core_coverage_fraction": float(anomaly_core_mask.sum() / anomaly_core_mask.size),
-        "anomalies": ground_truth,
-    }
-
-    gt_structured_path = output_path.replace(".npy", "_ground_truth_structured.npy")
-    np.save(gt_structured_path, metadata, allow_pickle=True)
-
-    gt_json_path = output_path.replace(".npy", "_ground_truth_metadata.json")
-    with open(gt_json_path, 'w', encoding='utf-8') as f:
-        dump_strict_json(metadata, f, indent=2)
-        f.write("\n")
-
     gt_meta_path = output_path.replace(".npy", "_ground_truth.txt")
-    with open(gt_meta_path, 'w', encoding='utf-8') as f:
+    with open(gt_meta_path, 'w') as f:
         f.write("# Synthetic Vibration Ground Truth\n")
-        f.write(f"# Seed: {seed}\n")
         f.write(f"# Grid size: {grid_size}x{grid_size}\n")
         f.write(f"# Noise level: {noise_level}\n\n")
-        f.write(f"# Active coverage fraction: {metadata['active_coverage_fraction']:.6f}\n")
-        f.write(f"# Core coverage fraction: {metadata['core_coverage_fraction']:.6f}\n\n")
         for gt in ground_truth:
             f.write(f"Anomaly {gt['id']}:\n")
             for k, v in gt.items():
@@ -753,7 +625,6 @@ def generate_synthetic_vibration_test(
             f.write("\n")
 
     logger.info(f"Saved ground truth: {gt_path}")
-    logger.info(f"Saved ground truth metadata: {gt_json_path}")
     return output_path
 
 
@@ -782,7 +653,6 @@ if __name__ == "__main__":
     synth_parser.add_argument("--size", type=int, default=512, help="Grid size")
     synth_parser.add_argument("--anomalies", type=int, default=3, help="Number of anomalies")
     synth_parser.add_argument("--noise", type=float, default=0.1, help="Noise level")
-    synth_parser.add_argument("--num-sub", type=int, default=5, help="Synthetic sub-apertures to encode")
     synth_parser.add_argument("--run-pipeline", action="store_true", help="Also run pipeline on synthetic")
 
     args = parser.parse_args()
@@ -810,11 +680,10 @@ if __name__ == "__main__":
             grid_size=args.size,
             num_anomalies=args.anomalies,
             noise_level=args.noise,
-            num_sub_apertures=args.num_sub,
         )
         if args.run_pipeline:
             print("\nRunning pipeline on synthetic data...")
-            outputs = run_vibrometry_pipeline(slc_path, config={"num_sub_apertures": args.num_sub})
+            outputs = run_vibrometry_pipeline(slc_path)
             print("\nOutputs:")
             for key, path in outputs.items():
                 print(f"  {key}: {path}")

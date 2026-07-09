@@ -1,0 +1,27 @@
+{
+    "schema_version": "field-verification-evidence-v1",
+    "template_only": true,
+    "must_not_be_committed": "Copy this template to a private evidence repository before adding real site evidence, owner records, survey logs, coordinates, photos, or contact information.",
+    "validation_id": "replace_with_holdout_campaign_id",
+    "description": "Private post-score scaffold for independent field evidence. This is not a withheld-label file and must not be used by the blind runner.",
+    "independent_field_evidence": [
+        {
+            "target_id": "replace_with_public_site_id",
+            "candidate_id": "replace_with_frozen_candidate_id_or_null",
+            "evidence_id": "replace_with_private_evidence_id",
+            "evidence_type": "survey_grade_mapping_or_borehole_or_engineering_record_or_independent_geophysics",
+            "custodian": "replace_with_private_custodian_or_org",
+            "collected_at_utc": "replace_with_collection_timestamp",
+            "chain_of_custody": "replace_with_private_record_location_and_access_controls",
+            "location_reference": {
+                "coordinate_system": "replace_with_crs_or_local_reference",
+                "redacted_public_location": true,
+                "private_coordinates_recorded_elsewhere": true
+            },
+            "verification_result": "unreviewed_candidate_or_confirmed_void_or_refuted_or_inconclusive",
+            "confidence_rationale": "replace_with_evidence_quality_and_limitations",
+            "redaction_notes": "Do not include secrets, private landowner data, controlled facility details, or exact private coordinates in public report packages."
+        }
+    ],
+    "claim_boundary": "Independent field evidence is required before any confirmed-void, hazard, object, or drill-target claim. Model detections and validation score reports alone are candidate evidence only."
+}

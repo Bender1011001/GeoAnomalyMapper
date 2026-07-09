@@ -1,0 +1,146 @@
+{
+    "campaign_id": "template_campaign_registry_id",
+    "notes": "Template only. Copy before use; do not add private labels, truth geometry, field evidence, credentials, or withheld-label paths.",
+    "policy": {
+        "ablation_use_rule": "calibration_only_unless_preregistered_before_holdout_unblinding",
+        "default_execution_mode": "dry_run_plan_only",
+        "labels_withheld_from_runner": true,
+        "no_downloads_or_training": true,
+        "parameter_changes_after_holdout_unblinding": "forbidden"
+    },
+    "preregistration": {
+        "holdout_unblinding_status": "not_unblinded",
+        "record": "replace_with_public_preregistration_or_protocol_reference",
+        "status": "draft_calibration_only"
+    },
+    "reviewer_attack_coverage": [
+        "threshold_sensitivity",
+        "segmentation_topology",
+        "connected_component_inflation",
+        "pinn_prior_sensitivity",
+        "sar_preprocessing_variants",
+        "null_region_false_positives",
+        "repeat_product_stability",
+        "candidate_volume_topk",
+        "physically_extreme_candidate_volume"
+    ],
+    "robustness_plan_hash": "42702f67fcc56bfa815c088ac370329edb2345e4790320561099da170d4884ae",
+    "robustness_plan_id": "robustness-plan-42702f67fcc56bfa",
+    "robustness_plan_name": "template_calibration_only_robustness_ablation_matrix",
+    "schema_version": "blind-validation-robustness-plan-v1",
+    "source_artifacts": {
+        "campaign_registry": "validation_examples/campaign_registry_template.json",
+        "parameter_set": "validation_examples/validation_parameter_set_template.json",
+        "public_manifest": "validation_examples/public_manifest_campaign_scaffold.json"
+    },
+    "template_only": true,
+    "validation_id": "template_validation_id",
+    "variants": [
+        {
+            "arm": "baseline",
+            "description": "Reference locked parameter set; included so deltas can be computed from the same plan.",
+            "family": "baseline_reference",
+            "parameters": {},
+            "scope": "calibration_only",
+            "variant_id": "baseline_locked_parameters"
+        },
+        {
+            "arm": "threshold_sensitivity",
+            "description": "Void probability threshold sweep low point for calibration-only sensitivity review.",
+            "family": "void_threshold_sweep",
+            "parameters": {
+                "void_probability_threshold": 0.25
+            },
+            "scope": "calibration_only",
+            "variant_id": "void_threshold_025"
+        },
+        {
+            "arm": "threshold_sensitivity",
+            "description": "Void probability threshold sweep high point for calibration-only sensitivity review.",
+            "family": "void_threshold_sweep",
+            "parameters": {
+                "void_probability_threshold": 0.45
+            },
+            "scope": "calibration_only",
+            "variant_id": "void_threshold_045"
+        },
+        {
+            "arm": "connected_component_inflation",
+            "description": "Higher minimum anomaly voxel cutoff to detect connected-component inflation.",
+            "family": "min_anomaly_voxel_threshold",
+            "parameters": {
+                "min_anomaly_voxels": 9
+            },
+            "scope": "calibration_only",
+            "variant_id": "min_anomaly_voxels_9"
+        },
+        {
+            "arm": "morphology_topology",
+            "description": "Segmentation topology variant using 26-neighbor connected components after morphology iterations.",
+            "family": "segmentation_topology",
+            "parameters": {
+                "connected_component_connectivity": 26,
+                "morphology_iterations": 2
+            },
+            "scope": "calibration_only",
+            "variant_id": "morphology_iter2_conn26"
+        },
+        {
+            "arm": "pinn_prior",
+            "description": "Lower depth prior and regularization weights for PINN prior sensitivity scaffolding only.",
+            "family": "depth_prior_pinn_regularization",
+            "parameters": {
+                "deep_prior_weight": 0.5,
+                "regularization_weight": 0.05
+            },
+            "scope": "calibration_only",
+            "variant_id": "pinn_prior_low_regularization"
+        },
+        {
+            "arm": "sar_preprocessing",
+            "description": "Strict vibrometry quality filter and SAR preprocessing metadata variant; no search or download is implied.",
+            "family": "sar_preprocessing_quality_filter",
+            "parameters": {
+                "coherence_min": 0.35,
+                "speckle_filter": "lee",
+                "vibrometry_quality_filter": "strict"
+            },
+            "scope": "calibration_only",
+            "variant_id": "sar_quality_strict"
+        },
+        {
+            "arm": "candidate_volume",
+            "description": "Top-k cutoff to bound physically extreme candidate volumes before review.",
+            "family": "top_k_candidate_cutoff",
+            "parameters": {
+                "top_k": 10
+            },
+            "scope": "calibration_only",
+            "variant_id": "topk_10"
+        },
+        {
+            "arm": "null_baseline",
+            "description": "Random spatial null baseline for false-positive calibration; no private labels are included.",
+            "family": "null_region_random_spatial_baseline",
+            "null_baseline": true,
+            "parameters": {
+                "random_seed": 17,
+                "spatial_jitter_m": 500
+            },
+            "scope": "calibration_only",
+            "variant_id": "null_random_spatial_seed17"
+        },
+        {
+            "arm": "repeat_product",
+            "description": "Repeat product/date stability grouping scaffold for calibration-only repeatability review.",
+            "family": "repeat_product_date_stability",
+            "parameters": {
+                "date_grouping": "month"
+            },
+            "scope": "calibration_only",
+            "stability_group": "same_target_repeat_dates",
+            "variant_id": "repeat_product_month_stability"
+        }
+    ],
+    "withheld_labels_loaded": false
+}

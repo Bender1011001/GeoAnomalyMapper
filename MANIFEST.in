@@ -1,0 +1,17 @@
+include README.md
+include LICENSE
+include requirements.txt
+include docs/*.md
+include validation_examples/*.json
+include validation_examples/fixture_candidates/*.csv
+include tests/*.py
+global-exclude .env .env.* *.py[cod]
+# Re-add the credential template after the .env.* exclusion (rules apply in order).
+include .env.example
+global-exclude *.tif *.hdf *.nc *.grb *.grib *.grib2 *.pth *.pt *.ckpt
+prune data
+prune downloads
+prune outputs
+prune results
+prune results_extracted
+prune validation_results

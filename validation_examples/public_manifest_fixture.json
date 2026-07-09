@@ -1,0 +1,37 @@
+{
+    "schema_version": "blind-validation-public-v1",
+    "validation_id": "safe_fixture_blind_validation_v1",
+    "description": "Safe local fixture manifest. Contains no withheld void geometry.",
+    "targets": [
+        {
+            "target_id": "fixture_positive_site",
+            "name": "Fixture Positive Site",
+            "data_mode": "existing_candidates",
+            "center": {
+                "lat": 34.0001,
+                "lon": -117.0001
+            },
+            "buffer_deg": 0.01,
+            "area_km2": 0.64,
+            "domain_width_m": 800.0,
+            "max_depth_m": 300.0,
+            "resolution": "quick",
+            "existing_candidates_csv": "fixture_candidates/positive_detected_anomalies.csv"
+        },
+        {
+            "target_id": "fixture_negative_control",
+            "name": "Fixture Negative Control",
+            "data_mode": "existing_candidates",
+            "center": {
+                "lat": 34.1001,
+                "lon": -117.1001
+            },
+            "buffer_deg": 0.01,
+            "area_km2": 0.64,
+            "domain_width_m": 800.0,
+            "max_depth_m": 300.0,
+            "resolution": "quick",
+            "existing_candidates_csv": "fixture_candidates/negative_detected_anomalies.csv"
+        }
+    ]
+}

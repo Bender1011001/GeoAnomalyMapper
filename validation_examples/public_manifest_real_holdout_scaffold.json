@@ -1,0 +1,176 @@
+{
+    "schema_version": "blind-validation-public-v1",
+    "validation_id": "real_holdout_broad_regions_v1",
+    "description": "Public, no-label scaffold for broad real holdout SAR inventory. Region names and centers are public search inputs only; ground-truth geometries, site classes, and scoring labels must be supplied separately by a private validation custodian.",
+    "scoring_boundary": "Do not add known void coordinates, cave passage geometry, expected depths, or withheld-label paths to this public runner manifest.",
+    "targets": [
+        {
+            "target_id": "mammoth_cave_plateau_ky_broad",
+            "name": "Mammoth Cave Plateau KY Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 37.1862,
+                "lon": -86.1005
+            },
+            "buffer_deg": 0.08,
+            "area_km2": 250.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 500.0,
+            "resolution": "quick",
+            "pair_id": "kentucky_plateau_pair",
+            "public_geologic_context": "Public broad carbonate/karst-region search area; no cave-passage geometry is included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        },
+        {
+            "target_id": "jackson_purchase_ky_tn_comparand_broad",
+            "name": "Jackson Purchase KY TN Comparand Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 36.84,
+                "lon": -88.62
+            },
+            "buffer_deg": 0.08,
+            "area_km2": 250.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 500.0,
+            "resolution": "quick",
+            "pair_id": "kentucky_plateau_pair",
+            "public_geologic_context": "Public broad physiographic comparand selected for matched regional SAR preflight; no private scoring labels are included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        },
+        {
+            "target_id": "guadalupe_carlsbad_karst_nm_broad",
+            "name": "Guadalupe Carlsbad Karst NM Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 32.22,
+                "lon": -104.52
+            },
+            "buffer_deg": 0.1,
+            "area_km2": 400.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 800.0,
+            "resolution": "quick",
+            "pair_id": "new_mexico_desert_pair",
+            "public_geologic_context": "Public broad evaporite/carbonate cave-region search area; no cave-room or passage geometry is included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        },
+        {
+            "target_id": "jornada_del_muerto_nm_comparand_broad",
+            "name": "Jornada Del Muerto NM Comparand Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 32.62,
+                "lon": -106.78
+            },
+            "buffer_deg": 0.1,
+            "area_km2": 400.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 800.0,
+            "resolution": "quick",
+            "pair_id": "new_mexico_desert_pair",
+            "public_geologic_context": "Public broad arid-basin comparand selected for matched Sentinel-1 availability checks; no private scoring labels are included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        },
+        {
+            "target_id": "edwards_aquifer_karst_tx_broad",
+            "name": "Edwards Aquifer Karst TX Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 29.75,
+                "lon": -98.32
+            },
+            "buffer_deg": 0.08,
+            "area_km2": 250.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 600.0,
+            "resolution": "quick",
+            "pair_id": "central_texas_pair",
+            "public_geologic_context": "Public broad karst/aquifer-region search area; no cave geometry or private scoring labels are included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        },
+        {
+            "target_id": "blackland_prairie_tx_comparand_broad",
+            "name": "Blackland Prairie TX Comparand Broad Region",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 31.35,
+                "lon": -97.2
+            },
+            "buffer_deg": 0.08,
+            "area_km2": 250.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 600.0,
+            "resolution": "quick",
+            "pair_id": "central_texas_pair",
+            "public_geologic_context": "Public broad physiographic comparand selected for matched regional inventory; no private scoring labels are included.",
+            "sar_search": {
+                "provider": "sentinel1_asf",
+                "platform": "Sentinel-1",
+                "processing_level": "SLC",
+                "beam_mode": "IW",
+                "polarization": "VV",
+                "flight_direction": null,
+                "start_date": "2022-01-01T00:00:00Z",
+                "end_date": "2024-01-01T00:00:00Z",
+                "max_results": 10,
+                "selection_count": 2
+            }
+        }
+    ]
+}

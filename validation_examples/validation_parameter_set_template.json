@@ -1,0 +1,97 @@
+{
+  "acquisition_provider_preferences": {
+    "comparison_arms": [
+      {
+        "band": "C",
+        "comparison_arm": "sentinel1_cband_iw",
+        "placeholder_only": false,
+        "provider": "sentinel1_asf",
+        "real_lock_supported": true,
+        "search_supported": true
+      },
+      {
+        "band": "X",
+        "comparison_arm": "umbra_xband_spotlight_placeholder",
+        "placeholder_only": true,
+        "provider": "umbra_open_data",
+        "real_lock_supported": false,
+        "search_supported": false
+      },
+      {
+        "band": "X",
+        "comparison_arm": "commercial_xband_spotlight_placeholder",
+        "placeholder_only": true,
+        "provider": "xband_spotlight_placeholder",
+        "real_lock_supported": false,
+        "search_supported": false
+      }
+    ],
+    "primary_provider": "sentinel1_asf",
+    "provider_preferences": [
+      "sentinel1_asf",
+      "umbra_open_data",
+      "xband_spotlight_placeholder"
+    ],
+    "real_downloads_default": false
+  },
+  "analysis_plan": {
+    "holdout_rule": "Do not alter this parameter set after withheld scoring data are exposed.",
+    "primary_endpoint": "positive_site_hit_rate_with_negative_false_positive_rate",
+    "secondary_endpoints": [
+      "rank_of_first_hit",
+      "localization_error_m",
+      "candidates_per_km2",
+      "provider_stratified_metrics"
+    ]
+  },
+  "approval": {
+    "approval_scope": "not_approved_for_holdout_until_status_is_approved",
+    "approved_at_utc": null,
+    "approved_by": null,
+    "status": "draft"
+  },
+  "model_card": {
+    "intended_use": "Blind known-void validation with frozen no-label parameters",
+    "model_family": "Biondi SAR Doppler tomography validation harness",
+    "training_policy": "No long training is started by parameter-set validation commands."
+  },
+  "parameter_set_hash": "8371eaba61832989a9637cb66708cade5b2d693e0c4a807bd3c80fc75de86c7e",
+  "parameter_set_id": "params-8371eaba61832989",
+  "parameter_set_name": "template_calibration_parameters",
+  "pinn_settings": {
+    "data_weight": 20.0,
+    "deep_prior_weight": 1.0,
+    "epochs": 500,
+    "excitation_frequency_hz": 2.0,
+    "physics_weight": 1.0,
+    "regularization_weight": 0.1,
+    "sparsity_weight": 1.0,
+    "surface_prior_weight": 0.0
+  },
+  "resolution_profile": {
+    "domain_width_m": 800.0,
+    "grid_nx": 64,
+    "grid_ny": 64,
+    "grid_nz": 32,
+    "max_depth_m": 500.0,
+    "name": "quick"
+  },
+  "schema_version": "blind-validation-parameter-set-v1",
+  "scoring_tolerances": {
+    "default_depth_tolerance_m": 150.0,
+    "default_horizontal_tolerance_m": 100.0
+  },
+  "split_policy": {
+    "calibration_split": "calibration",
+    "holdout_split": "holdout",
+    "labels_withheld_from_runner": true,
+    "parameter_changes_after_holdout_unblinding": "forbidden"
+  },
+  "template_only": true,
+  "thresholds": {
+    "candidate_confidence_threshold": 0.0,
+    "min_anomaly_voxels": 3,
+    "void_probability_threshold": 0.35
+  },
+  "validation_id": "replace_with_preregistered_campaign_id"
+}

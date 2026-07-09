@@ -1,0 +1,104 @@
+{
+    "schema_version": "blind-validation-labels-v1",
+    "template_only": true,
+    "validation_id": "replace_with_holdout_campaign_id",
+    "description": "Template only for the scorer custodian. Keep this file separate from runner inputs and public manifests; copy it to private custody storage before adding real labels, exact coordinates, provenance, or evidence records. Do not commit private real labels.",
+    "custody_metadata": {
+        "custodian_org": "replace_with_private_custodian_org",
+        "custodian_contact_ref": "replace_with_private_contact_reference",
+        "private_storage_ref": "replace_with_private_repository_or_records_system_ref",
+        "access_control": "replace_with_private_access_policy",
+        "created_at_utc": "replace_with_creation_timestamp",
+        "last_updated_at_utc": "replace_with_update_timestamp",
+        "release_status": "private_withheld_not_for_public_manifest",
+        "release_review_required": true,
+        "public_release_allowed": false,
+        "notes": "Private template metadata only. Do not place this object in public runner manifests."
+    },
+    "labels": [
+        {
+            "target_id": "replace_with_public_site_id",
+            "site_class": "positive",
+            "site_subclass": "replace_with_private_subclass_or_null",
+            "label_provenance": {
+                "source_type": "replace_with_private_map_or_survey_or_database_or_expert_review",
+                "source_reference": "replace_with_private_record_identifier",
+                "source_date": "replace_with_source_date_or_unknown",
+                "curator": "replace_with_private_curator_identifier",
+                "quality_control": "replace_with_review_status",
+                "public_manifest_separation": "not_public_runner_input"
+            },
+            "evidence_tier": "replace_with_private_evidence_tier",
+            "custody_record": {
+                "record_id": "replace_with_private_custody_record_id",
+                "chain_of_custody": "replace_with_private_chain_of_custody_notes",
+                "stored_at": "replace_with_private_storage_location_reference",
+                "access_log_ref": "replace_with_private_access_log_reference"
+            },
+            "scoring_eligibility": {
+                "split": "replace_with_calibration_or_holdout_or_audit",
+                "eligible_for_primary_holdout_scoring": false,
+                "exclusion_reason": "replace_with_reason_until_campaign_registry_marks_eligible",
+                "audit_only": false,
+                "requires_registry_lock": true
+            },
+            "release_metadata": {
+                "withheld_until": "replace_with_unblinding_or_embargo_rule",
+                "public_release_allowed": false,
+                "redaction_required": true,
+                "release_reviewer": "replace_with_private_release_reviewer",
+                "release_notes": "replace_with_private_release_notes"
+            },
+            "known_voids": [
+                {
+                    "void_id": "replace_with_private_label_id",
+                    "label_provenance": {
+                        "source_feature_id": "replace_with_private_source_feature_id",
+                        "location_method": "replace_with_survey_or_map_digitization_or_local_grid",
+                        "coordinate_reference": "replace_with_private_crs_or_local_reference"
+                    },
+                    "offset_m": [
+                        0.0,
+                        0.0
+                    ],
+                    "depth_m": 100.0,
+                    "horizontal_tolerance_m": 100.0,
+                    "depth_tolerance_m": 150.0
+                }
+            ]
+        },
+        {
+            "target_id": "replace_with_public_control_site_id",
+            "site_class": "negative",
+            "site_subclass": "replace_with_private_control_subclass_or_null",
+            "label_provenance": {
+                "source_type": "replace_with_private_negative_control_basis",
+                "source_reference": "replace_with_private_record_identifier",
+                "curator": "replace_with_private_curator_identifier",
+                "quality_control": "replace_with_review_status"
+            },
+            "evidence_tier": "replace_with_private_evidence_tier",
+            "custody_record": {
+                "record_id": "replace_with_private_custody_record_id",
+                "chain_of_custody": "replace_with_private_chain_of_custody_notes",
+                "stored_at": "replace_with_private_storage_location_reference",
+                "access_log_ref": "replace_with_private_access_log_reference"
+            },
+            "scoring_eligibility": {
+                "split": "replace_with_calibration_or_holdout_or_audit",
+                "eligible_for_primary_holdout_scoring": false,
+                "exclusion_reason": "replace_with_reason_until_campaign_registry_marks_eligible",
+                "audit_only": false,
+                "requires_registry_lock": true
+            },
+            "release_metadata": {
+                "withheld_until": "replace_with_unblinding_or_embargo_rule",
+                "public_release_allowed": false,
+                "redaction_required": true,
+                "release_reviewer": "replace_with_private_release_reviewer",
+                "release_notes": "replace_with_private_release_notes"
+            },
+            "known_voids": []
+        }
+    ]
+}

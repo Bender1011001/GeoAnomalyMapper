@@ -1,0 +1,207 @@
+{
+  "approval": {
+    "approval_scope": "campaign_registry_identity_and_parameter_set_lock",
+    "approved_at_utc": null,
+    "approved_by": null,
+    "status": "draft"
+  },
+  "approved_parameter_requirement": {
+    "locked_parameter_set_hash": "8371eaba61832989a9637cb66708cade5b2d693e0c4a807bd3c80fc75de86c7e",
+    "policy": "Campaign execution and scoring must use this exact approved parameter-set hash.",
+    "require_approved_for_holdout": true,
+    "required": true
+  },
+  "campaign_id": "replace_with_public_campaign_registry_id",
+  "campaign_name": "template_blind_multi_site_campaign_registry",
+  "immutable_artifacts": [
+    {
+      "hash_algorithm": "sha256_file",
+      "path": "validation_examples\\public_manifest_campaign_scaffold.json",
+      "role": "public_manifest",
+      "schema_version": "blind-validation-public-v1",
+      "sha256": "2e65e90036703c59152f6bf6258e6b7c48e1be516411a496e2ceaba403487429"
+    },
+    {
+      "hash_algorithm": "sha256_file",
+      "parameter_set_hash": "8371eaba61832989a9637cb66708cade5b2d693e0c4a807bd3c80fc75de86c7e",
+      "parameter_set_id": "params-8371eaba61832989",
+      "path": "validation_examples\\validation_parameter_set_template.json",
+      "role": "parameter_set",
+      "schema_version": "blind-validation-parameter-set-v1",
+      "sha256": "907feaa14144209e01202a4ecf0800e37287a1dea32fcbb6da09dc34b4103f99"
+    }
+  ],
+  "lock": {
+    "lock_scope": "public_manifest_parameter_set_scoring_metrics_provider_arms_and_immutable_artifact_hashes",
+    "locked": false,
+    "locked_at_utc": null,
+    "locked_by": null
+  },
+  "metric_definitions": {
+    "candidate_output_freeze_required": true,
+    "primary_endpoint": "positive_site_hit_rate_with_negative_false_positive_rate",
+    "score_after_withheld_label_release_only": true,
+    "secondary_endpoints": [
+      "rank_of_first_hit",
+      "localization_error_m",
+      "candidates_per_km2",
+      "provider_stratified_metrics"
+    ]
+  },
+  "parameter_set": {
+    "acquisition_provider_preferences": {
+      "comparison_arms": [
+        {
+          "band": "C",
+          "comparison_arm": "sentinel1_cband_iw",
+          "placeholder_only": false,
+          "provider": "sentinel1_asf",
+          "real_lock_supported": true,
+          "search_supported": true
+        },
+        {
+          "band": "X",
+          "comparison_arm": "umbra_xband_spotlight_placeholder",
+          "placeholder_only": true,
+          "provider": "umbra_open_data",
+          "real_lock_supported": false,
+          "search_supported": false
+        },
+        {
+          "band": "X",
+          "comparison_arm": "commercial_xband_spotlight_placeholder",
+          "placeholder_only": true,
+          "provider": "xband_spotlight_placeholder",
+          "real_lock_supported": false,
+          "search_supported": false
+        }
+      ],
+      "primary_provider": "sentinel1_asf",
+      "provider_preferences": [
+        "sentinel1_asf",
+        "umbra_open_data",
+        "xband_spotlight_placeholder"
+      ],
+      "real_downloads_default": false
+    },
+    "approval_status": "draft",
+    "approved_for_holdout": false,
+    "file_sha256": "907feaa14144209e01202a4ecf0800e37287a1dea32fcbb6da09dc34b4103f99",
+    "hash_algorithm": "sha256_canonical_json_excluding_approval_and_identity_metadata",
+    "parameter_set_hash": "8371eaba61832989a9637cb66708cade5b2d693e0c4a807bd3c80fc75de86c7e",
+    "parameter_set_id": "params-8371eaba61832989",
+    "parameter_set_name": "template_calibration_parameters",
+    "path": "validation_examples\\validation_parameter_set_template.json",
+    "schema_version": "blind-validation-parameter-set-v1",
+    "split_policy": {
+      "calibration_split": "calibration",
+      "holdout_split": "holdout",
+      "labels_withheld_from_runner": true,
+      "parameter_changes_after_holdout_unblinding": "forbidden"
+    },
+    "validation_id": "replace_with_preregistered_campaign_id",
+    "withheld_labels_loaded": false
+  },
+  "protocol": {
+    "label_release_rule": "Score only after withheld-label release and frozen run outputs.",
+    "preregistration_reference": "replace_with_public_preregistration_or_protocol_reference",
+    "preregistration_sha256": null,
+    "protocol_document": "docs/VALIDATION_FIRST_WORKFLOW.md",
+    "protocol_document_sha256": "785e73e71985eea57def7fe25678e1f842e58e85702439d0f0ffbab42d49677f"
+  },
+  "provider_arms": [
+    {
+      "band": "C",
+      "comparison_arm": "sentinel1_cband_iw",
+      "download_supported": true,
+      "placeholder_only": false,
+      "provider": "sentinel1_asf",
+      "provider_label": "ASF Sentinel-1",
+      "real_lock_supported": true,
+      "search_supported": true
+    },
+    {
+      "band": "X",
+      "comparison_arm": "umbra_xband_spotlight_placeholder",
+      "download_supported": false,
+      "placeholder_only": true,
+      "provider": "umbra_open_data",
+      "provider_label": "Umbra Open Data",
+      "real_lock_supported": false,
+      "search_supported": false
+    },
+    {
+      "band": "X",
+      "comparison_arm": "commercial_xband_spotlight_placeholder",
+      "download_supported": false,
+      "placeholder_only": true,
+      "provider": "xband_spotlight_placeholder",
+      "provider_label": "Generic X-band Spotlight Placeholder",
+      "real_lock_supported": false,
+      "search_supported": false
+    }
+  ],
+  "public_manifest": {
+    "file_sha256": "2e65e90036703c59152f6bf6258e6b7c48e1be516411a496e2ceaba403487429",
+    "hash_algorithm": "sha256_file",
+    "path": "validation_examples\\public_manifest_campaign_scaffold.json",
+    "schema_version": "blind-validation-public-v1",
+    "target_count": 5,
+    "target_ids": [
+      "campaign_pair_001_a",
+      "campaign_pair_001_b",
+      "campaign_pair_002_a",
+      "campaign_pair_002_b",
+      "campaign_audit_001_mammoth_prior_run"
+    ],
+    "validation_id": "replace_with_preregistered_campaign_id"
+  },
+  "registry_hash": "ba3fa210de7a99c87ff42378162a4fb7f640e1c239f4ba9dd11efd5355c3d3ca",
+  "registry_id": "campaign-registry-ba3fa210de7a99c8",
+  "schema_version": "blind-validation-campaign-registry-v1",
+  "scoring_tolerances": {
+    "default_depth_tolerance_m": 150.0,
+    "default_horizontal_tolerance_m": 100.0
+  },
+  "split_policy": {
+    "calibration_split": "calibration",
+    "holdout_split": "holdout",
+    "labels_withheld_from_runner": true,
+    "observed_public_splits": [
+      "audit",
+      "calibration",
+      "holdout"
+    ],
+    "parameter_changes_after_holdout_unblinding": "forbidden"
+  },
+  "status": "draft",
+  "target_counts": {
+    "audit_only_targets": 1,
+    "by_campaign_tier": {
+      "audit_calibration_only": 1,
+      "calibration_shakedown": 2,
+      "primary_holdout_candidate": 2
+    },
+    "by_provider_arm": {
+      "sentinel1_cband_iw": 5,
+      "umbra_xband_spotlight_placeholder": 1
+    },
+    "by_public_scoring_status": {
+      "calibration_not_primary_holdout": 2,
+      "eligible_after_registry_lock_and_private_label_custody": 2,
+      "not_primary_holdout_scoring_site": 1
+    },
+    "by_split": {
+      "audit": 1,
+      "calibration": 2,
+      "holdout": 2
+    },
+    "calibration_targets": 2,
+    "extension_targets": 0,
+    "primary_holdout_targets": 2,
+    "total_targets": 5
+  },
+  "template_only": true,
+  "validation_id": "replace_with_preregistered_campaign_id",
+  "withheld_labels_loaded": false
+}

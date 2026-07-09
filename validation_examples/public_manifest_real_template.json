@@ -1,0 +1,51 @@
+{
+    "schema_version": "blind-validation-public-v1",
+    "template_only": true,
+    "validation_id": "replace_with_holdout_campaign_id",
+    "description": "Template only. Copy this file, remove template_only, and fill public site metadata before running. Do not add known void geometry here.",
+    "targets": [
+        {
+            "target_id": "replace_with_public_site_id",
+            "name": "Replace With Public Site Name",
+            "data_mode": "real_slc",
+            "center": {
+                "lat": 0.0,
+                "lon": 0.0
+            },
+            "buffer_deg": 0.02,
+            "area_km2": 1.0,
+            "domain_width_m": 800.0,
+            "max_depth_m": 1000.0,
+            "resolution": "quick",
+            "comparison_arms": [
+                {
+                    "provider": "sentinel1_asf",
+                    "comparison_arm": "sentinel1_cband_iw",
+                    "comparison_group": "c_vs_x_band_planning",
+                    "platform": "Sentinel-1",
+                    "processing_level": "SLC",
+                    "beam_mode": "IW",
+                    "polarization": "VV",
+                    "flight_direction": null,
+                    "start_date": "2022-01-01T00:00:00Z",
+                    "end_date": "2024-01-01T00:00:00Z",
+                    "max_results": 10,
+                    "selection_count": 1,
+                    "notes": "Search-only ASF Sentinel-1 C-band arm. Real downloads remain opt-in and should use a product lock."
+                },
+                {
+                    "provider": "umbra_open_data",
+                    "comparison_arm": "umbra_xband_spotlight_placeholder",
+                    "comparison_group": "c_vs_x_band_planning",
+                    "platform": "Umbra",
+                    "processing_level": "SLC",
+                    "beam_mode": "SPOTLIGHT",
+                    "polarization": "VV",
+                    "resolution_m": 0.5,
+                    "placeholder_only": true,
+                    "notes": "Metadata-only X-band open-data placeholder. Blind validation does not currently lock or download Umbra products end-to-end."
+                }
+            ]
+        }
+    ]
+}
