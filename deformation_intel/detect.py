@@ -48,10 +48,13 @@ class Anomaly:
     pre_rate_cm_yr: Optional[float]
     post_rate_cm_yr: Optional[float]
     source_depth_m: Optional[float]
+    source_depth_range_m: Optional[List[float]]
     source_volume_rate_m3_yr: Optional[float]
     source_fit_r2: Optional[float]
+    source_growth: Optional[str]
     time_to_threshold_yr: Optional[float]
     is_localized: bool
+    regional_correlation: Optional[float]
     void_likelihood: float
     why: str
     context: Dict[str, float] = field(default_factory=dict)
@@ -90,6 +93,22 @@ def detect_anomalies(
     acc = fields["accel_m_yr2"]
     seas = fields["seasonal_amp_m"]
 
+    # AOI reference series: regional water-table "breathing", measured on QUIET
+    # ground only. Using the plain AOI median would let a large anomaly leak its
+    # own signal into the reference and self-correlate. Aquifer pumping cones
+    # co-move with this reference; an independent void collapse does not.
+    T = disp.shape[0]
+    med0 = np.nanmedian(vel[np.isfinite(vel)]) if np.isfinite(vel).any() else 0.0
+    quiet = np.isfinite(vel) & (np.abs(vel - med0) < 0.5 * (velocity_threshold_cm_yr / 100.0))
+    if quiet.sum() >= 200:
+        ref_series = np.nanmedian(disp[:, quiet], axis=1)
+    else:
+        ref_series = np.nanmedian(disp.reshape(T, -1), axis=1)
+    ref_resid = _detrended(t, ref_series)
+    # If the quiet ground barely moves (no regional breathing), correlation
+    # against it is noise — disable the aquifer fingerprint in that case.
+    ref_ok = np.isfinite(ref_resid).sum() >= 8 and np.nanstd(ref_resid) >= 0.002
+
     med = np.nanmedian(vel)
     vel_rel = vel - med
     sigma = 1.4826 * np.nanmedian(np.abs(vel_rel[np.isfinite(vel_rel)]))
@@ -123,6 +142,10 @@ def detect_anomalies(
             pfit = fit_pixel(t, series, seasonal=True, min_obs=max(12, len(t) // 3))
             finite = series[np.isfinite(series)]
             cumulative = float(finite[-1] - finite[0]) if finite.size > 2 else np.nan
+
+            # Regional co-movement (aquifer fingerprint): correlation of the
+            # bowl's excess motion with the quiet-ground reference residual.
+            regional_r = _regional_correlation(t, series, ref_series, ref_resid) if ref_ok else None
 
             # physical source inversion (local meters relative to peak)
             xr_ = x[cols] - x[pc]
@@ -164,7 +187,19 @@ def detect_anomalies(
 
             void_likelihood = _void_likelihood(
                 kind, classification, is_localized, good_mogi, mogi.depth_m, seasonal_amp, peak_v,
+                regional_r=regional_r,
             )
+
+            # Deeper characterization only for the candidates that matter
+            # (bootstrap + growth history are ~100 extra fits per bowl).
+            depth_range = None
+            growth = None
+            if is_localized and void_likelihood >= 0.5:
+                from .sources import fit_mogi_bootstrap
+                boot = fit_mogi_bootstrap(xr_, yr_, vals, n_boot=30)
+                if np.isfinite(boot["depth_lo_m"]):
+                    depth_range = [round(boot["depth_lo_m"], 0), round(boot["depth_hi_m"], 0)]
+                growth = _source_growth(t, disp, rows, cols, xr_, yr_)
 
             last_cum = float(np.nanmean(series[-3:])) if finite.size >= 3 else np.nan
             target = last_cum - forecast_threshold_cm / 100.0 if kind == "subsidence" else last_cum + forecast_threshold_cm / 100.0
@@ -191,10 +226,13 @@ def detect_anomalies(
                 pre_rate_cm_yr=None if not np.isfinite(pfit.pre_rate_m_yr) else round(pfit.pre_rate_m_yr * 100, 1),
                 post_rate_cm_yr=None if not np.isfinite(pfit.post_rate_m_yr) else round(pfit.post_rate_m_yr * 100, 1),
                 source_depth_m=None if not np.isfinite(mogi.depth_m) else round(mogi.depth_m, 0),
+                source_depth_range_m=depth_range,
                 source_volume_rate_m3_yr=None if vol_rate is None else round(vol_rate, 0),
                 source_fit_r2=None if not np.isfinite(mogi.r2) else round(mogi.r2, 2),
+                source_growth=growth,
                 time_to_threshold_yr=None if not np.isfinite(ttt) else round(float(ttt), 1),
                 is_localized=is_localized,
+                regional_correlation=None if regional_r is None else round(regional_r, 2),
                 void_likelihood=round(void_likelihood, 2),
                 why=why, context=ctx,
             ))
@@ -209,8 +247,75 @@ def detect_anomalies(
     return anomalies
 
 
+def _detrended(t: np.ndarray, series: np.ndarray) -> np.ndarray:
+    """Residual after removing a linear trend (NaN-aware); NaN where invalid."""
+    out = np.full_like(series, np.nan, dtype=np.float64)
+    m = np.isfinite(series)
+    if m.sum() < 6:
+        return out
+    A = np.column_stack([np.ones(m.sum()), t[m] - t[m].mean()])
+    coef, *_ = np.linalg.lstsq(A, series[m], rcond=None)
+    out[m] = series[m] - A @ coef
+    return out
+
+
+def _regional_correlation(t: np.ndarray, series: np.ndarray,
+                          ref_series: np.ndarray, ref_resid: np.ndarray):
+    """Aquifer fingerprint: Pearson r between the bowl's EXCESS motion
+    (series minus quiet-ground reference — common-mode removed, detrended)
+    and the regional residual. All ground shares the regional breathing, so
+    correlating raw series would tag everything; only a pumping cone's excess
+    still tracks the water table."""
+    excess = series - ref_series
+    e_resid = _detrended(t, excess)
+    m = np.isfinite(e_resid) & np.isfinite(ref_resid)
+    if m.sum() < 8:
+        return None
+    a, b = e_resid[m], ref_resid[m]
+    sa, sb = a.std(), b.std()
+    if sa < 1e-9 or sb < 1e-9:
+        return None
+    return float(np.corrcoef(a, b)[0, 1])
+
+
+def _source_growth(t, disp, rows, cols, xr_, yr_):
+    """Compare Mogi volume-rate for the early vs late half of the record.
+
+    Answers 'is the underlying source growing?' — a growing cavity shows a
+    larger volume-loss rate in the late half.
+    """
+    from .sources import fit_mogi
+    mid = np.median(t)
+    early, late = t <= mid, t > mid
+    if early.sum() < 8 or late.sum() < 8:
+        return None
+    rates = []
+    for m in (early, late):
+        sub = disp[m][:, rows, cols]
+        # per-pixel linear rate over the half-record
+        tt = t[m]
+        A = np.column_stack([np.ones(tt.size), tt - tt.mean()])
+        vals = np.full(sub.shape[1], np.nan)
+        for j in range(sub.shape[1]):
+            col = sub[:, j]
+            mm = np.isfinite(col)
+            if mm.sum() >= 6:
+                coef, *_ = np.linalg.lstsq(A[mm], col[mm], rcond=None)
+                vals[j] = coef[1]
+        fit = fit_mogi(xr_, yr_, vals)
+        rates.append(fit.volume_m3 if np.isfinite(fit.volume_m3) else None)
+    if rates[0] is None or rates[1] is None:
+        return None
+    early_rate, late_rate = abs(rates[0]), abs(rates[1])
+    if late_rate > 1.5 * early_rate:
+        return "growing"
+    if late_rate < 0.67 * early_rate:
+        return "slowing"
+    return "steady"
+
+
 def _void_likelihood(kind, classification, is_localized, good_mogi, depth_m,
-                     seasonal_amp_m, peak_v_m_yr) -> float:
+                     seasonal_amp_m, peak_v_m_yr, regional_r=None) -> float:
     """0..1 heuristic that a subsidence anomaly reflects a subsurface VOID
     (localized collapse) rather than aquifer/tectonic/seasonal processes."""
     if kind == "uplift" or classification in ("seasonal_dominated", "regional_subsidence"):
@@ -224,6 +329,13 @@ def _void_likelihood(kind, classification, is_localized, good_mogi, depth_m,
         score += 0.2   # void-plausible source depth with a real point-source fit
     if abs(peak_v_m_yr) >= 0.03:
         score += 0.1
+    # Aquifer fingerprint: a bowl that co-breathes with the regional signal is
+    # very likely a pumping cone, not an independent collapse.
+    if regional_r is not None:
+        if regional_r >= 0.85:
+            score *= 0.3
+        elif regional_r >= 0.7:
+            score *= 0.6
     return float(min(score, 1.0))
 
 

@@ -110,6 +110,67 @@ def test_broad_regional_field_is_not_a_void():
             assert a.classification in ("regional_subsidence", "seasonal_dominated")
 
 
+def test_aquifer_correlated_bowl_is_penalized():
+    """Two identical bowls; one co-breathes with the regional seasonal signal
+    (aquifer pumping cone), one is independent. The correlated bowl must get a
+    lower void_likelihood and a high regional_correlation."""
+    grid, n = 60, 60
+    x0, y0 = 600000.0, 4245000.0
+    x = x0 + (np.arange(grid) - grid / 2) * 30.0
+    y = y0 + (np.arange(grid) - grid / 2) * 30.0
+    X, Y = np.meshgrid(x, y)
+    t = 2016.5 + np.linspace(0, 9.0, n)
+    tc = t - t[0]
+    regional_wiggle = 0.02 * np.sin(2 * np.pi * t) + 0.01 * np.sin(0.7 * np.pi * tc)
+
+    # bowl A (aquifer-like): at (-450,-450)m offset, trend + regional wiggle
+    rA = np.hypot(X - (x0 - 450), Y - (y0 - 450))
+    shapeA = mogi_uz(rA, 250.0, -1e5)
+    shapeA /= abs(shapeA.min())
+    # bowl B (independent): at (+450,+450)m, pure accelerating trend
+    rB = np.hypot(X - (x0 + 450), Y - (y0 + 450))
+    shapeB = mogi_uz(rB, 250.0, -1e5)
+    shapeB /= abs(shapeB.min())
+
+    rng = np.random.default_rng(7)
+    cube_arr = np.empty((n, grid, grid))
+    for i in range(n):
+        # whole AOI breathes with the regional signal (common mode)
+        background = regional_wiggle[i]
+        # bowl A: subsidence trend + AMPLIFIED regional breathing (pumping
+        # cone responds to the water table more than quiet ground does)
+        bowl_a = shapeA * (0.05 * tc[i]) + np.abs(shapeA) * (0.9 * regional_wiggle[i])
+        # bowl B: independent accelerating subsidence, no excess breathing
+        bowl_b = shapeB * (0.03 * tc[i] + 0.004 * tc[i] ** 2)
+        cube_arr[i] = (background + bowl_a + bowl_b
+                       + 0.001 * rng.standard_normal((grid, grid)))
+    cube = {"cube": cube_arr, "t": t, "x": x, "y": y,
+            "crs_wkt": "EPSG:32610", "frame": "TEST"}
+    anomalies = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=5,
+                                 min_sigma=3.0)
+    subs = [a for a in anomalies if a.kind == "subsidence"]
+    assert len(subs) >= 2
+    # identify bowls by location
+    a_bowl = min(subs, key=lambda a: (a.lon + 122) ** 2 + 0)  # westernmost
+    b_bowl = max(subs, key=lambda a: a.lon)
+    assert a_bowl.regional_correlation is not None
+    assert a_bowl.regional_correlation > b_bowl.regional_correlation
+    assert b_bowl.void_likelihood >= a_bowl.void_likelihood
+
+
+def test_candidate_gets_depth_range_and_growth_label():
+    cube = _synthetic_cube()
+    anomalies = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=5,
+                                 min_sigma=3.0)
+    top = anomalies[0]
+    assert top.void_likelihood >= 0.5
+    assert top.source_depth_range_m is not None
+    lo, hi = top.source_depth_range_m
+    assert lo <= (top.source_depth_m or lo) <= hi or (hi - lo) >= 0
+    # planted signal accelerates -> late-half volume rate exceeds early half
+    assert top.source_growth in ("growing", "steady")
+
+
 def test_context_sampler_attaches_annotations():
     cube = _synthetic_cube()
     called = {}

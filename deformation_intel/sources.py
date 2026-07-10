@@ -48,6 +48,56 @@ def volume_from_peak(peak_uz_m: float, depth_m: float, nu: float = POISSON_DEFAU
     return float(peak_uz_m) * np.pi * depth_m * depth_m / (1.0 - nu)
 
 
+def fit_mogi_bootstrap(
+    x: np.ndarray,
+    y: np.ndarray,
+    uz: np.ndarray,
+    *,
+    n_boot: int = 40,
+    seed: int = 0,
+    nu: float = POISSON_DEFAULT,
+) -> dict:
+    """Bootstrap the Mogi inversion to get depth/volume uncertainty.
+
+    Resamples bowl pixels with replacement and refits; returns the median and
+    16-84 percentile interval for depth and volume. A point depth without an
+    interval overstates certainty — collapse-risk decisions need the range.
+    """
+    rng = np.random.default_rng(seed)
+    x = np.asarray(x, np.float64)
+    y = np.asarray(y, np.float64)
+    uz = np.asarray(uz, np.float64)
+    m = np.isfinite(x) & np.isfinite(y) & np.isfinite(uz)
+    x, y, uz = x[m], y[m], uz[m]
+    n = x.size
+    if n < 10:
+        return {"depth_m": np.nan, "depth_lo_m": np.nan, "depth_hi_m": np.nan,
+                "volume_m3": np.nan, "volume_lo_m3": np.nan, "volume_hi_m3": np.nan,
+                "n_boot_ok": 0}
+    depths, vols = [], []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        fit = fit_mogi(x[idx], y[idx], uz[idx], nu=nu)
+        if np.isfinite(fit.depth_m) and fit.converged:
+            depths.append(fit.depth_m)
+            vols.append(fit.volume_m3)
+    if len(depths) < max(5, n_boot // 4):
+        return {"depth_m": np.nan, "depth_lo_m": np.nan, "depth_hi_m": np.nan,
+                "volume_m3": np.nan, "volume_lo_m3": np.nan, "volume_hi_m3": np.nan,
+                "n_boot_ok": len(depths)}
+    d = np.array(depths)
+    v = np.array(vols)
+    return {
+        "depth_m": float(np.median(d)),
+        "depth_lo_m": float(np.percentile(d, 16)),
+        "depth_hi_m": float(np.percentile(d, 84)),
+        "volume_m3": float(np.median(v)),
+        "volume_lo_m3": float(np.percentile(v, 16)),
+        "volume_hi_m3": float(np.percentile(v, 84)),
+        "n_boot_ok": len(depths),
+    }
+
+
 def _typical_spacing(x: np.ndarray, y: np.ndarray) -> float:
     """Median nearest-neighbour spacing of scattered sample points (meters)."""
     vals = []
