@@ -55,6 +55,7 @@ class Anomaly:
     time_to_threshold_yr: Optional[float]
     is_localized: bool
     regional_correlation: Optional[float]
+    rate_reliable: bool
     void_likelihood: float
     why: str
     context: Dict[str, float] = field(default_factory=dict)
@@ -196,10 +197,26 @@ def detect_anomalies(
                        f"depth {'railed' if depth_railed else 'ok'}) — regional aquifer/tectonic, not a void")
                 conf = min(conf, 0.6)
 
+            # Self-consistency: the claimed peak rate must roughly agree with
+            # the bowl's observed cumulative displacement over the record.
+            # Wild disagreement (or opposite sign) marks a fit artifact
+            # (sparse-era stitching drift, gappy-pixel overfit) — measured on
+            # the 36-epoch national cubes where this exact failure appeared.
+            rate_reliable = True
+            span_yr = float(t.max() - t.min()) if t.size > 1 else np.nan
+            if np.isfinite(cumulative) and np.isfinite(span_yr) and span_yr > 1:
+                cum_rate = cumulative / span_yr
+                if abs(peak_v) > 0.005:
+                    same_sign = np.sign(cum_rate) == np.sign(peak_v)
+                    ratio = abs(cum_rate) / abs(peak_v)
+                    rate_reliable = bool(same_sign and 0.1 <= ratio)
             void_likelihood = _void_likelihood(
                 kind, classification, is_localized, good_mogi, mogi.depth_m, seasonal_amp, peak_v,
                 regional_r=regional_r,
             )
+            if not rate_reliable:
+                void_likelihood = round(void_likelihood * 0.3, 2)
+                why += " [RATE UNRELIABLE: claimed rate inconsistent with observed cumulative displacement]"
 
             # Deeper characterization only for the candidates that matter
             # (bootstrap + growth history are ~100 extra fits per bowl).
@@ -244,6 +261,7 @@ def detect_anomalies(
                 time_to_threshold_yr=None if not np.isfinite(ttt) else round(float(ttt), 1),
                 is_localized=is_localized,
                 regional_correlation=None if regional_r is None else round(regional_r, 2),
+                rate_reliable=rate_reliable,
                 void_likelihood=round(void_likelihood, 2),
                 why=why, context=ctx,
             ))

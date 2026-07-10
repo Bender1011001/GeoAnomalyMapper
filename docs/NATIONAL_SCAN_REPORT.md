@@ -1,5 +1,19 @@
 # National Deformation Scan — Consolidated Report (2026-07-10)
 
+> **AUDIT ADDENDUM (same day):** a self-consistency audit (claimed rate vs
+> observed cumulative displacement) found that sparse-era subsampling (36
+> epochs across ~25 OPERA reference eras) produced stitching-drift artifacts
+> that inflated rates at several targets. The detector now flags these
+> (`rate_reliable=false`, void_likelihood ×0.3), and epoch subsampling now
+> preserves era-bridge epochs (`subsample_epochs_preserving_bridges`).
+> **Reliable candidate counts after the audit:** Scranton 34, Tampa 9,
+> Houston 43, Wink 18 (unchanged — validated site), Pecos 13 (unchanged),
+> Central Valley 63 (unchanged — genuine fast aquifer motion), Long Beach 2,
+> The Villages 2, **Hutchinson 0 and Carlsbad-brine 0 (previous candidates
+> were artifacts — re-scan with bridge-preserving sampling before trusting
+> anything there)**. The table below predates the audit; per-target
+> findings_v3.json now carries the `rate_reliable` flag per candidate.
+
 12 high-value AOIs (~24×24 km each), OPERA DISP-S1 time series 2016→2025,
 36 epochs per target, analyzed with detector v4: calendar-true era stitching,
 noise-adaptive thresholds, localized-vs-regional Mogi discrimination,

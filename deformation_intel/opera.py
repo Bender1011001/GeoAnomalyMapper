@@ -59,6 +59,41 @@ class DispGranule:
         return decimal_year(self.secondary_date)
 
 
+def subsample_epochs_preserving_bridges(
+    pairs: Sequence[Tuple[str, str]],
+    max_epochs: int,
+) -> List[int]:
+    """Choose <=~max_epochs indices from (ref_date, sec_date) pairs, ALWAYS
+    keeping era-bridge epochs.
+
+    OPERA displacement resets at each reference era. Continuous stitching
+    requires, for each era k, the epoch of era k whose secondary date equals
+    era k+1's reference date (the exact bridge). A naive even subsample drops
+    most bridges, so every stitch becomes a nearest-date approximation and the
+    accumulated bridge errors masquerade as deformation (phantom rates /
+    acceleration) — measured on the 36-epoch national scan cubes. Bridges are
+    mandatory; the remainder of the budget is spread evenly.
+    """
+    n = len(pairs)
+    if max_epochs >= n:
+        return list(range(n))
+    refs_order: List[str] = []
+    for r, _ in pairs:
+        if not refs_order or refs_order[-1] != r:
+            refs_order.append(r)
+    ref_set = set(refs_order)
+    bridge_idx = {i for i, (r, s) in enumerate(pairs) if s in ref_set}
+    # last epoch is always decision-relevant
+    bridge_idx.add(n - 1)
+    remaining_budget = max(0, max_epochs - len(bridge_idx))
+    even = set()
+    if remaining_budget > 0:
+        step = n / remaining_budget
+        even = {int(i * step) for i in range(remaining_budget)}
+    keep = sorted(bridge_idx | even)
+    return keep
+
+
 def search_disp_frames(lat: float, lon: float, *, max_results: int = 3000) -> Dict[str, List[DispGranule]]:
     """Return OPERA DISP-S1 granules grouped by frame stack ID over a point."""
     import asf_search as asf
@@ -264,9 +299,9 @@ def build_aoi_cube(
     granules = [g for g in granules if _dates(g)[1]]
     granules.sort(key=lambda g: _dates(g)[1])
     if max_epochs and len(granules) > max_epochs:
-        # even temporal subsample
-        step = len(granules) / max_epochs
-        granules = [granules[int(i * step)] for i in range(max_epochs)]
+        pairs = [_dates(g) for g in granules]
+        keep = subsample_epochs_preserving_bridges(pairs, max_epochs)
+        granules = [granules[i] for i in keep]
     logger.info("OPERA frame %s: %d epochs to stream", frame, len(granules))
     if cache_dir is not None:
         cache_dir = Path(cache_dir)
