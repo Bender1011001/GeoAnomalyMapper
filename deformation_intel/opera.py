@@ -224,6 +224,31 @@ def _read_one_window(open_ds, lon, lat, half, coherence_threshold):
             pass
 
 
+def _read_window_hard_timeout(open_ds, lon, lat, half, coherence_threshold,
+                              timeout_s: float):
+    """_read_one_window with a hard wall-clock timeout.
+
+    Remote HDF5 reads over fsspec/aiohttp have no reliable socket timeout; a
+    stalled connection blocks forever and starves the retry loop (observed:
+    3.5 h hang mid-archive). Running the read in a disposable worker thread
+    lets us abandon a stuck read and retry with a fresh session. The abandoned
+    thread dies when its socket eventually errors; the fresh factory never
+    reuses its handle.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as _FutTimeout
+
+    ex = ThreadPoolExecutor(max_workers=1)
+    try:
+        fut = ex.submit(_read_one_window, open_ds, lon, lat, half,
+                        coherence_threshold)
+        return fut.result(timeout=timeout_s)
+    except _FutTimeout:
+        raise TimeoutError(f"window read exceeded {timeout_s}s") from None
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+
+
 def build_aoi_cube(
     lat: float,
     lon: float,
@@ -235,6 +260,7 @@ def build_aoi_cube(
     cache_dir: Optional[Path] = None,
     max_retries: int = 4,
     retry_backoff_s: float = 3.0,
+    read_timeout_s: float = 180.0,
     allow_download: bool = True,
     asf_session=None,
 ) -> dict:
@@ -341,9 +367,14 @@ def build_aoi_cube(
             #    errors (a 503'd/401'd fsspec handle stays broken -> re-open).
             for attempt in range(1, max_retries + 1):
                 try:
-                    result = _read_one_window(_lazy_factory, lon, lat, half, coherence_threshold)
+                    result = _read_window_hard_timeout(
+                        _lazy_factory, lon, lat, half, coherence_threshold,
+                        timeout_s=read_timeout_s)
                     break
-                except Exception:
+                except Exception as exc:
+                    if isinstance(exc, TimeoutError):
+                        logger.warning("window read timeout %s (attempt %d/%d)",
+                                       sd, attempt, max_retries)
                     if attempt >= max_retries:
                         result = None
                         break
