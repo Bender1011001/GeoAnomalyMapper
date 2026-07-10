@@ -71,6 +71,8 @@ def detect_anomalies(
     velocity_threshold_cm_yr: float = 3.0,
     min_pixels: int = 6,
     min_sigma: float = 4.0,
+    adaptive_threshold: bool = True,
+    threshold_floor_cm_yr: float = 0.8,
     seasonal_dominated_ratio: float = 1.5,
     accel_flag_cm_yr2: float = 0.5,
     forecast_threshold_cm: float = 30.0,
@@ -114,7 +116,16 @@ def detect_anomalies(
     sigma = 1.4826 * np.nanmedian(np.abs(vel_rel[np.isfinite(vel_rel)]))
     sigma = float(sigma) if sigma > 1e-9 else 1e-9
 
-    thr = velocity_threshold_cm_yr / 100.0
+    if adaptive_threshold:
+        # Noise-calibrated threshold: in quiet terrain (e.g. OPERA desert
+        # frames with sigma ~0.2 cm/yr) a fixed 2-3 cm/yr floor is >10 sigma
+        # and blinds us to small weak features; in noisy agricultural frames
+        # it under-thresholds. Scale with the measured field noise, bounded
+        # below by an absolute floor against atmospheric residue.
+        thr = max(threshold_floor_cm_yr / 100.0,
+                  min(velocity_threshold_cm_yr / 100.0, min_sigma * sigma))
+    else:
+        thr = velocity_threshold_cm_yr / 100.0
     from pyproj import Transformer
     inv = Transformer.from_crs(cube["crs_wkt"], "EPSG:4326", always_xy=True)
     px_km2 = (pixel_size_m ** 2) / 1e6

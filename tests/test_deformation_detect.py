@@ -171,6 +171,37 @@ def test_candidate_gets_depth_range_and_growth_label():
     assert top.source_growth in ("growing", "steady")
 
 
+def test_adaptive_threshold_finds_weak_bowl_in_quiet_terrain():
+    """A weak (-1.3 cm/yr) small bowl in very quiet terrain (noise ~0.1 cm/yr)
+    is >10 sigma locally but below the legacy fixed 2 cm/yr floor. The adaptive
+    threshold must recover it; the fixed threshold must miss it."""
+    grid, n = 60, 60
+    x0, y0 = 600000.0, 4245000.0
+    x = x0 + (np.arange(grid) - grid / 2) * 30.0
+    y = y0 + (np.arange(grid) - grid / 2) * 30.0
+    X, Y = np.meshgrid(x, y)
+    r = np.hypot(X - x0, Y - y0)
+    shape = mogi_uz(r, 150.0, -1e5)
+    shape /= abs(shape.min())
+    t = 2016.5 + np.linspace(0, 9.0, n)
+    tc = t - t[0]
+    rng = np.random.default_rng(11)
+    cube_arr = np.empty((n, grid, grid))
+    for i in range(n):
+        cube_arr[i] = shape * (0.013 * tc[i]) + 0.0006 * rng.standard_normal((grid, grid))
+    cube = {"cube": cube_arr, "t": t, "x": x, "y": y,
+            "crs_wkt": "EPSG:32610", "frame": "TEST"}
+
+    fixed = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=5,
+                             min_sigma=4.0, adaptive_threshold=False)
+    adaptive = detect_anomalies(cube, velocity_threshold_cm_yr=2.0, min_pixels=5,
+                                min_sigma=4.0, adaptive_threshold=True)
+    assert not [a for a in fixed if a.kind == "subsidence"]
+    subs = [a for a in adaptive if a.kind == "subsidence"]
+    assert subs, "adaptive threshold should recover the weak bowl"
+    assert subs[0].peak_velocity_cm_yr <= -1.0
+
+
 def test_context_sampler_attaches_annotations():
     cube = _synthetic_cube()
     called = {}
