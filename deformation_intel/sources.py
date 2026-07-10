@@ -48,6 +48,18 @@ def volume_from_peak(peak_uz_m: float, depth_m: float, nu: float = POISSON_DEFAU
     return float(peak_uz_m) * np.pi * depth_m * depth_m / (1.0 - nu)
 
 
+def _typical_spacing(x: np.ndarray, y: np.ndarray) -> float:
+    """Median nearest-neighbour spacing of scattered sample points (meters)."""
+    vals = []
+    for arr in (np.unique(x), np.unique(y)):
+        if arr.size >= 2:
+            d = np.diff(np.sort(arr))
+            d = d[d > 0]
+            if d.size:
+                vals.append(float(np.median(d)))
+    return max(vals) if vals else 1.0
+
+
 @dataclass
 class MogiFit:
     depth_m: float = np.nan
@@ -84,11 +96,22 @@ def fit_mogi(
     if n < 8:
         return MogiFit(n_points=n)
 
-    # Epicenter guess = location of extreme displacement.
+    # Epicenter guess: median location of the strongest decile of |uz|.
+    # A single-pixel peak (unwrapping spike, corner reflector) would otherwise
+    # lock the initial epicenter and skew the whole radius field; the top-|uz|
+    # median centroid is robust to isolated outliers while still centering on
+    # a genuine bowl.
     sign = -1.0 if np.nanmin(uz) < -abs(np.nanmax(uz)) else 1.0
-    peak_idx = int(np.argmin(uz) if sign < 0 else np.argmax(uz))
-    x0, y0 = x[peak_idx], y[peak_idx]
-    peak = uz[peak_idx]
+    strong = np.abs(uz) >= np.nanpercentile(np.abs(uz), 90)
+    if strong.sum() >= 3:
+        x0 = float(np.median(x[strong]))
+        y0 = float(np.median(y[strong]))
+    else:
+        peak_idx = int(np.argmin(uz) if sign < 0 else np.argmax(uz))
+        x0, y0 = float(x[peak_idx]), float(y[peak_idx])
+    # Peak amplitude estimate, robust to lone spikes: extreme of the strong set.
+    peak = float(np.nanmin(uz[strong]) if sign < 0 else np.nanmax(uz[strong])) \
+        if strong.any() else float(np.nanmin(uz) if sign < 0 else np.nanmax(uz))
 
     # Half-width guess from radial profile.
     r = np.hypot(x - x0, y - y0)
@@ -98,7 +121,11 @@ def fit_mogi(
     else:
         within = r[uz >= half_level]
     r_half = float(np.nanmax(within)) if within.size else float(np.nanmedian(r))
-    r_half = max(r_half, (x.max() - x.min() + y.max() - y.min()) / 40.0 + 1.0)
+    # Floor r_half at the data's own sampling scale (median nearest-neighbour
+    # spacing), NOT the window extent — a window-sized floor would inflate the
+    # initial depth for compact features inside broad AOIs.
+    spacing = _typical_spacing(x, y)
+    r_half = max(r_half, spacing)
     d0 = np.clip(depth_from_bowl_width(r_half), *depth_bounds)
     dV0 = volume_from_peak(peak, d0, nu)
 

@@ -82,8 +82,17 @@ def stitch_reference_eras(
             if era in prev_out_by_date:
                 offset = prev_out_by_date[era]
             else:
-                # nearest by date distance
-                nearest = min(prev_out_by_date, key=lambda d: abs(int(d) - int(era)))
+                # Nearest by TRUE calendar distance. Naive int(YYYYMMDD)
+                # subtraction is non-linear across month/year boundaries
+                # (|20200101-20191231| = 8870 for a 1-day gap) and can pick
+                # the wrong bridge epoch when the exact boundary is missing
+                # (e.g. under epoch subsampling).
+                from datetime import datetime as _dt
+                era_dt = _dt.strptime(era, "%Y%m%d")
+                nearest = min(
+                    prev_out_by_date,
+                    key=lambda d: abs((_dt.strptime(d, "%Y%m%d") - era_dt).days),
+                )
                 offset = prev_out_by_date[nearest]
             running_offset = offset
         for i in idxs:
@@ -232,12 +241,12 @@ def fit_cube(
     *,
     seasonal: bool = True,
     min_obs: int = 12,
-    detect_breakpoints: bool = False,
 ) -> dict:
     """Vectorized trend+accel+seasonal fit over a (T,H,W) cube.
 
-    Breakpoint search is per-pixel and slow; off by default for full cubes and
-    run only on flagged candidate pixels via fit_pixel.
+    Breakpoint/regime-change search is deliberately NOT part of the cube pass
+    (it is per-pixel and slow); run `fit_pixel` on flagged candidate series —
+    detect.py does exactly this for each clustered anomaly.
     """
     t = np.asarray(t, dtype=np.float64)
     T, H, W = disp.shape

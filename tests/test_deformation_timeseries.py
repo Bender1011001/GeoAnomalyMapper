@@ -167,6 +167,47 @@ def test_stitch_makes_eras_continuous_no_fabricated_jump():
     assert np.allclose(got, expected, atol=1e-9)
 
 
+def test_stitch_nearest_bridge_uses_calendar_distance_not_int_distance():
+    """Era ref 20200101 missing from prior era; candidates are 20191231 (1 day)
+    and 20200115 (14 days). Naive int(YYYYMMDD) distance would pick 20200115
+    (|diff|=14 vs 8870); calendar distance must pick 20191231."""
+    rate = -0.10  # m/yr encoded as ~ -0.000274 m/day
+
+    def daily(d0, d1):
+        from datetime import datetime
+        return (datetime.strptime(d1, "%Y%m%d") - datetime.strptime(d0, "%Y%m%d")).days
+
+    era1_ref = "20191201"
+    era1_dates = ["20191201", "20191231", "20200115"]
+    era2_ref = "20200101"          # NOT among era1 secondaries
+    era2_dates = ["20200201", "20200301"]
+    dates = era1_dates + era2_dates
+    refs = [era1_ref] * 3 + [era2_ref] * 2
+
+    disp = np.zeros((len(dates), 1, 1))
+    for i, d in enumerate(dates):
+        disp[i, 0, 0] = rate * daily(refs[i], d) / 365.25
+
+    stitched = stitch_reference_eras(disp, dates, refs)
+    # ground truth: cumulative from era1_ref, continuous through the boundary
+    order = sorted(range(len(dates)), key=lambda i: dates[i])
+    got = {dates[i]: stitched[i, 0, 0] for i in order}
+    expected_20200201 = rate * daily(era1_ref, "20200201") / 365.25
+    # Correct bridge (20191231, offset ~rate*30d) puts 20200201 within ~1 day
+    # of truth; the int-distance bug bridges via 20200115 (15-day error).
+    assert abs(got["20200201"] - expected_20200201) <= abs(rate) * 2 / 365.25
+
+
+def test_time_to_threshold_two_positive_roots_returns_first_crossing():
+    """Documented semantics: with subsiding-but-decelerating motion that dips
+    through the threshold and comes back, the FIRST future crossing is the
+    correct 'time to reach threshold'."""
+    # v=-0.10 m/yr, a=+0.04 m/yr^2: turning point at t=2.5yr, depth -0.125 m.
+    # Threshold -0.10 m is crossed on the way down (~1.38yr) and back (~3.62yr).
+    ttt = time_to_threshold(0.0, -0.10, +0.04, -0.10)
+    assert 1.0 < ttt < 2.0  # earliest crossing, not the return leg
+
+
 def test_stitch_preserves_single_era():
     t_dates = ["20200101", "20200201", "20200301"]
     refs = ["20200101"] * 3

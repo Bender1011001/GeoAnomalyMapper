@@ -70,6 +70,23 @@ def test_fit_robust_to_noise():
     assert np.sign(fit.volume_m3) == np.sign(dV)
 
 
+def test_fit_robust_to_single_pixel_outlier_spike():
+    """A lone corrupted pixel far from the bowl must not hijack the epicenter
+    initialization (median-of-strong-decile init)."""
+    d, dV, x0, y0 = 300.0, -2.0e5, 0.0, 0.0
+    X, Y = _grid(n=41)
+    r = np.hypot(X - x0, Y - y0)
+    uz = mogi_uz(r, d, dV)
+    # inject a spike 3x the true peak amplitude at a far corner
+    spike_idx = int(np.argmax(np.hypot(X - 1800, Y - 1800) < 100))
+    uz = uz.copy()
+    uz[spike_idx] = 3.0 * uz.min()
+    fit = fit_mogi(X, Y, uz)
+    # epicenter must stay near the true bowl, not the corner spike
+    assert np.hypot(fit.x0_m - x0, fit.y0_m - y0) < 400.0
+    assert fit.depth_m == pytest.approx(d, rel=0.5)
+
+
 def test_fit_underdetermined_returns_nan():
     fit = fit_mogi(np.array([0.0, 1.0]), np.array([0.0, 1.0]), np.array([-0.01, -0.02]))
     assert np.isnan(fit.depth_m)
