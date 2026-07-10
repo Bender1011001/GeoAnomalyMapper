@@ -79,6 +79,7 @@ def detect_anomalies(
     forecast_threshold_cm: float = 30.0,
     context_samplers: Optional[Dict[str, Callable[[float, float], float]]] = None,
     pixel_size_m: float = 30.0,
+    min_valid_fraction: float = 0.5,
 ) -> List[Anomaly]:
     """Detect and classify deformation anomalies in an OPERA/HyP3 cube dict.
 
@@ -95,6 +96,15 @@ def detect_anomalies(
     vel = fields["velocity_m_yr"]
     acc = fields["accel_m_yr2"]
     seas = fields["seasonal_amp_m"]
+
+    # Under-observed pixels produce artifact velocities: a pixel masked in
+    # most eras has its valid epochs clumped in time, and a seasonal+trend fit
+    # on that clump yields slopes several x the true rate (measured on the
+    # full-archive Hutchinson cube: gappy pixels fit ~3 cm/yr where
+    # well-observed neighbors fit ~0.8). Require coverage across the record,
+    # not just a raw observation count.
+    n_valid = np.isfinite(disp).sum(axis=0)
+    vel = np.where(n_valid >= min_valid_fraction * disp.shape[0], vel, np.nan)
 
     # AOI reference series: regional water-table "breathing", measured on QUIET
     # ground only. Using the plain AOI median would let a large anomaly leak its

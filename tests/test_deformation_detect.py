@@ -216,3 +216,28 @@ def test_context_sampler_attaches_annotations():
     assert anomalies
     assert anomalies[0].context.get("groundwater_index") == pytest.approx(0.42)
     assert "hit" in called
+
+
+def test_gappy_pixels_excluded_from_detection():
+    """Pixels observed in only a clump of the record fit artifact slopes
+    (measured on the full-archive Hutchinson cube: ~3 cm/yr artifacts where
+    well-observed neighbors fit ~0.8). They must not seed clusters."""
+    cube = _synthetic_cube()
+    disp = cube["cube"]
+    # Plant a gappy patch far from the real bowl: valid only in the first 40%
+    # of epochs, where noise + a seasonal-ish wobble mimics a fast slope.
+    n = disp.shape[0]
+    cut = int(0.4 * n)
+    rr, cc = slice(5, 13), slice(5, 13)
+    disp[:, rr, cc] += 0.01 * np.sin(np.linspace(0, 6, n))[:, None, None]
+    disp[cut:, rr, cc] = np.nan
+    anomalies = detect_anomalies(cube, velocity_threshold_cm_yr=2.0,
+                                 min_pixels=5, min_sigma=3.0)
+    for a in anomalies:
+        # nothing detected inside the gappy patch (rows/cols 5-13 sit SW of
+        # the planted bowl: lat < 38.345, lon < -121.860; verified the patch
+        # IS detected there when min_valid_fraction=0)
+        assert not (a.lat < 38.345 and a.lon < -121.860), \
+            f"gappy-patch artifact detected: {a}"
+    # the real planted bowl must still be found
+    assert any(a.classification == "accelerating_subsidence" for a in anomalies)
