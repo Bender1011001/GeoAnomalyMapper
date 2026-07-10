@@ -143,8 +143,7 @@ def _make_two_era_series():
 
     def frac(d):
         # crude month fraction of a year for the synthetic
-        y, m, day = int(d[:4]), int(d[4:6]), int(d[6:])
-        return (m - 1) / 12.0
+        return (int(d[4:6]) - 1) / 12.0
 
     H = W = 2
     disp = np.zeros((len(all_dates), H, W))

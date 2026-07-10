@@ -89,9 +89,9 @@ class ReleaseHardeningHealthTests(unittest.TestCase):
         self.assertIn('geoanomaly-validation = "blind_validation:main"', pyproject)
         self.assertIn('blind-validation = "blind_validation:main"', pyproject)
         self.assertIn('"numpy>=1.24.0"', pyproject)
-        self.assertIn('"scikit-gstat>=1.0.0"', pyproject)
+        self.assertIn('"earthaccess>=', pyproject)
         self.assertIn('"json_utils"', pyproject)
-        self.assertIn('"pandas>=2.0.0"', pyproject)
+        self.assertIn('packages = ["deformation_intel"]', pyproject)
         self.assertIn("prune data", manifest)
         self.assertIn("prune results_extracted", manifest)
         self.assertIn("global-exclude .env", manifest)
@@ -109,8 +109,7 @@ class ReleaseHardeningHealthTests(unittest.TestCase):
         self.assertIn("python -m venv .venv-clean", commands_text)
         self.assertIn("pip install -e .", commands_text)
         self.assertNotIn("--execute-real", commands_text)
-        self.assertIn("scikit-gstat", docs)
-        self.assertIn("skgstat", docs)
+        self.assertIn("pip install", docs)
 
     def test_real_run_and_field_verification_docs_are_explicit(self):
         docs = Path("docs/VALIDATION_FIRST_WORKFLOW.md").read_text(encoding="utf-8")

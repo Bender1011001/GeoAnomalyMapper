@@ -1,0 +1,67 @@
+{
+  "target_name": "Unknown Area Scan (Guadalupe Backcountry NM)",
+  "coordinates": {
+    "lat": 32.05,
+    "lon": -104.75
+  },
+  "resolution_profile": "quick",
+  "status": "success",
+  "anomaly_count": 1,
+  "anomalies_detected": 1,
+  "top_deep_targets": [
+    {
+      "id": 1,
+      "centroid_m": [
+        9.885952493314505,
+        -0.06606890042473879,
+        224.06480061349694
+      ],
+      "depth_m": 224.06480061349694,
+      "depth_range_m": [
+        0.0,
+        460.0
+      ],
+      "extent_m": [
+        800.0,
+        800.0,
+        460.0
+      ],
+      "volume_m3": 285568359.375,
+      "voxel_count": 127140,
+      "mean_wave_speed_ms": 893.0191040039062,
+      "min_wave_speed_ms": 437.704833984375,
+      "mean_void_probability": 0.9868084788322449,
+      "shape_classification": "SPHERICAL",
+      "shape_note": "Natural void or ore body",
+      "aspect_ratios": [
+        1.7391304347826086,
+        1.7391304347826086
+      ],
+      "edge_sharpness": 0.1452251374721527,
+      "artificiality_score": 0.3,
+      "depth_priority_score": 0.6666133052147238,
+      "void_evidence_score": 0.7653467655181885,
+      "deep_target_score": 0.655994010437884,
+      "surface_anomaly_at_centroid": null,
+      "fused_confidence_score": 0.655994010437884,
+      "deep_target_rank": 1
+    }
+  ],
+  "data_source": "sentinel1_cband",
+  "outputs": {
+    "target_local_slc": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\bursts\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local.npy",
+    "target_local_slc_metadata": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\bursts\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local_metadata.json",
+    "vibration_amplitude": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\vibrometry\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local_vibration_amplitude.npy",
+    "wave_speed_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\pinn_inversion\\wave_speed_volume.npy",
+    "void_probability_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\pinn_inversion\\void_probability_volume.npy",
+    "visualization_dir": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\visualization",
+    "anomaly_report": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\visualization\\anomaly_report.txt",
+    "anomaly_catalog": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\visualization\\detected_anomalies.csv",
+    "audit_manifest": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Unknown_Area_Scan_Guadalupe_Backcountry_NM\\visualization\\audit_manifest.json"
+  },
+  "elapsed_seconds": 299.57926082611084,
+  "error": null,
+  "embedding_prior_used": false,
+  "locked_product_enforced": false,
+  "locked_product_ids": []
+}

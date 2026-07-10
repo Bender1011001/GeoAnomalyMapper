@@ -201,6 +201,7 @@ def build_aoi_cube(
     max_retries: int = 4,
     retry_backoff_s: float = 3.0,
     allow_download: bool = True,
+    asf_session=None,
 ) -> dict:
     """Stream an OPERA DISP-S1 AOI displacement cube via lazy windowed reads.
 
@@ -224,6 +225,20 @@ def build_aoi_cube(
         logger.warning("authenticated fsspec session unavailable (%s); "
                        "falling back to earthaccess.open", type(exc).__name__)
         fs = None
+
+    # ASFSession authenticates to the ASF datapool (URS redirect) for the
+    # download fallback, which earthaccess.download does not handle.
+    if asf_session is None:
+        try:
+            import asf_search as asf
+            import os as _os
+            user = _os.environ.get("EARTHDATA_USERNAME")
+            pwd = _os.environ.get("EARTHDATA_PASSWORD")
+            if user and pwd:
+                asf_session = asf.ASFSession().auth_with_creds(user, pwd)
+        except Exception as exc:
+            logger.warning("ASF session unavailable for download fallback: %s", type(exc).__name__)
+            asf_session = None
     results = earthaccess.search_data(
         short_name="OPERA_L3_DISP-S1_V1",
         point=(lon, lat),
@@ -300,26 +315,32 @@ def build_aoi_cube(
                     time.sleep(retry_backoff_s * attempt)
 
             # 2) Fallback for datapool-only frames (no cloud-lazy access):
-            #    authenticated full download -> extract AOI window -> delete.
-            #    Bounded disk (one .nc at a time); cached window makes it one-time.
-            if result is None and allow_download:
-                import tempfile
-                import xarray as xr
-                tmp = Path(tempfile.mkdtemp(prefix="opera_dl_"))
-                try:
-                    earthaccess.download([g], str(tmp))
-                    ncs = list(tmp.glob("*.nc"))
-                    if ncs:
-                        def _local_factory(p=ncs[0]):
-                            return xr.open_dataset(p, engine="h5netcdf")
-                        result = _read_one_window(_local_factory, lon, lat, half, coherence_threshold)
-                except Exception as exc:
-                    logger.warning("download fallback failed %s: %s: %s",
-                                   sd, type(exc).__name__, str(exc)[:80])
-                    result = None
-                finally:
-                    import shutil
-                    shutil.rmtree(tmp, ignore_errors=True)
+            #    authenticated full download via asf_search (ASFSession handles
+            #    the ASF datapool URS redirect that earthaccess.download does
+            #    not) -> extract AOI window -> delete. Bounded disk (one .nc at
+            #    a time); the cached window makes it one-time.
+            if result is None and allow_download and asf_session is not None:
+                dl_url = _granule_nc_url(g) or nc_url
+                if dl_url:
+                    import tempfile
+                    import xarray as xr
+                    import asf_search as asf
+                    tmp = Path(tempfile.mkdtemp(prefix="opera_dl_"))
+                    try:
+                        asf.download_url(url=dl_url, path=str(tmp),
+                                         filename=Path(dl_url).name, session=asf_session)
+                        ncs = list(tmp.glob("*.nc"))
+                        if ncs and ncs[0].stat().st_size > 1_000_000:
+                            def _local_factory(p=ncs[0]):
+                                return xr.open_dataset(p, engine="h5netcdf")
+                            result = _read_one_window(_local_factory, lon, lat, half, coherence_threshold)
+                    except Exception as exc:
+                        logger.warning("download fallback failed %s: %s: %s",
+                                       sd, type(exc).__name__, str(exc)[:80])
+                        result = None
+                    finally:
+                        import shutil
+                        shutil.rmtree(tmp, ignore_errors=True)
 
             if result is None:
                 logger.warning("skip %s (lazy+download both failed)", sd)

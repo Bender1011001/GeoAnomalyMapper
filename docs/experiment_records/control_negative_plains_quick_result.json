@@ -1,0 +1,67 @@
+{
+  "target_name": "High Plains Negative Control (CO)",
+  "coordinates": {
+    "lat": 39.7,
+    "lon": -103.2
+  },
+  "resolution_profile": "quick",
+  "status": "success",
+  "anomaly_count": 1,
+  "anomalies_detected": 1,
+  "top_deep_targets": [
+    {
+      "id": 1,
+      "centroid_m": [
+        9.417030242156955,
+        -0.22059746700358573,
+        224.6013944035531
+      ],
+      "depth_m": 224.6013944035531,
+      "depth_range_m": [
+        0.0,
+        460.0
+      ],
+      "extent_m": [
+        800.0,
+        800.0,
+        460.0
+      ],
+      "volume_m3": 286237695.3125,
+      "voxel_count": 127438,
+      "mean_wave_speed_ms": 913.7671508789062,
+      "min_wave_speed_ms": 434.06103515625,
+      "mean_void_probability": 0.9874451160430908,
+      "shape_classification": "SPHERICAL",
+      "shape_note": "Natural void or ore body",
+      "aspect_ratios": [
+        1.7391304347826086,
+        1.7391304347826086
+      ],
+      "edge_sharpness": 0.1451338231563568,
+      "artificiality_score": 0.3,
+      "depth_priority_score": 0.6673715355702381,
+      "void_evidence_score": 0.7639666795730591,
+      "deep_target_score": 0.6550593666436775,
+      "surface_anomaly_at_centroid": null,
+      "fused_confidence_score": 0.6550593666436775,
+      "deep_target_rank": 1
+    }
+  ],
+  "data_source": "sentinel1_cband",
+  "outputs": {
+    "target_local_slc": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\bursts\\S1A_IW_SLC__1SDV_20260627T130116_20260627T130145_065155_083699_73FB_IW2_target_local.npy",
+    "target_local_slc_metadata": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\bursts\\S1A_IW_SLC__1SDV_20260627T130116_20260627T130145_065155_083699_73FB_IW2_target_local_metadata.json",
+    "vibration_amplitude": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\vibrometry\\S1A_IW_SLC__1SDV_20260627T130116_20260627T130145_065155_083699_73FB_IW2_target_local_vibration_amplitude.npy",
+    "wave_speed_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\pinn_inversion\\wave_speed_volume.npy",
+    "void_probability_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\pinn_inversion\\void_probability_volume.npy",
+    "visualization_dir": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\visualization",
+    "anomaly_report": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\visualization\\anomaly_report.txt",
+    "anomaly_catalog": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\visualization\\detected_anomalies.csv",
+    "audit_manifest": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\High_Plains_Negative_Control_CO\\visualization\\audit_manifest.json"
+  },
+  "elapsed_seconds": 308.1723704338074,
+  "error": null,
+  "embedding_prior_used": false,
+  "locked_product_enforced": false,
+  "locked_product_ids": []
+}

@@ -96,9 +96,7 @@ class EarthdataNoSecretLoggingTests(unittest.TestCase):
         self.assertIn(f"length={len(fake_token)}", log_text)
         self.assertIn("masked=<redacted>", log_text)
 
-    def test_cli_env_loader_masks_token_and_other_sensitive_values(self):
-        import run_biondi_exploration
-
+    def test_env_file_loader_does_not_print_secret_values(self):
         fake_token = "dummy-env-token-never-log-me"
         with tempfile.TemporaryDirectory() as tmp:
             env_path = Path(tmp) / ".env"
@@ -112,14 +110,13 @@ class EarthdataNoSecretLoggingTests(unittest.TestCase):
             stdout = io.StringIO()
             with mock.patch.dict(os.environ, {}, clear=False):
                 with contextlib.redirect_stdout(stdout):
-                    run_biondi_exploration.load_cli_env(env_path)
+                    with self.assertLogs(level="INFO") as logs:
+                        loaded = slc_data_fetcher.load_env_file(env_path)
 
-        output = stdout.getvalue()
-        self.assertNotIn(fake_token, output)
-        self.assertNotIn("dummy-user", output)
-        self.assertIn(f"length={len(fake_token)}", output)
-        self.assertIn("masked=<redacted>", output)
-        self.assertIn("PLAIN_VALUE=visible", output)
+        self.assertTrue(loaded)
+        combined = stdout.getvalue() + "\n".join(logs.output)
+        self.assertNotIn(fake_token, combined)
+        self.assertNotIn("dummy-user", combined)
 
 
 class ASFSearchRobustnessTests(unittest.TestCase):

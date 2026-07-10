@@ -49,7 +49,7 @@ sites are run and scored.
   - Deterministically freezes selected product IDs from the inventory so later
     real execution can use the same selection or detect drift.
 - Parameter set: `validation_examples/validation_parameter_set_template.json`
-  - Records thresholds, resolution profile, PINN settings, scoring tolerances,
+  - Records thresholds, resolution profile, model settings, scoring tolerances,
     provider preferences, comparison arms, split policy, model card, and analysis
     plan.
   - Must not include labels, truth geometry, expected site class, or withheld-label
@@ -110,7 +110,7 @@ with `--allow-templates` before copying them to a private location.
 ## Safe Fixture Smoke Test
 
 These commands use only committed local fixtures and do not download SAR data or
-start PINN training:
+start any training or heavy processing:
 
 ```bash
 python blind_validation.py validate-public --manifest validation_examples/public_manifest_fixture.json
@@ -139,7 +139,7 @@ Use `python geoanomaly.py commands` to print canonical validation-first examples
 
 Release hardening is intentionally validation-first and no-download. The top-level
 health command checks local prerequisites and example/test command availability
-without loading withheld labels, downloading SAR products, or starting PINN
+without loading withheld labels, downloading SAR products, or starting model
 training:
 
 ```bash
@@ -185,7 +185,7 @@ processing.
 
 Use a fresh virtual environment when validating install metadata or reproducing a
 release-smoke failure. These commands are intentionally no-download/no-training
-with respect to SAR products and PINN execution; only Python package installation
+with respect to SAR products and pipeline execution; only Python package installation
 uses the package index.
 
 Windows command prompt / PowerShell:
@@ -327,7 +327,7 @@ Use the campaign-level driver after the copied public manifest, approved
 parameter set, locked registry, and product lock have been reviewed. The default
 workflow is no-download/dry-run-safe: planning and status commands emit strict
 JSON, do not load withheld labels, do not start SAR downloads, and do not start
-PINN training.
+heavy processing.
 
 Create a deterministic per-target execution plan from the public manifest,
 locked registry, approved parameter set, and product lock:
@@ -377,7 +377,7 @@ plan before any heavy processing. The committed template is
 `validation_examples/robustness_ablation_plan_template.json`. It covers the
 expected ablation families for threshold sensitivity, minimum anomaly voxel
 thresholds, morphology iterations and connected-component topology, depth-prior
-or PINN regularization sensitivity, SAR preprocessing and vibrometry quality
+or model regularization sensitivity, preprocessing and data-quality
 filters, top-k candidate cutoffs for physically extreme candidate volume, null
 region/random-spatial baselines, and repeat product/date stability groups.
 
@@ -541,7 +541,7 @@ or any known cave geometry.
 ## No-Download SAR Preflight Inventory
 
 The inventory command is search-only by design. It does not call product
-download APIs, does not run vibrometry, and does not start PINN training. It may
+download APIs and does not start any processing pipeline. It may
 load local `.env` values to authenticate ASF/CMR search, but it records only auth
 mode and secret presence metadata, never token or password values.
 
@@ -658,7 +658,7 @@ metadata before allowing real execution. Missing size metadata should be treated
 as unknown disk risk, not as zero size.
 
 Real execution also requires an explicit confirmation flag in addition to
-`--execute-real`. This prevents accidental downloads or long PINN training from a
+`--execute-real`. This prevents accidental downloads or long processing runs from a
 copy-pasted command. Use `--confirm-real-downloads-and-training` only after the
 public manifest, approved parameters, product lock, selected-product size
 estimate, free disk space, and no-synthetic-fallback policy have been reviewed.

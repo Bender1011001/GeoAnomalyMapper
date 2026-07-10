@@ -1,0 +1,104 @@
+{
+  "target_name": "Carlsbad Caverns Control (NM)",
+  "coordinates": {
+    "lat": 32.1479,
+    "lon": -104.5567
+  },
+  "resolution_profile": "quick",
+  "status": "success",
+  "anomaly_count": 2,
+  "anomalies_detected": 2,
+  "top_deep_targets": [
+    {
+      "id": 1,
+      "centroid_m": [
+        7.588394083135711,
+        0.5698219635501687,
+        225.6146919080015
+      ],
+      "depth_m": 225.6146919080015,
+      "depth_range_m": [
+        0.0,
+        460.0
+      ],
+      "extent_m": [
+        800.0,
+        800.0,
+        460.0
+      ],
+      "volume_m3": 287895312.5,
+      "voxel_count": 128176,
+      "mean_wave_speed_ms": 828.7889404296875,
+      "min_wave_speed_ms": 413.54296875,
+      "mean_void_probability": 0.9891330003738403,
+      "shape_classification": "SPHERICAL",
+      "shape_note": "Natural void or ore body",
+      "aspect_ratios": [
+        1.7391304347826086,
+        1.7391304347826086
+      ],
+      "edge_sharpness": 0.1509321928024292,
+      "artificiality_score": 0.3,
+      "depth_priority_score": 0.6688033690004369,
+      "void_evidence_score": 0.7742643356323242,
+      "deep_target_score": 0.6643641615760926,
+      "surface_anomaly_at_centroid": null,
+      "fused_confidence_score": 0.6643641615760926,
+      "deep_target_rank": 1
+    },
+    {
+      "id": 2,
+      "centroid_m": [
+        -388.75,
+        393.75,
+        435.5625
+      ],
+      "depth_m": 435.5625,
+      "depth_range_m": [
+        416.875,
+        460.0
+      ],
+      "extent_m": [
+        25.0,
+        12.5,
+        43.125
+      ],
+      "volume_m3": 11230.46875,
+      "voxel_count": 5,
+      "mean_wave_speed_ms": 2529.299072265625,
+      "min_wave_speed_ms": 2503.646484375,
+      "mean_void_probability": 0.3887624144554138,
+      "shape_classification": "ELONGATED",
+      "shape_note": "Linear feature (vein, channel, or conduit)",
+      "aspect_ratios": [
+        3.45,
+        2.0
+      ],
+      "edge_sharpness": 0.0,
+      "artificiality_score": 0.0,
+      "depth_priority_score": 0.96546875,
+      "void_evidence_score": 0.25077909231185913,
+      "deep_target_score": 0.24706778565554746,
+      "surface_anomaly_at_centroid": null,
+      "fused_confidence_score": 0.24706778565554746,
+      "deep_target_rank": 2
+    }
+  ],
+  "data_source": "sentinel1_cband",
+  "outputs": {
+    "target_local_slc": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\bursts\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local.npy",
+    "target_local_slc_metadata": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\bursts\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local_metadata.json",
+    "vibration_amplitude": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\vibrometry\\S1C_IW_SLC__1SDV_20260628T005933_20260628T010000_008299_0106AA_D720_IW2_target_local_vibration_amplitude.npy",
+    "wave_speed_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\pinn_inversion\\wave_speed_volume.npy",
+    "void_probability_volume": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\pinn_inversion\\void_probability_volume.npy",
+    "visualization_dir": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\visualization",
+    "anomaly_report": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\visualization\\anomaly_report.txt",
+    "anomaly_catalog": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\visualization\\detected_anomalies.csv",
+    "audit_manifest": "E:\\code.projects\\GeoAnomalyMapper-1\\data\\biondi_exploration\\Carlsbad_Caverns_Control_NM\\visualization\\audit_manifest.json"
+  },
+  "elapsed_seconds": 294.5672128200531,
+  "error": null,
+  "embedding_prior_used": false,
+  "locked_product_enforced": false,
+  "locked_product_ids": []
+}

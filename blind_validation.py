@@ -950,11 +950,11 @@ def _key_module_fingerprints() -> Dict[str, Dict[str, Any]]:
     base = Path(__file__).resolve().parent
     module_names = [
         "blind_validation.py",
-        "run_biondi_exploration.py",
         "slc_data_fetcher.py",
-        "sar_vibrometry.py",
-        "pinn_vibro_inversion.py",
-        "visualize_3d_subsurface.py",
+        "deformation_intel/opera.py",
+        "deformation_intel/timeseries.py",
+        "deformation_intel/sources.py",
+        "deformation_intel/detect.py",
     ]
     return {name: _file_fingerprint(base / name, base) for name in module_names}
 
@@ -4174,9 +4174,17 @@ def run_blind_validation(
                 candidate_count, freeze_reason = _copy_or_empty_candidate_csv(source_csv, frozen_csv)
             else:
                 if pipeline_executor is None:
-                    from run_biondi_exploration import execute_biondi_pipeline_for_target
-
-                    pipeline_executor = execute_biondi_pipeline_for_target
+                    # The legacy SAR-vibrometry executor was removed after it
+                    # failed ground-truth validation (Carlsbad vs barren
+                    # control, 2026-07). Real execution now requires an
+                    # explicit pipeline_executor (e.g. a deformation_intel
+                    # based runner).
+                    raise ManifestValidationError(
+                        "Real execution requires a pipeline_executor: the legacy "
+                        "vibrometry pipeline was removed after failing blind "
+                        "ground-truth validation. Provide an executor built on "
+                        "deformation_intel, or run with dry_run/existing_candidates."
+                    )
                 pipeline_target = _public_target_to_pipeline_target(public_target)
                 pipeline_kwargs: Dict[str, Any] = {
                     "target": pipeline_target,

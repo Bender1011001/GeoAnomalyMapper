@@ -35,7 +35,7 @@ jobs:
 
       - name: Compile validation-first sources
         run: |
-          python -m compileall -q blind_validation.py geoanomaly.py sar_vibrometry.py pinn_vibro_inversion.py visualize_3d_subsurface.py run_biondi_exploration.py satellite_embeddings.py slc_data_fetcher.py project_paths.py tests
+          python -m compileall -q blind_validation.py geoanomaly.py json_utils.py slc_data_fetcher.py project_paths.py deformation_intel tests
 
       - name: Run no-download release health check
         run: |
