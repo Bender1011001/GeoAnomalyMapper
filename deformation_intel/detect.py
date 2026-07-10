@@ -184,7 +184,20 @@ def detect_anomalies(
             seasonal_amp = float(np.nanmean(seas[rows, cols])) if np.isfinite(seas[rows, cols]).any() else np.nan
             peak_v = float(vals[pi])
             mean_v = float(np.nanmean(vals))
+            # Acceleration: temporal shape from the cluster-mean fit (robust),
+            # amplitude rescaled to the peak pixel. Per-pixel accel alone is
+            # noise-dominated — it mislabeled real decelerating
+            # (drought-recovery) bowls as ACCELERATING on the Vacaville cube
+            # (cluster fit +0.95 cm/yr^2, peak pixel negative). A coherent
+            # bowl moves with one time function scaled spatially, so
+            # peak accel = cluster accel x (peak/mean velocity ratio).
             accel = float(acc[pr, pc])
+            if np.isfinite(pfit.accel_m_yr2):
+                scale = 1.0
+                if (np.isfinite(mean_v) and abs(mean_v) > 1e-6
+                        and np.sign(mean_v) == np.sign(peak_v)):
+                    scale = min(max(peak_v / mean_v, 0.5), 10.0)
+                accel = float(pfit.accel_m_yr2) * scale
 
             classification, why, conf = _classify(
                 kind, peak_v, accel, seasonal_amp, pfit,
