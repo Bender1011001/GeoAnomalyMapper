@@ -104,7 +104,12 @@ def detect_anomalies(
     # well-observed neighbors fit ~0.8). Require coverage across the record,
     # not just a raw observation count.
     n_valid = np.isfinite(disp).sum(axis=0)
-    vel = np.where(n_valid >= min_valid_fraction * disp.shape[0], vel, np.nan)
+    covered = n_valid >= min_valid_fraction * disp.shape[0]
+    # Same gappy-pixel artifact applies to accel and seasonal amplitude, which
+    # feed classification and the peak-pixel accel fallback — gate them too.
+    vel = np.where(covered, vel, np.nan)
+    acc = np.where(covered, acc, np.nan)
+    seas = np.where(covered, seas, np.nan)
 
     # AOI reference series: regional water-table "breathing", measured on QUIET
     # ground only. Using the plain AOI median would let a large anomaly leak its
