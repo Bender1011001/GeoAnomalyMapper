@@ -1,72 +1,71 @@
-# National Deformation Scan — Consolidated Report (2026-07-10)
+# National Deformation Scan — Full-Archive Report (2026-07-11)
 
-> **AUDIT ADDENDUM (same day):** a self-consistency audit (claimed rate vs
-> observed cumulative displacement) found that sparse-era subsampling (36
-> epochs across ~25 OPERA reference eras) produced stitching-drift artifacts
-> that inflated rates at several targets. The detector now flags these
-> (`rate_reliable=false`, void_likelihood ×0.3), and epoch subsampling now
-> preserves era-bridge epochs (`subsample_epochs_preserving_bridges`).
-> **Reliable candidate counts after the audit:** Scranton 34, Tampa 9,
-> Houston 43, Wink 18 (unchanged — validated site), Pecos 13 (unchanged),
-> Central Valley 63 (unchanged — genuine fast aquifer motion), Long Beach 2,
-> The Villages 2, **Hutchinson 0 and Carlsbad-brine 0 (previous candidates
-> were artifacts — re-scan with bridge-preserving sampling before trusting
-> anything there)**. The table below predates the audit; per-target
-> findings_v3.json now carries the `rate_reliable` flag per candidate.
+12 high-value AOIs (~24×24 km), NASA OPERA DISP-S1 time series 2016→2025,
+processed with the **complete epoch archive** (149–434 epochs per target) and
+detector v5: calendar-true era stitching, per-pixel temporal-coverage gate,
+robust cluster fits, cluster-mean acceleration, rate-vs-cumulative
+self-consistency, localized-vs-regional Mogi discrimination, and bootstrap depth
+ranges. Every headline number below was independently verified against the raw
+pixel series. Per-target detail: `data/national_scan/<target>/findings_v4_full.json`
+and `map_final.png`; summary: `data/national_scan/NATIONAL_REPORT_final.json`.
 
-12 high-value AOIs (~24×24 km each), OPERA DISP-S1 time series 2016→2025,
-36 epochs per target, analyzed with detector v4: calendar-true era stitching,
-noise-adaptive thresholds, localized-vs-regional Mogi discrimination,
-quiet-ground aquifer-correlation rejection, bootstrap depth ranges, and
-early/late source-growth labels. Per-target details: `data/national_scan/
-<target>/findings_v3.json`; summary: `data/national_scan/NATIONAL_REPORT_v3.json`.
+> **This supersedes the earlier 36-epoch scan.** That sparse pass claimed 457
+> candidates; most were artifacts from stitching drift on under-sampled epochs.
+> The full archive plus reliability/coverage filtering reduces this to **35
+> verified localized candidates** — a ~13× cull, with each survivor consistent
+> with its raw cumulative displacement.
 
-## Results
+## Results (verified)
 
-| Target | Anomalies | Localized void candidates | Top candidate | Reading |
+| Target | Epochs | Candidates | Top verified candidate | Reading |
 |---|---|---|---|---|
-| Scranton anthracite, PA | 505 | **130** | −49.6 cm/yr @ **42 m** (41.3428, −75.7151) | Shallow depths match anthracite workings; most active mine-subsidence field in the set |
-| Hutchinson salt, KS | 424 | 71 | −4.9 cm/yr @ 731 m (38.1257, −98.0626) | Active salt district; top depth deeper than local salt — treat depth with its CI |
-| Central Valley, CA | 264 | 63 | −22.8 cm/yr @ 153 m | Known aquifer province; candidates here are pumping cones (no quiet ground for rejection — see caveats) |
-| Houston, TX | 264 | 62 | −7.2 cm/yr @ 97 m (29.7170, −95.2482) | Fault-block + groundwater subsidence; industrial SE corridor |
-| Carlsbad brine, NM | 114 | **48** | −3.6 cm/yr @ **394 m** (32.4687, −104.2920) | Depth lands in the Salado/Castile dissolution section; 11 km NNW of the remediated I&W well |
-| Tampa/Spring Hill, FL | 238 | **45** | −17.2 cm/yr @ **111 m** (28.3465, −82.4136) | Sinkhole Alley; karst-depth accelerating bowls — flagship insurance-relevant result |
-| Wink/Kermit, TX | 55 | 18 | −3.8 cm/yr @ **459 m** (31.7754, −103.1270) | Ground-truth site; top candidate in the validated sink complex at Salado depth |
-| Pecos, TX | 128 | 13 | −6.9 cm/yr @ 169 m | Oilfield terrain correctly dominated by regional/uplift classes |
-| Long Beach, CA | 54 | 5 | −5.9 cm/yr @ 160 m (33.7606, −118.2459) | Wilmington oilfield/harbor; small candidate set |
-| The Villages, FL | 283 | 2 | −2.9 cm/yr @ 360 m | Mass "uplift" flags are a referencing-artifact suspect — do not interpret |
-| Retsof, NY | 45 | **0** | — | 1994 mine collapse stabilized — clean result matches history |
-| Bayou Corne, LA | 181 | **0** | — | 2012 sinkhole stabilized; swamp coherence limits |
+| Scranton anthracite, PA | 194 | **16** | −24.5 cm/yr* @ 55 m (41.426, −75.600) | Active abandoned-mine subsidence; strongest field. *peak-pixel rate inflated; cluster ~−3 cm/yr |
+| Wink/Kermit, TX | 269 | **6** | cluster to −88 cm cumulative (31.78, −103.13) | **Validation anchor** — recovers the documented sink complex (5/6 within 3.5 km of Sink 1) |
+| Houston, TX | 434 | **5** | −1.9 cm/yr @ 76 m (29.854, −95.260) | Fault-block + groundwater subsidence |
+| Tampa/Spring Hill, FL | 269 | **4** | −6.8 cm/yr @ karst depth (28.443, −82.423) | Sinkhole Alley; 2 accelerating karst movers (low OPERA coverage — HyP3 follow-up) |
+| Long Beach, CA | 371 | **2** | −2.4 cm/yr abs @ 81 m (33.796, −118.248) | Tight subsidence bowls inside the injection-*uplifted* Wilmington oilfield |
+| Hutchinson salt, KS | 254 | **1** | −2.3 cm/yr abs, −20.8 cm cum (38.029, −97.873) | One genuine salt-district bowl (was "71" on sparse data — artifacts) |
+| Retsof, NY | 149 | **1** | ~−1 cm/yr, −13.6 cm cum (42.764, −77.799) | Real *residual* settlement at the 1994 salt-mine collapse; steady, decelerating |
+| Carlsbad brine, NM | 254 | **0** | — | "48" on sparse data were artifacts; old top spot is actually *rising*. 206 masked coverage-holes = HyP3 targets |
+| Bayou Corne, LA | 254 | **0** | — | Clean negative — stabilized 2012 collapse; swamp-coherence noise culled |
+| The Villages, FL | 239 | **0** | — | Prior "uplift field" was a referencing artifact; quiet |
+| Pecos, TX | 269 | **0** | — | Oilfield correctly dominated by regional/uplift classes |
+| Central Valley, CA | 374 | **0** | — | Most extreme *real* subsidence in the set (−10 to −18 cm/yr abs) but broad-regional → correctly not localized voids; only 11.5% of pixels measurable (ag decorrelation) |
 
-**Totals: ~2,555 classified anomalies; 457 localized void candidates.**
+**Total: 35 verified localized candidates across 12 targets.**
 
-## Validation anchors inside the scan
+## Validation & negative controls (the trust anchors)
 
-- Wink's top candidate sits in the independently validated sink complex, at the
-  documented salt depth.
-- Retsof and Bayou Corne — both *stabilized* historic collapses — correctly
-  return **zero** candidates: the detector does not invent signal where ground
-  truth says motion ended.
-- Central Valley's aquifer province is correctly majority-classified regional.
+- **Wink** (independently validated): the detector recovers the sink complex as a
+  tight cluster of raw-consistent subsidence bowls (−22 to −88 cm cumulative)
+  2–3.5 km from the documented Sink 1 — blind, through the full archive.
+- **Bayou Corne** (stabilized 2012 collapse): **0** candidates — correct.
+- **Central Valley** (aquifer province): **0** localized candidates — the
+  localized-vs-regional discriminator correctly declines to call groundwater
+  compaction a void field.
+- The self-audit this pass discarded artifacts at Hutchinson (71→1), Carlsbad
+  (48→0), Tampa (45→4), Scranton (130→16) and reclassified Retsof from "clean
+  zero" to real residual settlement.
 
 ## Caveats (read before acting on any candidate)
 
-1. Candidates are **leads for investigation**, not confirmed voids. Ground
-   methods (microgravity/ERT/records search) confirm; the satellite ranks.
-2. **Aquifer rejection needs quiet ground.** In wall-to-wall subsiding basins
-   (Central Valley, parts of Houston) there is no stable reference, so pumping
-   cones can still score as candidates. External groundwater/well data is the
-   remaining discriminator for those basins.
-3. Mass-uplift fields (The Villages, Bayou Corne) are referencing artifacts
-   until proven otherwise.
-4. LOS single-geometry rates; depth estimates carry the bootstrap ranges in the
-   per-target JSONs — use the ranges, not the point values.
-5. Coverage-hole lists (fast-motion fingerprints) are lead-generation only;
-   intersect with known salt/mine locations before spending HyP3 credits.
+1. Candidates are **leads for ground follow-up** (microgravity / ERT / records),
+   not confirmed voids.
+2. **Depths are the least-reliable output** — Mogi point-source fits scatter on
+   complex/fast bowls (Wink 272–1046 m). Use the bootstrap ranges in the JSONs,
+   and weight detection + rate over depth.
+3. Rates are **relative to the AOI median** unless marked "abs"; in uplifting
+   fields (Long Beach) a negative relative rate can be modest absolute motion.
+4. Peak-pixel rates can exceed the cluster rate (Scranton −24.5 peak vs ~−3
+   cluster) — trust the cluster.
+5. Low-coverage targets (Tampa karst, Central Valley ag) undersample the fast
+   movers OPERA masks — intersect with HyP3 short-pairs before spending credits.
 
-## What to do next with this
+## What to do next
 
-- Field-verifiable shortlist: Scranton (shallow, fast, dense), Tampa (insurance
-  market), Carlsbad brine (regulatory hazard precedent).
-- HyP3 10×2 follow-ups on coverage holes at Hutchinson/Wink/Carlsbad.
-- Groundwater-context layer to de-confound the basin targets.
+- Field-verifiable shortlist: **Scranton** (dense, shallow, active),
+  **Tampa** (insurance market), **Wink** (validated, for methodology).
+- HyP3 10×2 short-pair follow-ups on Carlsbad's 206 coverage-holes and Tampa's
+  low-coverage accelerating bowls.
+- Groundwater-context layer to de-confound the basin targets (Houston, Central
+  Valley).
