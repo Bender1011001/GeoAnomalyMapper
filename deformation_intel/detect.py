@@ -38,6 +38,7 @@ class Anomaly:
     confidence: float
     peak_velocity_cm_yr: float
     mean_velocity_cm_yr: float
+    abs_peak_velocity_cm_yr: float
     accel_cm_yr2: float
     seasonal_amp_cm: float
     area_km2: float
@@ -189,6 +190,12 @@ def detect_anomalies(
             seasonal_amp = float(np.nanmean(seas[rows, cols])) if np.isfinite(seas[rows, cols]).any() else np.nan
             peak_v = float(vals[pi])
             mean_v = float(np.nanmean(vals))
+            # ABSOLUTE peak velocity = relative + AOI median. In a wall-to-wall
+            # subsiding basin (med << 0, e.g. Central Valley -10.6 cm/yr) a patch
+            # subsiding LESS than the field has positive vel_rel and is flagged
+            # "uplift" — but the ground is still sinking. Report absolute so that
+            # relative-uplift isn't mistaken for real uplift.
+            abs_peak_v = peak_v + med
             # Acceleration: temporal shape from the cluster-mean fit (robust),
             # amplitude rescaled to the peak pixel. Per-pixel accel alone is
             # noise-dominated — it mislabeled real decelerating
@@ -208,6 +215,16 @@ def detect_anomalies(
                 kind, peak_v, accel, seasonal_amp, pfit,
                 seasonal_dominated_ratio, accel_flag_cm_yr2, pk_sigma,
             )
+
+            # "Uplift" in a regionally-subsiding AOI can be merely RELATIVE (the
+            # patch subsides less than the field). Flag it so it isn't read as
+            # true uplift, and reclassify to avoid a false "rising ground" call.
+            if kind == "uplift" and abs_peak_v < -0.002:
+                classification = "relative_uplift"
+                why = (f"relative uplift only: +{peak_v*100:.1f} cm/yr vs the field, but "
+                       f"ground is still subsiding {abs_peak_v*100:.1f} cm/yr absolute "
+                       f"(AOI median {med*100:.1f} cm/yr) — not true uplift")
+                conf = min(conf, 0.6)
 
             # Localized (point-source, possible void) vs regional (aquifer/
             # tectonic sheet). A real void gives a clean, compact Mogi bowl; a
@@ -274,6 +291,7 @@ def detect_anomalies(
                 classification=classification, confidence=round(conf, 2),
                 peak_velocity_cm_yr=round(peak_v * 100, 1),
                 mean_velocity_cm_yr=round(mean_v * 100, 1),
+                abs_peak_velocity_cm_yr=round(abs_peak_v * 100, 1),
                 accel_cm_yr2=round(accel * 100, 2),
                 seasonal_amp_cm=round(seasonal_amp * 100, 1) if np.isfinite(seasonal_amp) else float("nan"),
                 area_km2=round(npx * px_km2, 3), n_pixels=npx, sigma=round(pk_sigma, 1),

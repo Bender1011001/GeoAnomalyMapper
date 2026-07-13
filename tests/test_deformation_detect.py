@@ -241,3 +241,29 @@ def test_gappy_pixels_excluded_from_detection():
             f"gappy-patch artifact detected: {a}"
     # the real planted bowl must still be found
     assert any(a.classification == "accelerating_subsidence" for a in anomalies)
+
+
+def test_relative_uplift_in_subsiding_field_not_called_true_uplift():
+    """A patch subsiding LESS than a wall-to-wall subsiding field has positive
+    RELATIVE velocity; it must not be reported as true uplift (the ground is
+    still sinking). Verifies abs_peak_velocity_cm_yr + relative_uplift reclass."""
+    n_epochs, grid, pixel_m = 60, 60, 30.0
+    x0, y0 = 600000.0, 4245000.0
+    x = x0 + (np.arange(grid) - grid / 2) * pixel_m
+    y = y0 + (np.arange(grid) - grid / 2) * pixel_m
+    t = 2016.5 + np.linspace(0, 9.0, n_epochs)
+    tc = t - t[0]
+    rng = np.random.default_rng(3)
+    cube = np.empty((n_epochs, grid, grid))
+    # whole field subsides -2 cm/yr; a 10x10 patch subsides only -0.4 cm/yr
+    for i in range(n_epochs):
+        field = -0.02 * tc[i] * np.ones((grid, grid))
+        field[25:35, 25:35] = -0.004 * tc[i]
+        cube[i] = field + 0.001 * rng.standard_normal((grid, grid))
+    cube_d = {"cube": cube, "t": t, "x": x, "y": y, "crs_wkt": "EPSG:32610", "frame": "TEST"}
+    anoms = detect_anomalies(cube_d, velocity_threshold_cm_yr=1.0, min_pixels=5, min_sigma=3.0)
+    ups = [a for a in anoms if a.abs_peak_velocity_cm_yr > 0.5]  # any TRUE uplift?
+    assert not ups, f"reported true uplift in a subsiding field: {[(a.classification,a.abs_peak_velocity_cm_yr) for a in ups]}"
+    rel = [a for a in anoms if a.classification == "relative_uplift"]
+    assert rel, "the less-subsiding patch should be flagged relative_uplift"
+    assert all(a.abs_peak_velocity_cm_yr < 0 for a in rel)  # still absolutely subsiding
