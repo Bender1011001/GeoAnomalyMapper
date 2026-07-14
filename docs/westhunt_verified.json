@@ -1,0 +1,317 @@
+[
+ {
+  "idx": 1,
+  "lat": 36.58051,
+  "lon": 39.27647,
+  "grade": "B",
+  "note": "compact rounded mound w/ sharp shadow, pale halo, hamlet SW; E ridge suspicious",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.85
+ },
+ {
+  "idx": 2,
+  "lat": 36.63307,
+  "lon": 39.29375,
+  "grade": "A-",
+  "note": "Balikh corridor mound group (dup of 22)",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 3,
+  "lat": 36.46711,
+  "lon": 39.28853,
+  "grade": "D",
+  "note": "erosion-remnant chain in dissected badlands",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 4,
+  "lat": 36.63919,
+  "lon": 39.29465,
+  "grade": "B-",
+  "note": "small paired mounds on flat farmland near village",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 5,
+  "lat": 36.62947,
+  "lon": 39.41093,
+  "grade": "C+",
+  "note": "discrete bump in hummocky chain near village (dup 24)",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 6,
+  "lat": 36.61579,
+  "lon": 39.42209,
+  "grade": "C",
+  "note": "knob on levee-like ridge chain along drainage (dup 10)",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 7,
+  "lat": 36.49015,
+  "lon": 39.27719,
+  "grade": "D",
+  "note": "vague elongated swell, no discrete mound",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 8,
+  "lat": 36.59995,
+  "lon": 39.29699,
+  "grade": "C-",
+  "note": "knoll-field member, several similar knobs around",
+  "tile": "ChueraV2_r0c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 9,
+  "lat": 36.57187,
+  "lon": 39.44367,
+  "grade": "A",
+  "note": "KRANZHUGEL: circular ring rampart + inner mound ~600m beside wadi",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.87
+ },
+ {
+  "idx": 11,
+  "lat": 36.58951,
+  "lon": 39.56643,
+  "grade": "B-",
+  "note": "compact pale mound at edge of large modern gridded enclosure",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.85
+ },
+ {
+  "idx": 12,
+  "lat": 36.60139,
+  "lon": 39.52107,
+  "grade": "C",
+  "note": "broad lobed platform = likely natural terrace remnant",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 13,
+  "lat": 36.56359,
+  "lon": 39.50685,
+  "grade": "B",
+  "note": "compact bright mound N of village cluster along wadi",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 14,
+  "lat": 36.60499,
+  "lon": 39.42423,
+  "grade": "D",
+  "note": "modern pen on weak rise (near ring #9)",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 15,
+  "lat": 36.57493,
+  "lon": 39.43557,
+  "grade": "D",
+  "note": "modern pen/compound, featureless relief",
+  "tile": "ChueraV2_r0c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 16,
+  "lat": 36.56287,
+  "lon": 39.58387,
+  "grade": "C",
+  "note": "elongated multi-lobe rise on wadi bank, likely levee hummocks",
+  "tile": "ChueraV2_r0c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 17,
+  "lat": 36.61255,
+  "lon": 39.62635,
+  "grade": "C",
+  "note": "lumpy N-S chain along wadi, ambiguous",
+  "tile": "ChueraV2_r0c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 18,
+  "lat": 36.65717,
+  "lon": 39.28385,
+  "grade": "A",
+  "note": "Balikh tell w/ village at foot (verified earlier)",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 19,
+  "lat": 36.65339,
+  "lon": 39.28493,
+  "grade": "A-",
+  "note": "southern mound of the 18 pair, steep discrete bump",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 20,
+  "lat": 36.65555,
+  "lon": 39.29753,
+  "grade": "C+",
+  "note": "broad smooth swell E of 18 - outer town or natural rise",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 21,
+  "lat": 36.62027,
+  "lon": 39.41615,
+  "grade": "C",
+  "note": "mound in knob chain along drainage",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 23,
+  "lat": 36.64115,
+  "lon": 39.30005,
+  "grade": "C-",
+  "note": "small knob pair in farmland",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 25,
+  "lat": 36.65663,
+  "lon": 39.40517,
+  "grade": "A-",
+  "note": "RING: circular rampart mound ~450m with rim, beside wadi",
+  "tile": "ChueraV2_r1c0",
+  "vlm_conf": 0.87
+ },
+ {
+  "idx": 26,
+  "lat": 36.69641,
+  "lon": 39.49281,
+  "grade": "B+",
+  "note": "compact steep-sided pale tell knob N of village",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.85
+ },
+ {
+  "idx": 27,
+  "lat": 36.64799,
+  "lon": 39.49839,
+  "grade": "B-",
+  "note": "small mound at village edge",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 28,
+  "lat": 36.64295,
+  "lon": 39.45087,
+  "grade": "A",
+  "note": "RING: best-preserved oval rampart ~700x500m, wadi wraps it, radial texture",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 29,
+  "lat": 36.68831,
+  "lon": 39.46689,
+  "grade": "B",
+  "note": "steep dark mound at hamlet w/ pale ring",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 30,
+  "lat": 36.79973,
+  "lon": 39.47013,
+  "grade": "D",
+  "note": "natural platform in rolling dissected terrain (verified earlier)",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 31,
+  "lat": 36.79109,
+  "lon": 39.42009,
+  "grade": "D",
+  "note": "natural drainage spur fingers in irrigated fields",
+  "tile": "ChueraV2_r1c1",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 32,
+  "lat": 36.67517,
+  "lon": 39.66775,
+  "grade": "A-",
+  "note": "RING: crisp dark annulus ~300m isolated on flat steppe",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.87
+ },
+ {
+  "idx": 33,
+  "lat": 36.66023,
+  "lon": 39.60961,
+  "grade": "B",
+  "note": "village on rise w/ underlying mound + steep knob S",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 34,
+  "lat": 36.64619,
+  "lon": 39.74119,
+  "grade": "A",
+  "note": "RING: concentric double-wall rampart ~400m, village attached NW",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.93
+ },
+ {
+  "idx": 35,
+  "lat": 36.64763,
+  "lon": 39.61303,
+  "grade": "D",
+  "note": "faint mottled rise",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 36,
+  "lat": 36.70343,
+  "lon": 39.69223,
+  "grade": "B",
+  "note": "village-on-mound w/ radiating tracks (verified earlier)",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 37,
+  "lat": 36.74213,
+  "lon": 39.70555,
+  "grade": "C",
+  "note": "elongated dark rise, mesa remnant?",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.82
+ },
+ {
+  "idx": 38,
+  "lat": 36.66365,
+  "lon": 39.60385,
+  "grade": "C+",
+  "note": "hummocky mass by village, possible settlement debris",
+  "tile": "ChueraV2_r1c2",
+  "vlm_conf": 0.82
+ }
+]
