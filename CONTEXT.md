@@ -1,4 +1,15 @@
+---
+project: SAR-project
+status: wip
+updated: 2026-03-14
+---
+
 # GeoAnomalyMapper
+
+## Resume
+- **Pick up at**: [Review and update]
+- **Last session**: [Auto-migrated to CONTEXT v2]
+- **Blocked on**: Nothing
 
 ## Status
 - **Working**: Core geophysical data fusion pipeline, InSAR pre-processing, anomaly detection (`detect_voids.py`), and visualization toolings (PNG, KMZ).
