@@ -124,6 +124,23 @@ class TestComposite:
         assert abs(np.median(an)) < 0.3
 
 
+class TestCorona:
+    def test_fit_affine_exact_recovery(self):
+        from archaeo_intel.corona import apply_affine, fit_affine
+        # synthetic truth: lon = 39 + 1e-3*col - 2e-4*row ; lat = 36 - 9e-4*row
+        cols_rows = [(0, 0), (500, 0), (0, 500), (500, 500), (250, 100)]
+        geo = [(39 + 1e-3*c - 2e-4*r, 36 - 9e-4*r) for c, r in cols_rows]
+        M = fit_affine(cols_rows, geo)
+        lon, lat = apply_affine(M, 123, 456)
+        assert abs(lon - (39 + 0.123 - 0.0912)) < 1e-9
+        assert abs(lat - (36 - 0.4104)) < 1e-9
+
+    def test_fit_affine_needs_three_points(self):
+        from archaeo_intel.corona import fit_affine
+        with pytest.raises(ValueError):
+            fit_affine([(0, 0), (1, 1)], [(39, 36), (39.1, 36.1)])
+
+
 class TestCatalog:
     def test_nearest_and_classify(self):
         cat_lat = np.array([36.6675, 36.70])
