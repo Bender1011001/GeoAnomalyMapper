@@ -1,0 +1,1905 @@
+[
+ {
+  "rank": 2,
+  "score": 71.4,
+  "lat": 37.37009,
+  "lon": 32.96219,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a single isolated, smoothly rounded elevated mound rising clearly above the flat agricultural plain, with buff/pale soil tones in the optical image and what appears to be an outer settlement halo, consistent with a tell rather than a natural hill or modern infrastructure."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 610.79,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 7,
+  "score": 23.4,
+  "lat": 37.52147,
+  "lon": 32.91395,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The DEM hillshade shows a single isolated smooth rounded mound rising clearly above the flat agricultural plain, consistent with a tell, and the optical image reveals a pale/buff triangular enclosure or outer town halo around the mound summit with no dominant dark rocky texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 614.947,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 8,
+  "score": 17.5,
+  "lat": 37.38251,
+  "lon": 32.91755,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated flat-topped to rounded mound rising clearly above the surrounding flat agricultural plain, with no regional clustering or dendritic texture, consistent with a tell mound, while the optical image shows pale/buff soil tones and a patchwork of fields around it characteristic of a Near-East tell setting."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 614.721,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 9,
+  "score": 16.1,
+  "lat": 37.39925,
+  "lon": 32.83835,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade shows a discrete, isolated rounded mound rising above the surrounding flat plain at the red crosshair, consistent with a tell, while the Sentinel-2 optical image shows buff/pale earthen tones with radiating linear features (hollow-ways) converging on the site, supporting an ancient occupation mound rather than a natural or modern feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 621.662,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 17,
+  "score": 7.9,
+  "lat": 37.45973,
+  "lon": 32.92889,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, broadly rounded elevated mound with irregular hummocky micro-relief and subtle stepped edges consistent with a tell, sitting above the flat agricultural plain, while the optical image shows a modern village overlay on pale buff soil with radiating road/hollow-way patterns characteristic of long-term occupation on an ancient mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 613.626,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 18,
+  "score": 7.8,
+  "lat": 37.42229,
+  "lon": 32.88659,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, smooth, gently rounded mound rising above the flat agricultural plain with no surrounding regional relief trend, consistent with a tell, while the optical image shows pale buff soil with no significant modern infrastructure directly on the feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 617.38,
+  "tile": "R2_Konya_r1c0"
+ },
+ {
+  "rank": 1,
+  "score": 64.1,
+  "lat": 37.61127,
+  "lon": 32.82917,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a single isolated rounded mound rising above the flat agricultural plain with a bright topographic signature consistent with a tell, while the Sentinel-2 optical image shows pale/buff soil tones and no distinctive modern infrastructure on the feature itself."
+  },
+  "known_site": {
+   "name": "Seyithan H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 37.6113971,
+   "lon": 32.8289536,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.024
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 622.513,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 2,
+  "score": 53.5,
+  "lat": 37.59993,
+  "lon": 32.92691,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smoothly rounded mound rising clearly above the flat agricultural plain, with a modern village sitting atop it\u2014classic tell morphology\u2014and the optical image reveals buff/pale soil tones and radiating hollow-ways converging on the mound."
+  },
+  "known_site": {
+   "name": "Sarlak H\u00f6y\u00fck",
+   "lat": 37.5995551,
+   "lon": 32.9271169,
+   "source": "wikidata",
+   "dist_km": 0.045
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 613.931,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 3,
+  "score": 45.6,
+  "lat": 37.56249,
+  "lon": 32.96237,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain, consistent with a tell, while the Sentinel-2 imagery reveals pale/buff soil tones and what appears to be a triangular field boundary pattern typical of land subdivided around a central elevated feature."
+  },
+  "known_site": {
+   "name": "Eski \u00dc\u00e7h\u00fcy\u00fck",
+   "lat": 37.5678351,
+   "lon": 32.9628295,
+   "type": "ruins",
+   "source": "osm",
+   "dist_km": 0.595
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 610.75,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 7,
+  "score": 27.5,
+  "lat": 37.68039,
+  "lon": 32.88623,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, isolated elevated mound with a smooth rounded profile rising above the flat agricultural plain at the red cross, consistent with a tell, while the optical image reveals a modern village sitting atop it with surrounding buff/pale soil and an urban halo typical of long-occupied Near Eastern tells."
+  },
+  "known_site": {
+   "name": "Kark\u0131n H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 37.6802269,
+   "lon": 32.8863139,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.02
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 617.736,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 10,
+  "score": 22.5,
+  "lat": 37.57923,
+  "lon": 32.96345,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated, smoothly rounded mound rising clearly above the surrounding flat agricultural plain, with the optical image revealing pale/buff earthen tones and no dominant modern structures, consistent with a tell mound."
+  },
+  "known_site": {
+   "name": "Eski \u00dc\u00e7h\u00fcy\u00fck",
+   "lat": 37.5678351,
+   "lon": 32.9628295,
+   "type": "ruins",
+   "source": "osm",
+   "dist_km": 1.266
+  },
+  "novelty": "not-in-open-DB",
+  "catalog_km": 610.686,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 12,
+  "score": 20.7,
+  "lat": 37.63035,
+  "lon": 32.81837,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete isolated mound with a rounded profile rising above the flat agricultural plain, consistent with a tell, and the optical image reveals pale/buff soil tones with no dominant modern industrial footprint at that location."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 623.506,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 13,
+  "score": 20.3,
+  "lat": 37.54341,
+  "lon": 32.97803,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.93,
+   "reason": "The hillshade shows a single isolated, smoothly rounded mound rising clearly above the flat agricultural plain with no surrounding topographic context, and the optical image reveals a pale buff circular soil anomaly consistent with a tell, surrounded by a faint halo distinct from the cultivated fields."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 609.348,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 14,
+  "score": 16.9,
+  "lat": 37.70001,
+  "lon": 32.86247,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade clearly shows a single isolated, smooth, flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 image shows pale/buff soil tones and a road network radiating from the feature typical of a settled tell mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 619.888,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 16,
+  "score": 16.2,
+  "lat": 37.66833,
+  "lon": 32.97083,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade shows a subtly elevated, isolated rounded mound rising above the flat agricultural plain at the marked location, consistent with a tell mound, while the Sentinel-2 imagery shows pale/buff soil tones and the feature sits in isolation from any natural regional relief trend."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 610.301,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 17,
+  "score": 14.5,
+  "lat": 37.70307,
+  "lon": 32.82143,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, gently domed elevation anomaly rising above the flat agricultural plain, consistent with a tell mound, while the optical image reveals pale/buff soil tones and what appears to be a small settlement cluster on its summit typical of inhabited or recently occupied tells."
+  },
+  "known_site": {
+   "name": "Salur H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 37.70289,
+   "lon": 32.82145,
+   "source": "wikidata",
+   "dist_km": 0.02
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 623.483,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 19,
+  "score": 13.8,
+  "lat": 37.66653,
+  "lon": 32.82233,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.85,
+   "reason": "The hillshade shows a single isolated rounded mound rising above the flat agricultural plain, consistent with a tell, while the optical image reveals buff/pale soil tones and a circular enclosure pattern typical of a Near Eastern tell site."
+  },
+  "known_site": {
+   "name": "\u00c7atalh\u00f6y\u00fck",
+   "lat": 37.6675,
+   "lon": 32.828333333333,
+   "source": "wikidata",
+   "dist_km": 0.538
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 623.268,
+  "tile": "R2_Konya_r2c0"
+ },
+ {
+  "rank": 2,
+  "score": 76.0,
+  "lat": 37.53513,
+  "lon": 33.07449,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated rounded mound rising clearly above the flat agricultural plain, with the optical image revealing a circular dark-soil spread (~buff/disturbed earth) consistent with a tell mound, surrounded by radiating field boundaries characteristic of a hollow-way halo."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 600.878,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 3,
+  "score": 69.7,
+  "lat": 37.62297,
+  "lon": 33.02841,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.93,
+   "reason": "The hillshade clearly shows a single isolated, rounded flat-topped earthen mound rising abruptly from a flat agricultural plain, with a modern village occupying its summit and pale buff soil tones plus a surrounding halo visible in the Sentinel-2 image, all consistent with a classic Near Eastern tell."
+  },
+  "known_site": {
+   "name": "T\u00fcrkmen Karah\u00f6y\u00fck",
+   "lat": 37.623299,
+   "lon": 33.0294,
+   "source": "wikidata",
+   "dist_km": 0.094
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 605.111,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 5,
+  "score": 51.1,
+  "lat": 37.64583,
+  "lon": 33.12381,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.91,
+   "reason": "The hillshade shows a single isolated smooth oval mound rising clearly above the flat agricultural plain, consistent with a tell, and the optical image reveals a pale/buff circular earthen elevation with a modern village on its summit and surrounding field systems typical of ancient settlement halos."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 596.848,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 6,
+  "score": 34.0,
+  "lat": 37.60353,
+  "lon": 33.14685,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain, with a pale/buff soil signature in the optical image and no rocky or clustered texture, consistent with a tell mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 594.689,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 8,
+  "score": 24.1,
+  "lat": 37.67715,
+  "lon": 33.04749,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.91,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain with a bright highlight indicating significant positive relief, consistent with a tell, while the optical image shows pale/buff soil tones and no evidence of rocky or volcanic texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 603.641,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 16,
+  "score": 12.9,
+  "lat": 37.58139,
+  "lon": 33.05667,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade clearly shows an isolated, flat-topped rectangular earthen mound rising above the surrounding flat plain, consistent with a tell, while the optical image shows pale/buff soil and what appears to be a modern structure on the summit\u2014typical of an occupied or recently excavated tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 602.525,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 19,
+  "score": 11.5,
+  "lat": 37.54881,
+  "lon": 33.14307,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, elongated raised mound standing above the flat agricultural plain, with a small modern settlement on its summit consistent with a tell, and the optical image shows pale/buff soil tones with a surrounding field halo typical of a Near-Eastern tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 594.887,
+  "tile": "R2_Konya_r2c1"
+ },
+ {
+  "rank": 2,
+  "score": 167.7,
+  "lat": 37.54719,
+  "lon": 33.27499,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a broad, flat-topped elevated mound rising in isolation above the surrounding agricultural plain, with a smooth rounded profile consistent with a tell, while the Sentinel-2 true color shows pale buff/grey soil tones and what appears to be a settled summit, all characteristic of an ancient occupation mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 583.32,
+  "tile": "R2_Konya_r2c2"
+ },
+ {
+  "rank": 4,
+  "score": 146.7,
+  "lat": 37.56807,
+  "lon": 33.26761,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated smooth mound rising clearly above the flat agricultural plain, consistent with a tell morphology, while the Sentinel-2 true color reveals pale buff soil and what appears to be a small modern settlement on the summit\u2014a classic tell signature\u2014surrounded by irrigated fields with no regional topographic trend suggesting natural relief."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 584.016,
+  "tile": "R2_Konya_r2c2"
+ },
+ {
+  "rank": 5,
+  "score": 144.6,
+  "lat": 37.57311,
+  "lon": 33.27085,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated, smoothly rounded mound rising above the flat agricultural plain with a broad oval footprint, consistent with a tell, while the Sentinel-2 optical image reveals pale buff/grey soil tones and no coherent modern infrastructure on the mound itself."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 583.746,
+  "tile": "R2_Konya_r2c2"
+ },
+ {
+  "rank": 8,
+  "score": 124.4,
+  "lat": 37.53999,
+  "lon": 33.30055,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, rounded positive relief anomaly rising above the flat agricultural plain, consistent with a tell mound, while the optical image reveals pale/buff soil tones and a central elevated feature surrounded by cultivated fields with no evidence of rocky or volcanic texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 581.064,
+  "tile": "R2_Konya_r2c2"
+ },
+ {
+  "rank": 2,
+  "score": 24.3,
+  "lat": 36.76575,
+  "lon": 39.02115,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated bright anomaly (convex mound) rising above the flat agricultural plain, with a modern village sitting atop it\u2014classic tell morphology\u2014while the optical image shows pale/buff soil tones and a settlement cluster consistent with a Near Eastern tell."
+  },
+  "known_site": {
+   "name": "A\u015fa\u011f\u0131deren H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 36.765892,
+   "lon": 39.0211983,
+   "source": "wikidata",
+   "dist_km": 0.016
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 73.583,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 5,
+  "score": 19.4,
+  "lat": 36.66099,
+  "lon": 39.05301,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, flat-topped rectangular mound rising above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale buff soil tones and a settlement halo with radiating field boundaries characteristic of long-term occupation."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.293,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 6,
+  "score": 19.0,
+  "lat": 36.83217,
+  "lon": 39.04149,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a clear isolated rounded mound rising above the flat agricultural plain, with a pale/buff soil signature in the optical image and no rocky or clustered-hill texture, consistent with a tell mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 71.776,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 8,
+  "score": 16.0,
+  "lat": 36.69627,
+  "lon": 39.01701,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, irregular but clearly elevated mound-like mass rising above the flat agricultural plain, with a blocky stepped or eroded profile consistent with a tell, while the optical image shows pale buff soil and what appears to be a settlement cluster atop the mound surrounded by typical hollow-way field patterns."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 74.736,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 9,
+  "score": 15.9,
+  "lat": 36.82893,
+  "lon": 39.01107,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, isolated low mound rising above the flat agricultural plain at the red cross, with a bright reflective signature in the optical image consistent with a settlement on a tell summit, surrounded by irrigated fields and no regional topographic trend suggesting natural relief."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 74.457,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 17,
+  "score": 12.4,
+  "lat": 36.66837,
+  "lon": 39.05391,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, broadly rounded elevated anomaly rising above the flat agricultural plain, with a relatively smooth profile consistent with a tell mound, while the Sentinel-2 true color reveals buff/pale earthen tones and a surrounding agricultural halo with no dark rocky or volcanic texture to suggest a natural hill."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.046,
+  "tile": "R2_Harran_r0c0"
+ },
+ {
+  "rank": 1,
+  "score": 62.6,
+  "lat": 36.86275,
+  "lon": 39.02979,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.93,
+   "reason": "The hillshade clearly shows a single large isolated rounded mound with a distinct raised profile and inner concentric ridge typical of a tell, surrounded by flat agricultural plain, while the optical image reveals buff/pale earthen soil with a modern village settled on its summit and an encircling settlement halo\u2014classic tell morphology."
+  },
+  "known_site": {
+   "name": "Harran H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 36.8627299,
+   "lon": 39.0298203,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.003
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 73.063,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 2,
+  "score": 51.9,
+  "lat": 36.97363,
+  "lon": 39.07443,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.93,
+   "reason": "The hillshade shows a single isolated, broadly rounded earthen mound rising clearly above the flat agricultural plain, with a modern village sitting on its summit\u2014classic tell morphology\u2014and radiating hollow-ways visible in the optical image confirming long-term settlement focus on this feature."
+  },
+  "known_site": {
+   "name": "Seksen\u00f6ren H\u00f6y\u00fc\u011f\u00fc",
+   "lat": 36.9738189,
+   "lon": 39.0743854,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.021
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 71.253,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 3,
+  "score": 37.1,
+  "lat": 36.98821,
+  "lon": 39.04653,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.91,
+   "reason": "The hillshade clearly shows a single isolated, smoothly rounded mound rising above the surrounding flat agricultural plain, consistent with a tell, and the optical image shows a pale/buff settlement cluster on its summit typical of a village-capped tell with no dark rocky texture or regional cluster of similar features."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 73.665,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 4,
+  "score": 36.2,
+  "lat": 36.91441,
+  "lon": 39.04779,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade reveals an isolated, smoothly rounded bright mound rising clearly above the flat agricultural plain, consistent with a tell, while the optical image shows pale/white soil and what appears to be a small settlement cluster on the summit\u2014classic tell morphology with a modern village cap."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.269,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 5,
+  "score": 33.0,
+  "lat": 36.83215,
+  "lon": 39.04149,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete isolated low mound rising above the flat agricultural plain, matching a tell morphology, while the optical image reveals a pale/buff circular feature distinct from surrounding green crop fields with no modern built infrastructure on the mound itself."
+  },
+  "known_site": {
+   "name": "Tell Magrin",
+   "lat": 36.8316819,
+   "lon": 39.0415324,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.052
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 71.776,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 6,
+  "score": 31.8,
+  "lat": 36.85969,
+  "lon": 39.03537,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.97,
+   "reason": "The hillshade reveals a classic tell morphology\u2014a prominent isolated rounded mound with a raised central boss and a clearly defined, nearly rectangular outer enclosure wall or lower town terrace rising above the flat agricultural plain, while the Sentinel-2 image shows buff/pale earthen soil with a modern village sitting atop the summit and radiating field boundaries consistent with hollow-ways."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.538,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 7,
+  "score": 28.9,
+  "lat": 36.82891,
+  "lon": 39.01107,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a discrete, isolated bright mound rising above the flat agricultural plain, with a small settlement cluster on its summit visible in the optical image and no surrounding regional topographic context suggesting natural relief, consistent with a tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 74.457,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 8,
+  "score": 26.6,
+  "lat": 36.89389,
+  "lon": 39.01161,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated rounded mound rising above the flat agricultural plain, with a modern village clustered on its summit visible in the Sentinel-2 image, radiating roads suggesting hollow-ways, and no regional topographic context indicating a natural feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 75.074,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 9,
+  "score": 24.2,
+  "lat": 36.95995,
+  "lon": 39.01179,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated low mound rising clearly above the flat agricultural plain, consistent with a tell, while the optical image reveals a cluster of white-roofed structures on its summit\u2014a classic pattern of a modern village atop an ancient earthen mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 76.429,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 11,
+  "score": 20.0,
+  "lat": 36.86779,
+  "lon": 39.05463,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.88,
+   "reason": "The hillshade shows an isolated, rounded earthen mound rising above the flat agricultural plain, with a modern village sitting on its summit and radiating hollow-ways visible in the optical image, all consistent with a classic tell morphology."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 70.928,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 13,
+  "score": 18.7,
+  "lat": 36.97165,
+  "lon": 39.00657,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, low-relief rounded mound rising above the surrounding flat agricultural plain, with a modern village sitting atop it\u2014classic tell morphology\u2014and the optical image shows pale/buff tones at the summit with radiating pathways consistent with a settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 77.19,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 14,
+  "score": 18.4,
+  "lat": 36.86689,
+  "lon": 39.02097,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade reveals a large, isolated, flat-topped to gently domed mound with stepped/terraced edges rising above the surrounding flat agricultural plain, consistent with a major tell, while the optical image shows buff/pale soil on the exposed eastern half and a modern settlement occupying the summit\u2014a classic tell morphology."
+  },
+  "known_site": {
+   "name": "Harran",
+   "lat": 36.8629297,
+   "lon": 39.0299134,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.908
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 73.888,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 15,
+  "score": 17.5,
+  "lat": 36.87427,
+  "lon": 39.03123,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a clearly isolated, flat-topped to gently domed elevated platform rising above the surrounding flat agricultural plain, with a modern village sitting on its summit\u2014classic tell morphology\u2014and the optical image shows buff/pale soil tones around the settlement halo consistent with an earthen mound."
+  },
+  "known_site": {
+   "name": "Harran, Ulu \u00c7am\u0131",
+   "lat": 36.8648589,
+   "lon": 39.0309263,
+   "type": "ruins",
+   "source": "osm",
+   "dist_km": 1.045
+  },
+  "novelty": "not-in-open-DB",
+  "catalog_km": 73.071,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 16,
+  "score": 16.9,
+  "lat": 36.86887,
+  "lon": 39.03249,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.95,
+   "reason": "The hillshade clearly shows a single large, smooth, flat-topped to gently domed mound rising in isolation from the surrounding flat agricultural plain, with a modern village sitting atop the summit (classic tell morphology), rectangular terrace-like features visible on the flanks consistent with occupation layers, and the optical image confirms buff/pale earthen coloring with a surrounding town halo and radiating tracks typical of a major Near Eastern tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.894,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 17,
+  "score": 16.8,
+  "lat": 36.87301,
+  "lon": 39.07515,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, flat-topped mound rising clearly above the surrounding flat agricultural plain, consistent with a tell, and the optical image reveals a pale/buff settlement cluster on its summit typical of a village-capped tell with surrounding hollow-ways visible in the field pattern."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 69.186,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 18,
+  "score": 15.6,
+  "lat": 36.87769,
+  "lon": 39.05391,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a broad, isolated, gently domed elevation rising subtly above the surrounding flat agricultural plain with a smooth, rounded profile characteristic of a tell, while the optical image shows a pale/buff soil anomaly amid cultivated fields with no sharp modern infrastructure footprint underlying the mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 71.119,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 19,
+  "score": 15.4,
+  "lat": 36.90721,
+  "lon": 39.07695,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade reveals a single smooth, rounded, isolated mound rising clearly above the flat agricultural plain, consistent with a tell, while the optical image shows buff/pale soil exposure near the summit and surrounding field patterns characteristic of a long-occupied site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 69.584,
+  "tile": "R2_Harran_r1c0"
+ },
+ {
+  "rank": 6,
+  "score": 6.1,
+  "lat": 36.11819,
+  "lon": 43.39029,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, smooth, flat-topped elevated mound rising distinctly above the surrounding flat agricultural plain, with the optical image showing characteristic buff/pale soil tones and a surrounding cultivated halo consistent with a tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 89.791,
+  "tile": "R2_Nineveh_r0c2"
+ },
+ {
+  "rank": 4,
+  "score": 7.7,
+  "lat": 36.42219,
+  "lon": 43.10231,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, gently raised mound rising above the surrounding flat plain in isolation, consistent with a tell, while the optical image reveals buff/pale earthen tones and a dense settlement halo typical of a village occupying a tell summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 60.344,
+  "tile": "R2_Nineveh_r1c1"
+ },
+ {
+  "rank": 6,
+  "score": 9.5,
+  "lat": 36.43515,
+  "lon": 43.34745,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the surrounding flat agricultural plain, with a modern settlement visible on its summit in the optical image\u2014classic tell morphology with no rocky or volcanic texture."
+  },
+  "known_site": {
+   "name": "\u062a\u0644 \u0628\u064a\u0644 (\u0628\u0644\u0627)",
+   "lat": 36.4339996,
+   "lon": 43.3485305,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.16
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 82.243,
+  "tile": "R2_Nineveh_r1c2"
+ },
+ {
+  "rank": 8,
+  "score": 8.7,
+  "lat": 36.44667,
+  "lon": 43.25331,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade shows a subtle but distinct isolated low mound rising above the flat agricultural plain, consistent with a tell, while the Sentinel-2 image reveals a nucleated settlement with pale/buff soils, radiating hollow-ways, and an outer halo typical of a village occupying a tell summit."
+  },
+  "known_site": {
+   "name": "\u062a\u0644 \u064a\u0627\u0631\u0627",
+   "lat": 36.4467,
+   "lon": 43.2532701,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.005
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 74.05,
+  "tile": "R2_Nineveh_r1c2"
+ },
+ {
+  "rank": 18,
+  "score": 6.4,
+  "lat": 36.29115,
+  "lon": 43.25025,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, subtly elevated flat-topped mound rising above the surrounding agricultural plain with a rectangular/blocky relief signature consistent with a tell, while the optical image shows buff/pale soil tones and a dispersed settlement halo typical of an occupied or recently occupied tell mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 73.52,
+  "tile": "R2_Nineveh_r1c2"
+ },
+ {
+  "rank": 19,
+  "score": 6.4,
+  "lat": 36.32229,
+  "lon": 43.24413,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a distinct isolated rounded elevated feature rising above the flat agricultural plain at the red cross, consistent with a tell mound, while the optical image reveals a small settlement with buff/pale soils and surrounding agricultural halo typical of a village atop an ancient tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.7,
+  "tile": "R2_Nineveh_r1c2"
+ },
+ {
+  "rank": 2,
+  "score": 10.6,
+  "lat": 36.37335,
+  "lon": 39.09419,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade reveals a large, blocky flat-topped elevated mound rising in isolation above the surrounding plain, consistent with a tell of ~2.6 km extent, while the Sentinel-2 image shows buff/pale earthen tones with a dense settlement cluster on the summit typical of a village-capped tell, with no indication of natural rocky or volcanic texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.82,
+  "tile": "R2_Balikh_r0c0"
+ },
+ {
+  "rank": 3,
+  "score": 10.5,
+  "lat": 36.35355,
+  "lon": 39.06431,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain with no regional trend of similar hills, and the optical image reveals pale/buff soil tones consistent with an earthen tell, likely with a small modern structure on its summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 76.055,
+  "tile": "R2_Balikh_r0c0"
+ },
+ {
+  "rank": 9,
+  "score": 7.7,
+  "lat": 36.38937,
+  "lon": 39.03011,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals multiple discrete elevated rectangular/blocky mounds rising from an otherwise flat agricultural plain, consistent with a multi-period tell complex, while the Sentinel-2 imagery shows buff/pale soil tones with field boundaries radiating outward\u2014classic hollow-way signatures around an ancient settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 77.809,
+  "tile": "R2_Balikh_r0c0"
+ },
+ {
+  "rank": 12,
+  "score": 7.1,
+  "lat": 36.38811,
+  "lon": 39.09635,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, broadly rounded elevated mound with a flat-topped profile and irregular stepped/terraced edges rising above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale buff soil tones and a scatter of structures characteristic of a village atop a buried occupation mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.147,
+  "tile": "R2_Balikh_r0c0"
+ },
+ {
+  "rank": 14,
+  "score": 7.0,
+  "lat": 36.38865,
+  "lon": 39.02255,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a clear isolated flat-topped or slightly raised mound with a distinct rectilinear elevated perimeter visible as a bright ridge, sitting above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale buff soil tones and dark field halos characteristic of ancient occupation."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 78.483,
+  "tile": "R2_Balikh_r0c0"
+ },
+ {
+  "rank": 1,
+  "score": 34.2,
+  "lat": 36.48295,
+  "lon": 39.05729,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a clear isolated rounded mound rising above the flat agricultural plain with a bright convex relief signature characteristic of a tell, while the optical image shows pale/buff soil tones and what appears to be a circular feature consistent with a settlement mound surrounded by cultivated fields."
+  },
+  "known_site": {
+   "name": "Tell Hammam et-Turkman",
+   "lat": 36.482222,
+   "lon": 39.056944,
+   "source": "wikidata",
+   "dist_km": 0.087
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 73.299,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 3,
+  "score": 16.0,
+  "lat": 36.37333,
+  "lon": 39.09419,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade shows a broad, isolated, roughly flat-topped elevated mound with rectilinear sub-surface relief consistent with stratified occupation deposits (tell morphology), set apart from the surrounding flat agricultural plain, while the Sentinel-2 image reveals buff/pale soil tones and a dense white cluster typical of a modern village overlying a tell summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.821,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 5,
+  "score": 13.3,
+  "lat": 36.37117,
+  "lon": 39.09023,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade reveals a broad, elevated mound-like mass with the blocky relief typical of a tell bearing a modern settlement on its summit, rising above the surrounding flat agricultural plain visible in the Sentinel-2 image, with buff/pale soil tones and an irrigated field halo consistent with a Near Eastern tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 73.232,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 10,
+  "score": 12.1,
+  "lat": 36.38809,
+  "lon": 39.09635,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, roughly rectangular flat-topped elevated mound with subtle terraced edges rising above the surrounding flat agricultural plain, consistent with a tell morphology, while the optical image reveals pale buff soil and a scatter of structures on its summit typical of a village-capped tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.147,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 14,
+  "score": 10.8,
+  "lat": 36.44659,
+  "lon": 39.03839,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade clearly shows an isolated, roughly rectangular flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 optical image shows pale/buff soil tones and what appears to be a small modern structure on the summit\u2014typical of an occupied or partially excavated tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 75.634,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 16,
+  "score": 10.2,
+  "lat": 36.46693,
+  "lon": 39.02759,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade clearly shows an isolated, roughly rectangular flat-topped mound with a raised perimeter and interior relief consistent with mudbrick architecture collapse, set within an otherwise flat agricultural plain, while the optical image shows pale buff soil tones and surrounding field patterns typical of a tell with an associated settlement halo."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 76.19,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 20,
+  "score": 9.7,
+  "lat": 36.46351,
+  "lon": 39.02885,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.85,
+   "reason": "The hillshade reveals a clearly isolated, roughly rectangular elevated mound with blocky internal relief consistent with stratified occupation debris and possible excavation scarps, rising above the flat agricultural plain, while the Sentinel-2 imagery shows characteristic buff/pale soil tones with no modern industrial signature, matching a classic tell morphology."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 76.14,
+  "tile": "R2_Balikh_r1c0"
+ },
+ {
+  "rank": 1,
+  "score": 7.9,
+  "lat": 36.67175,
+  "lon": 39.07295,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade clearly shows an isolated, elongated flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell morphology, while the optical image shows pale/buff soil tones and surrounding field systems typical of a Near Eastern tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 70.307,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 2,
+  "score": 7.8,
+  "lat": 36.56753,
+  "lon": 39.09329,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated, smoothly rounded mounded anomaly with a cross-shaped or lobate elevated footprint rising clearly above the surrounding flat agricultural plain, consistent with a multi-period tell, while the optical image shows buff/pale soil tones and a small settlement cluster on the elevated area typical of a village-capped tell."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 69.366,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 3,
+  "score": 7.6,
+  "lat": 36.55385,
+  "lon": 39.03785,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, isolated, smoothly rounded mound rising above the flat agricultural plain with no surrounding regional topographic trend, and the optical image reveals pale/buff soil consistent with an earthen tell, likely situated near a river meander as is typical of Near Eastern occupation mounds."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 74.343,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 6,
+  "score": 7.3,
+  "lat": 36.67751,
+  "lon": 39.12317,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, elongated flat-topped mound rising distinctly above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale/buff soil tones and a road intersection at the base typical of a settlement mound halo."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 65.792,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 8,
+  "score": 7.2,
+  "lat": 36.61325,
+  "lon": 39.11273,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded elevation anomaly rising above the flat agricultural plain, consistent with a tell mound, while the optical image reveals buff/pale soil tones and a surrounding agricultural halo typical of ancient occupation mounds in the Near East."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 67.428,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 9,
+  "score": 7.1,
+  "lat": 36.64727,
+  "lon": 39.12785,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a subtle but distinct isolated low dome rising above the flat agricultural plain, consistent with a tell mound, while the optical image shows a small settlement cluster with buff/pale soils and surrounding field systems typical of a historic tell with a modern village on its summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 65.856,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 11,
+  "score": 7.0,
+  "lat": 36.55169,
+  "lon": 39.00887,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a distinct isolated bright anomaly (elevated mound) rising above the surrounding flat agricultural plain at the red cross location, consistent with a tell mound, while the Sentinel-2 image shows pale/buff soil tones typical of an earthen archaeological mound amid green cultivated fields."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 76.935,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 12,
+  "score": 6.9,
+  "lat": 36.60299,
+  "lon": 39.06953,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, roughly rectangular elevated mound with a flat-to-rounded top rising above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale buff soil tones and a small settlement cluster on the summit typical of an occupied or recently occupied tell mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 71.347,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 13,
+  "score": 6.8,
+  "lat": 36.57995,
+  "lon": 39.06449,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a distinct isolated elevated mound with a smooth, rounded profile rising above the flat agricultural plain, consistent with a tell, while the Sentinel-2 image reveals pale buff-toned soil and no dark rocky texture, ruling out natural or modern flat-ground features."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 71.929,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 14,
+  "score": 6.7,
+  "lat": 36.58139,
+  "lon": 39.06917,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, elongated flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows pale buff soil and surrounding field systems typical of an ancient settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 71.513,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 15,
+  "score": 6.6,
+  "lat": 36.58949,
+  "lon": 39.05765,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, broadly rounded elevated mound with a relatively flat top rising above the surrounding agricultural plain, the optical image shows a modern village sitting atop a buff/pale-soiled platform consistent with a tell, and no regional cluster or dendritic erosion pattern suggests natural origin."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.527,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 19,
+  "score": 6.3,
+  "lat": 36.62441,
+  "lon": 39.09977,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade reveals a single isolated oval mound rising above the flat agricultural plain with a smooth, rounded profile and slight stepped appearance consistent with a tell, while the Sentinel-2 imagery shows buff/pale soil tones and surrounding field patterns typical of a Near-East archaeological mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 68.52,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 20,
+  "score": 6.2,
+  "lat": 36.59759,
+  "lon": 39.05891,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, smoothly rounded elevated mound rising above the flat agricultural plain, with a modern village sitting atop it\u2014classic tell morphology\u2014and the optical image reveals buff/pale soil tones with a surrounding halo consistent with an ancient occupation mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 72.337,
+  "tile": "R2_Balikh_r2c0"
+ },
+ {
+  "rank": 1,
+  "score": 17.7,
+  "lat": 36.65717,
+  "lon": 39.28389,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, smooth, rounded mound rising above the flat agricultural plain with a bright highlight and shadow signature consistent with a tell, while the optical image reveals buff/pale soil tones and a central elevated feature amid surrounding field systems with no dark rocky texture indicating volcanic or natural terrain."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 51.914,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 2,
+  "score": 15.2,
+  "lat": 36.65339,
+  "lon": 39.28497,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, roughly rectangular flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 image reveals pale/buff soil tones and a bright halo typical of an eroded earthen mound with possible modern settlement on its summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 51.843,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 4,
+  "score": 11.1,
+  "lat": 36.55313,
+  "lon": 39.15591,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.85,
+   "reason": "The hillshade shows a single elongated flat-topped mound rising in isolation from the surrounding plain with smooth flanks consistent with an occupational tell, while the Sentinel-2 optical image reveals buff/pale earthen tones and no significant modern infrastructure on the feature itself."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 63.823,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 5,
+  "score": 10.1,
+  "lat": 36.58049,
+  "lon": 39.27651,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade reveals a single isolated, smooth, rounded mound rising clearly above the surrounding flat agricultural plain, with radiating hollow-ways visible in the optical image converging on a pale buff-toned central mound, consistent with a tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 53.034,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 9,
+  "score": 8.6,
+  "lat": 36.65375,
+  "lon": 39.24465,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a broad, isolated, flat-topped to gently domed mound rising above the surrounding flat agricultural plain, with no regional trend of similar hills, and the optical image reveals buff/pale disturbed soil consistent with a tell rather than dark rocky or volcanic material."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 55.425,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 13,
+  "score": 7.7,
+  "lat": 36.67751,
+  "lon": 39.12315,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, smooth, flat-topped mound rising above the surrounding flat agricultural plain with a stepped/eroded profile characteristic of a tell, while the optical image shows pale buff soil tones and surrounding field patterns consistent with a Near-East settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 65.794,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 14,
+  "score": 7.7,
+  "lat": 36.60155,
+  "lon": 39.21999,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a prominent isolated mound with a flat-topped, multi-terraced profile rising above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 imagery reveals buff/pale soil tones and a radiating pattern of hollow-ways converging on the feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 57.988,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 15,
+  "score": 7.6,
+  "lat": 36.59993,
+  "lon": 39.29199,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, smoothly rounded mound rising above the flat agricultural plain, consistent with a tell, while the Sentinel-2 optical image reveals buff/pale soil tones and what appears to be a settlement halo with radiating field boundaries typical of a Bronze/Iron Age mound reused into the modern period."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 51.615,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 16,
+  "score": 7.5,
+  "lat": 36.64115,
+  "lon": 39.29721,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, gently rounded low mound rising above the flat agricultural plain with no regional topographic trend, consistent with a tell, while the Sentinel-2 optical image shows pale/buff soil tones and a surrounding agricultural halo typical of ancient occupation sites."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 50.859,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 19,
+  "score": 7.1,
+  "lat": 36.65879,
+  "lon": 39.24933,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, roughly flat-topped elevated mound with a stepped/terraced profile rising above the surrounding flat agricultural plain, consistent with a tell, while the optical image shows buff/pale soil tones and surrounding field systems typical of a Near Eastern settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 54.979,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 20,
+  "score": 7.0,
+  "lat": 36.59939,
+  "lon": 39.21693,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, irregular but elevated mound-like mass rising above an otherwise flat agricultural plain, consistent with a tell, while the Sentinel-2 optical image reveals pale/buff soils and what appear to be hollow-ways or field boundaries radiating from the central elevated feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 58.281,
+  "tile": "R2_Balikh_r2c1"
+ },
+ {
+  "rank": 1,
+  "score": 15.5,
+  "lat": 36.60121,
+  "lon": 40.78573,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.93,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain with no surrounding topographic trend, and the optical image reveals pale/buff soil tones with a circular halo pattern consistent with a classic tell morphology."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.043,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 6,
+  "score": 10.9,
+  "lat": 36.57637,
+  "lon": 40.68439,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a broad, smoothly rounded elevated mound rising in isolation from the flat agricultural plain, consistent with a tell, while the optical image shows buff/pale earthen tones and a surrounding settlement halo with radiating tracks typical of an occupied or formerly occupied tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.935,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 10,
+  "score": 9.4,
+  "lat": 36.58933,
+  "lon": 40.75009,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a discrete, isolated low mound rising above the flat agricultural plain at the red cross, consistent with a tell morphology, while the optical image shows buff/pale soil tones and a settlement halo with no dominant rocky or volcanic texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.062,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 11,
+  "score": 9.3,
+  "lat": 36.49177,
+  "lon": 40.80409,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, smooth, gently rounded mound rising above the flat agricultural plain with no surrounding natural relief, consistent with a tell, while the optical image shows pale/buff soil tones and agricultural activity typical of a long-occupied site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.11,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 13,
+  "score": 8.9,
+  "lat": 36.63919,
+  "lon": 40.68421,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, broad flat-topped to gently rounded mound rising above the surrounding flat agricultural plain, consistent with a tell morphology, while the Sentinel-2 imagery shows pale buff soils and radiating hollow-ways/trackways converging on the site, characteristic of a long-occupied settlement mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.714,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 14,
+  "score": 8.6,
+  "lat": 36.51715,
+  "lon": 40.70059,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The DEM hillshade shows an isolated, smooth, flat-topped mound rising above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 imagery reveals buff/pale earthen tones and a surrounding halo typical of ancient occupation debris."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.015,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 15,
+  "score": 8.1,
+  "lat": 36.57169,
+  "lon": 40.70239,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows two elongated raised lobes with smooth, rounded relief rising in isolation from the flat agricultural plain, consistent with a tell or paired tell complex, while the Sentinel-2 imagery shows buff/pale earthen tones and a surrounding settlement halo with no strongly rocky or volcanic texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.676,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 19,
+  "score": 7.8,
+  "lat": 36.54991,
+  "lon": 40.78357,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade clearly shows a single isolated rounded mound rising above a flat agricultural plain, with a bright smooth summit profile and no rocky or dendritic texture, consistent with a tell, while the optical image shows pale/buff soil tones and surrounding field systems with possible hollow-ways radiating outward."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.978,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 20,
+  "score": 7.7,
+  "lat": 36.56737,
+  "lon": 40.67521,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, smoothly rounded elevated mound rising above the flat agricultural plain, consistent with a tell, while the optical image reveals buff/pale soil tones, a surrounding halo of disturbed ground, and what appear to be radiating hollow-ways, all classic signatures of a Near Eastern tell site."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 1.376,
+  "tile": "R2_Khabur_r0c0"
+ },
+ {
+  "rank": 5,
+  "score": 8.1,
+  "lat": 36.59293,
+  "lon": 41.08395,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, flat-topped elevated mound with a stepped or eroded profile rising above the surrounding flat agricultural plain, and the optical image reveals radiating hollow-ways and pale buff soil consistent with a tell, with a small modern settlement on its summit."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 1.054,
+  "tile": "R2_Khabur_r0c2"
+ },
+ {
+  "rank": 6,
+  "score": 7.4,
+  "lat": 36.63649,
+  "lon": 41.03067,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a clearly isolated, flat-topped elevated mound with stepped/terraced edges rising above the surrounding flat agricultural plain, consistent with a stratified tell, while the optical imagery shows pale buff soil tones and surrounding field patterns typical of a long-occupied site."
+  },
+  "known_site": {
+   "name": "ruins",
+   "lat": 36.6315962,
+   "lon": 41.0288643,
+   "type": "ruins",
+   "source": "osm",
+   "dist_km": 0.567
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 0.034,
+  "tile": "R2_Khabur_r0c2"
+ },
+ {
+  "rank": 7,
+  "score": 7.4,
+  "lat": 36.60445,
+  "lon": 41.07243,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, roughly rectangular raised mound with a flat-topped profile standing above the surrounding flat agricultural plain, consistent with a tell, while the Sentinel-2 true color shows pale buff-brown soil tones and linear field boundaries (potential hollow-ways) radiating from the feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.178,
+  "tile": "R2_Khabur_r0c2"
+ },
+ {
+  "rank": 11,
+  "score": 6.4,
+  "lat": 36.59167,
+  "lon": 41.08773,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, multi-lobed elevated mound rising above the flat agricultural plain with a stepped/terraced profile consistent with a tell, while the optical image shows pale buff soils, radiating hollow-ways converging on the site, and what appears to be a small settlement on the summit\u2014classic tell morphology."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 1.218,
+  "tile": "R2_Khabur_r0c2"
+ },
+ {
+  "rank": 1,
+  "score": 57.2,
+  "lat": 36.66833,
+  "lon": 41.05731,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated rounded mound rising above the flat agricultural plain, consistent with a tell, while the optical image reveals a buff/pale circular earthen platform with radiating hollow-ways and what appears to be a modern settlement on its summit\u2014a classic tell morphology."
+  },
+  "known_site": {
+   "name": "Tell Brak",
+   "lat": 36.6672905,
+   "lon": 41.0586112,
+   "type": "archaeological_site",
+   "source": "osm",
+   "dist_km": 0.164
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 0.21,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 2,
+  "score": 49.3,
+  "lat": 36.73943,
+  "lon": 41.12697,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated, smooth, rounded mound rising clearly above the flat agricultural plain, consistent with a tell, while the optical image reveals pale/buff soil tones and a bright reflective halo typical of an exposed earthen occupation mound."
+  },
+  "known_site": {
+   "name": "Tell Barri",
+   "lat": 36.7392,
+   "lon": 41.1272,
+   "source": "wikidata",
+   "dist_km": 0.033
+  },
+  "novelty": "CATALOGUED",
+  "catalog_km": 0.226,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 3,
+  "score": 30.3,
+  "lat": 36.75509,
+  "lon": 41.12463,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, gently elevated mound-like anomaly rising subtly above the flat agricultural plain with a smooth, rounded profile consistent with a tell, while the optical image reveals pale/buff soil tones and surrounding field patterns typical of a long-occupied mounded site with hollow-way traces radiating outward."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.047,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 4,
+  "score": 30.3,
+  "lat": 36.78245,
+  "lon": 41.05083,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a single isolated low mound rising above a flat agricultural plain with subtle radiating hollow-ways visible around it, and the optical image reveals pale/buff soil tones and a radial field-boundary pattern characteristic of a tell with surrounding halo rather than a natural or modern feature."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.06,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 5,
+  "score": 26.3,
+  "lat": 36.75221,
+  "lon": 41.02923,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.87,
+   "reason": "The hillshade shows a single isolated rounded mound rising clearly above the flat agricultural plain, consistent with a tell, while the Sentinel-2 true color reveals pale/buff earthen tones with surrounding field systems and no dark rocky texture."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.074,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 7,
+  "score": 22.9,
+  "lat": 36.77201,
+  "lon": 41.13561,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, roughly rectangular elevated mound rising above the flat agricultural plain, consistent with a tell, while the optical image reveals pale buff soil tones and surrounding agricultural fields with no dominant modern infrastructure directly on the mound."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.067,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 14,
+  "score": 16.6,
+  "lat": 36.71423,
+  "lon": 41.08305,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a small, isolated, bright convex mound rising above the flat agricultural plain with no regional topographic context, consistent with a tell, while the Sentinel-2 image shows a cluster of structures atop buff/pale disturbed soil typical of a village-capped tell with surrounding halo."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.069,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 15,
+  "score": 16.3,
+  "lat": 36.66203,
+  "lon": 41.09889,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows an isolated, smooth, flat-topped mound rising clearly above the surrounding flat agricultural plain, consistent with a tell, while the optical image reveals pale/buff soil and a small settlement cluster on its summit typical of a village-capped tell with surrounding hollow-ways and field halos."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.278,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 16,
+  "score": 15.9,
+  "lat": 36.68597,
+  "lon": 41.04687,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals an isolated, flat-topped to gently rounded elevated feature rising above the surrounding flat agricultural plain, consistent with a tell mound, with a modern village occupying the summit visible in the Sentinel-2 image and subtle radiating patterns suggesting hollow-ways, while the buff/pale soil tones confirm earthen rather than rocky composition."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.154,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 18,
+  "score": 15.7,
+  "lat": 36.75329,
+  "lon": 41.04471,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a subtle but isolated low rounded mound rising above the flat agricultural plain, with a modern village cluster sitting atop it visible in the Sentinel-2 image\u2014classic tell morphology with surrounding agricultural fields and no regional topographic trend suggesting natural relief."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.053,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 19,
+  "score": 15.3,
+  "lat": 36.71225,
+  "lon": 41.02887,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade shows a small isolated low mound rising above the flat agricultural plain near the red crosshair, consistent with a tell, while the Sentinel-2 optical image reveals buff/pale soil tones and a circular feature (possible courtyard or outer halo) characteristic of an ancient mounded site rather than natural relief or modern flat-ground infrastructure."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.044,
+  "tile": "R2_Khabur_r1c2"
+ },
+ {
+  "rank": 20,
+  "score": 15.0,
+  "lat": 36.68561,
+  "lon": 41.05281,
+  "vlm": {
+   "class": "ANCIENT",
+   "confidence": 0.82,
+   "reason": "The hillshade reveals a broad, flat-topped isolated mound with clearly raised relief and a rectilinear perimeter edge (likely eroded mudbrick fortification wall), sitting above the surrounding flat agricultural plain, while the optical image shows a modern village occupying the summit\u2014classic tell morphology with a settlement halo visible in the true-color imagery."
+  },
+  "known_site": null,
+  "novelty": "not-in-open-DB",
+  "catalog_km": 0.386,
+  "tile": "R2_Khabur_r1c2"
+ }
+]
