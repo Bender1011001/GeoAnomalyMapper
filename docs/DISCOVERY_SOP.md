@@ -97,7 +97,32 @@ plow lines, pivot-irrigation geometry."
 - **Iteration 1 (2026-07-14): FAILED.** Densest cultivated Khabur tile,
   42-scene 2019-2025 spring NDVI stack, 6 big-tell + 63 flat sites.
   AUC: raw_std 0.478/0.483 (big/flat), stress_contrast 0.497/0.487 — chance.
-- **Iteration 2 (pre-registered, running):** single change — background-
-  removal scale (250 m -> 600 m -> none); prediction: AUC rises if the 250 m
-  detrend was erasing site-scale signal. If flat-tier AUC stays ~0.5 across
-  scales, one iteration remains before the capability is declared dead.
+- **Iteration 2 (2026-07-14): FAILED — prediction falsified.** Background-
+  removal scale swept 250 m / 600 m / none: all 12 cells 0.41-0.50; coarser
+  scales drift BELOW chance. Aggregation scale is not hiding signal.
+- **Iteration 3 (2026-07-14): FAILED — exhaustive per-date scan.** Every
+  acquisition scored individually (29 dates, 7 springs): flat-tier AUC range
+  0.406-0.571, no date >= 0.60. Note: the best dates (0.56-0.57) are late-May
+  of the driest year — the physically expected stress moment — but within
+  noise at n=46 sites.
+- **VERDICT: CAPABILITY DEAD in Khabur rainfed-wheat terrain (kill switch,
+  3/3 iterations failed).** No statistic built from these dates can separate
+  known site footprints from matched background. Scope note: the crop-mark
+  method's published successes are in NW-European agriculture (deep-rooted
+  cereals over chalk/gravel with strong soil-depth contrast); Khabur rainfed
+  wheat on deep alluvium apparently lacks the contrast. Re-testing in a
+  different terrain requires a NEW pre-registered control set and its own
+  3-iteration budget — this ledger entry does not transfer.
+
+### Capability-1 control ledger (live)
+
+- **Control locked (2026-07-14):** Gemini Solar Project, Moapa Valley NV
+  (~36.54, -114.62; ~28.7 km2). Site work publicly dated from 2021-01-25
+  (desert-tortoise fencing; mass grading follows within weeks). HyP3
+  INSAR_GAMMA stack SUBMITTED 2026-07-14: 36 consecutive 6-day pairs
+  (S1A+S1B era), Jul 2020 -> early Feb 2021 = stable baseline + onset
+  (job name gam_cap1_gemini; 6,910 credits remain). The drop-then-RECOVER
+  tail needs a second tranche (Feb-Aug 2021) once onset analysis passes.
+  Success = coherence-collapse onset within +/-1 acquisition of the
+  optically visible grading onset; FP ceiling measured on the surrounding
+  undisturbed desert of the same frames.
