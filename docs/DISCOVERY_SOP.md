@@ -172,3 +172,22 @@ plow lines, pivot-irrigation geometry."
     3-of-4-above-threshold) may NOT be tuned further on this control —
     re-register it on a FRESH dated-construction control with its own
     budget before any blind sweep. Sweep authorization: WITHHELD until then.
+
+### Capability-1 rule re-registration (fresh control, PRE-REGISTERED 2026-07-15
+before SAR submission)
+
+- **Control site:** new solar complex, Eldorado Valley NE (Boulder City NV),
+  site box (-114.915, 35.925, -114.845, 35.952). Optical timeline
+  (townsite_timeline.png): bare 2021-02-04; mass grading by 2021-05-05;
+  panels by 2021-08-23. OPTICAL ONSET WINDOW: 2021-02-04 .. 2021-05-05.
+- **Quiet control box:** (-114.88, 35.86, -114.80, 35.90) — flat bajada,
+  no construction through 2024.
+- **Frozen statistic:** excess = frac(site corr < 0.85) - frac(ctrl < 0.85),
+  40 m HyP3 INSAR_GAMMA products, 6-day pairs Dec 2020 - Sep 2021.
+- **Frozen rule (the one being re-registered):** baseline = median of first
+  8 pairs; threshold = baseline + max(5*MAD, 0.02); onset = first pair i
+  with >= 3 of pairs {i..i+3} above threshold (tolerates one work-front
+  pause).
+- **PASS:** onset within the optical window +/-1 acquisition AND zero
+  onsets before 2021-02-04. No further tuning permitted; miss = the rule
+  (not the physics) fails and Cap-1 goes back to design.
