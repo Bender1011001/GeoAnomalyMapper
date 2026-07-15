@@ -136,3 +136,17 @@ plow lines, pivot-irrigation geometry."
   decorrelate 30 m pixels). Lesson: date the *earth-moving*, not the press
   release. Tranche 2 (30 pairs, Feb-Sep 2021, gam_cap1_gemini2) submitted
   2026-07-14 to capture the actual grading onset.
+- **Tranche-2 analysis + footprint audit (2026-07-14 night):** still no
+  onset through Sep 2021 — and the auto-explain discipline turned on our
+  own control: (a) the original SITE box was ~8 km NE of the real plant
+  (2024 optical shows the true footprint at 36.42-36.49, -114.775..-114.71;
+  the black arrays farther north are OLDER Moapa-area plants pre-dating
+  2021); (b) the optical timeline at the TRUE footprint shows bare desert
+  through spring 2022 and visible array construction by fall 2022 — the
+  press "construction start Jan 2021" preceded mass grading here by ~1.5
+  years. Control interval redefined OPTICALLY: onset between 2022-05-25
+  and 2022-09-02. Tranche 3 (24 twelve-day pairs, Mar-Dec 2022; S1B died
+  Dec 2021; gam_cap1_gemini3) submitted, watcher chained to auto-run the
+  corrected-footprint analysis. SOP AMENDMENT: control intervals must be
+  defined from optical change detection BEFORE SAR job submission — two
+  tranches went to windows a press release implied and optics refute.
