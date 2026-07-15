@@ -150,3 +150,25 @@ plow lines, pivot-irrigation geometry."
   corrected-footprint analysis. SOP AMENDMENT: control intervals must be
   defined from optical change detection BEFORE SAR job submission — two
   tranches went to windows a press release implied and optics refute.
+- **Tranche-3 verdict (2026-07-15): SIGNAL VALIDATED; detector rule needs
+  fresh-control re-registration. Tuning budget spent (3/3).**
+  - Iter 1 (box-mean ratio): falsified — spatial dilution (~48 km2 box vs
+    section-by-section grading).
+  - Iter 2 (frac<0.85, box extended N): signal visible in the raster
+    (mottled 0.5-0.85 coherence tracking the work front — see
+    cap1_debug_corr.png) but drowned by a NOISY CONTROL (Valley-of-Fire
+    badlands decorrelate erratically).
+  - Iter 3 (quiet-bajada control — the originally mis-placed box, certified
+    flat over 66 pairs): **2021 = 30/30 pairs at excess <= +0.001 (clean
+    negative control, 0 false flags); from the 2022-07-19 pair onward 9/12
+    pairs positive with pulses +0.070/+0.094/+0.077 (6-8 sigma above the
+    2021 spread), onset INSIDE the optical window (2022-05-25..09-02).**
+    The pre-registered persistence rule (3 consecutive pairs) missed it on
+    one pause pair (work-front gap Aug 24 - Sep 5) — construction is PULSED,
+    not sustained.
+  - GOVERNANCE CALL: the physical claim (discrete grading events produce
+    control-relative coherence-drop pulses timestampable within the optical
+    window) is CONFIRMED; the detector persistence rule (needs e.g.
+    3-of-4-above-threshold) may NOT be tuned further on this control —
+    re-register it on a FRESH dated-construction control with its own
+    budget before any blind sweep. Sweep authorization: WITHHELD until then.
