@@ -126,3 +126,13 @@ plow lines, pivot-irrigation geometry."
   Success = coherence-collapse onset within +/-1 acquisition of the
   optically visible grading onset; FP ceiling measured on the surrounding
   undisturbed desert of the same frames.
+- **Tranche-1 analysis (2026-07-14): INCONCLUSIVE — control-window design
+  error, not a capability failure (does not burn a tuning iteration).**
+  All 36 pairs analyzed via windowed /vsizip//vsicurl reads of *_corr.tif:
+  site/control ratio 0.999 +/- ~0.004 across Jul 2020 - Feb 6 2021 — the
+  desert null is exquisitely stable (validates the baseline half of the
+  test). BUT the stack ends 2021-02-06, before MASS GRADING began; the
+  documented Jan-25 start was tortoise FENCING (sub-resolution, cannot
+  decorrelate 30 m pixels). Lesson: date the *earth-moving*, not the press
+  release. Tranche 2 (30 pairs, Feb-Sep 2021, gam_cap1_gemini2) submitted
+  2026-07-14 to capture the actual grading onset.
