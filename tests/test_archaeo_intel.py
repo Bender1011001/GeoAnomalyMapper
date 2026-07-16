@@ -140,6 +140,91 @@ class TestCorona:
         with pytest.raises(ValueError):
             fit_affine([(0, 0), (1, 1)], [(39, 36), (39.1, 36.1)])
 
+    @staticmethod
+    def _truth_ll(c, r):
+        # gently nonlinear truth (panoramic-like): quadratic terms present
+        lon = 39.0 + 1e-3*c - 2e-4*r + 3e-8*c*c
+        lat = 36.0 - 9e-4*r + 2e-8*c*r
+        return lon, lat
+
+    @staticmethod
+    def _truth_ll_affine(c, r):
+        # exact affine truth: inverse is exact, so geometry tests are clean
+        lon = 39.0 + 1e-3*c - 2e-4*r
+        lat = 36.0 - 9e-4*r + 1e-4*c
+        return lon, lat
+
+    def _gcps(self, pts, truth=None):
+        from archaeo_intel.corona import add_gcp
+        truth = truth or self._truth_ll
+        g = None
+        for c, r in pts:
+            lon, lat = truth(c, r)
+            g = add_gcp(g, c, r, lon, lat)
+        return g
+
+    def test_order2_fit_beats_affine_on_panoramic_truth(self):
+        from archaeo_intel.corona import fit_report
+        pts = [(c, r) for c in (0, 400, 800, 1200) for r in (0, 300, 600)]
+        gcps = self._gcps(pts)
+        rep1 = fit_report(gcps, order=1)
+        rep2 = fit_report(gcps, order=2)
+        assert rep2["rms_m"] < rep1["rms_m"] / 5
+        assert rep2["rms_m"] < 1.0            # exact family -> ~0 residual
+
+    def test_fit_report_flags_bad_gcp(self):
+        from archaeo_intel.corona import fit_report
+        # enough well-spread GCPs that one outlier's leverage is small
+        pts = [(c, r) for c in (0, 300, 600, 900, 1200)
+               for r in (0, 250, 500)]
+        gcps = self._gcps(pts, truth=self._truth_ll_affine)
+        gcps[7]["lon"] += 0.01                # ~900 m mis-click
+        rep = fit_report(gcps, order=1)
+        worst = int(np.argmax(rep["residuals_m"]))
+        assert worst == 7
+        assert rep["residuals_m"][7] > 3 * np.median(rep["residuals_m"])
+
+    def test_gcp_roundtrip_persistence(self, tmp_path):
+        from archaeo_intel.corona import load_gcps, save_gcps
+        gcps = self._gcps([(0, 0), (10, 20), (30, 5)])
+        save_gcps(tmp_path / "g.json", gcps, "http://example/strip.ntf")
+        back, url = load_gcps(tmp_path / "g.json")
+        assert back == gcps and url == "http://example/strip.ntf"
+
+    def test_warp_to_grid_synthetic_roundtrip(self):
+        from archaeo_intel.corona import fit_transform, ll_to_px, warp_to_grid
+        # synthetic 'strip': value encodes an affine ground pattern with a
+        # bright square landmark at a known lon/lat
+        H, W = 600, 900
+        yy, xx = np.mgrid[:H, :W]
+        strip = (0.1 * xx + 0.05 * yy).astype("float32")
+        pts = [(0, 0), (800, 0), (0, 500), (800, 500), (400, 250),
+               (200, 400), (700, 100)]
+        gcps = self._gcps(pts, truth=self._truth_ll_affine)
+        model = fit_transform(gcps, order=1)
+        lm_lon, lm_lat = self._truth_ll_affine(450.0, 300.0)   # landmark truth
+        c, r = ll_to_px(model, lm_lon, lm_lat)
+        strip[int(r[0])-4:int(r[0])+5, int(c[0])-4:int(c[0])+5] = 999.0
+        img, bbox = warp_to_grid(strip, gcps, res_m=30.0, order=1)
+        # the bright landmark must appear within ~3 output px of its lon/lat;
+        # use the centroid of the bright blob (argmax picks a corner cell)
+        ys, xs = np.where(img > 900)
+        assert len(ys) > 0
+        iy, ix = float(ys.mean()), float(xs.mean())
+        lon0, lat0, lon1, lat1 = bbox
+        lon_hit = lon0 + (ix + 0.5) / img.shape[1] * (lon1 - lon0)
+        lat_hit = lat1 - (iy + 0.5) / img.shape[0] * (lat1 - lat0)
+        assert img[int(round(iy)), int(round(ix))] > 900
+        assert abs(lon_hit - lm_lon) * 111e3 < 90       # < 3 px at 30 m
+        assert abs(lat_hit - lm_lat) * 111e3 < 90
+        assert np.isfinite(img[int(round(iy)), int(round(ix))])
+
+    def test_warp_rejects_insufficient_gcps_for_order2(self):
+        from archaeo_intel.corona import fit_transform
+        gcps = self._gcps([(0, 0), (10, 0), (0, 10), (10, 10)])
+        with pytest.raises(ValueError):
+            fit_transform(gcps, order=2)
+
 
 class TestCatalog:
     def test_nearest_and_classify(self):
