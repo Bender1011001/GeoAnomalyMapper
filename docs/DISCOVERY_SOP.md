@@ -191,3 +191,20 @@ before SAR submission)
 - **PASS:** onset within the optical window +/-1 acquisition AND zero
   onsets before 2021-02-04. No further tuning permitted; miss = the rule
   (not the physics) fails and Cap-1 goes back to design.
+- **VERDICT (2026-07-15): PASS.** 30/30 pairs analyzed. Threshold
+  (baseline 0.009 + 5*MAD = 0.068). Control box excess ~0.000 for ALL 30
+  pairs (pristine negative). Site excess stayed sub-threshold through
+  January (peak 0.061 on Jan 25-31, BELOW 0.068 — so zero pre-onset flags,
+  criterion met), then the 3-of-4 persistence rule fires at the pair ending
+  2021-03-14 (0.098), rising monotonically to 0.23 by late March and holding
+  0.03-0.23 through Sep 2021. Detected onset (Mar 8-14) sits INSIDE the
+  pre-registered optical window (Feb 4 - May 5). No parameters touched after
+  registration. **Capability 1 is now validated end-to-end (physics + rule)
+  on a fully pre-registered fresh control; blind-sweep authorization GRANTED
+  (one AOI, pre-registered negative zone + triage budget, per Part 1).**
+  Honest caveats: (a) coherent-change detection of construction is a KNOWN
+  technique — this validates our free-data implementation, not new science;
+  (b) onset detected ~5 wk after the "still bare" optical date, consistent
+  with grading starting mid-window, not a tight edge match; (c) signal is
+  pulsed/noisy (Feb 18 fell back to 0.038), so single-pair hits are not
+  trustworthy — the persistence rule is load-bearing.
