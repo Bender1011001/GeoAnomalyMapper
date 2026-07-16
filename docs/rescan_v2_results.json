@@ -1,9 +1,12 @@
 [
  {
+  "REDACTION_NOTICE": "Coordinates rounded to 0.1 deg (~11 km) - see docs/WESTHUNT_BALIKH_REPORT.md."
+ },
+ {
   "rank": 2,
   "score": 71.4,
-  "lat": 37.37009,
-  "lon": 32.96219,
+  "lat": 37.4,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -17,8 +20,8 @@
  {
   "rank": 7,
   "score": 23.4,
-  "lat": 37.52147,
-  "lon": 32.91395,
+  "lat": 37.5,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -32,8 +35,8 @@
  {
   "rank": 8,
   "score": 17.5,
-  "lat": 37.38251,
-  "lon": 32.91755,
+  "lat": 37.4,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -47,8 +50,8 @@
  {
   "rank": 9,
   "score": 16.1,
-  "lat": 37.39925,
-  "lon": 32.83835,
+  "lat": 37.4,
+  "lon": 32.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -62,8 +65,8 @@
  {
   "rank": 17,
   "score": 7.9,
-  "lat": 37.45973,
-  "lon": 32.92889,
+  "lat": 37.5,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -77,8 +80,8 @@
  {
   "rank": 18,
   "score": 7.8,
-  "lat": 37.42229,
-  "lon": 32.88659,
+  "lat": 37.4,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -92,8 +95,8 @@
  {
   "rank": 1,
   "score": 64.1,
-  "lat": 37.61127,
-  "lon": 32.82917,
+  "lat": 37.6,
+  "lon": 32.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -114,8 +117,8 @@
  {
   "rank": 2,
   "score": 53.5,
-  "lat": 37.59993,
-  "lon": 32.92691,
+  "lat": 37.6,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -135,8 +138,8 @@
  {
   "rank": 3,
   "score": 45.6,
-  "lat": 37.56249,
-  "lon": 32.96237,
+  "lat": 37.6,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -157,8 +160,8 @@
  {
   "rank": 7,
   "score": 27.5,
-  "lat": 37.68039,
-  "lon": 32.88623,
+  "lat": 37.7,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -179,8 +182,8 @@
  {
   "rank": 10,
   "score": 22.5,
-  "lat": 37.57923,
-  "lon": 32.96345,
+  "lat": 37.6,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -201,8 +204,8 @@
  {
   "rank": 12,
   "score": 20.7,
-  "lat": 37.63035,
-  "lon": 32.81837,
+  "lat": 37.6,
+  "lon": 32.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -216,8 +219,8 @@
  {
   "rank": 13,
   "score": 20.3,
-  "lat": 37.54341,
-  "lon": 32.97803,
+  "lat": 37.5,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.93,
@@ -231,8 +234,8 @@
  {
   "rank": 14,
   "score": 16.9,
-  "lat": 37.70001,
-  "lon": 32.86247,
+  "lat": 37.7,
+  "lon": 32.9,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -246,8 +249,8 @@
  {
   "rank": 16,
   "score": 16.2,
-  "lat": 37.66833,
-  "lon": 32.97083,
+  "lat": 37.7,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -261,8 +264,8 @@
  {
   "rank": 17,
   "score": 14.5,
-  "lat": 37.70307,
-  "lon": 32.82143,
+  "lat": 37.7,
+  "lon": 32.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -282,8 +285,8 @@
  {
   "rank": 19,
   "score": 13.8,
-  "lat": 37.66653,
-  "lon": 32.82233,
+  "lat": 37.7,
+  "lon": 32.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.85,
@@ -303,8 +306,8 @@
  {
   "rank": 2,
   "score": 76.0,
-  "lat": 37.53513,
-  "lon": 33.07449,
+  "lat": 37.5,
+  "lon": 33.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -318,8 +321,8 @@
  {
   "rank": 3,
   "score": 69.7,
-  "lat": 37.62297,
-  "lon": 33.02841,
+  "lat": 37.6,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.93,
@@ -339,8 +342,8 @@
  {
   "rank": 5,
   "score": 51.1,
-  "lat": 37.64583,
-  "lon": 33.12381,
+  "lat": 37.6,
+  "lon": 33.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.91,
@@ -354,8 +357,8 @@
  {
   "rank": 6,
   "score": 34.0,
-  "lat": 37.60353,
-  "lon": 33.14685,
+  "lat": 37.6,
+  "lon": 33.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -369,8 +372,8 @@
  {
   "rank": 8,
   "score": 24.1,
-  "lat": 37.67715,
-  "lon": 33.04749,
+  "lat": 37.7,
+  "lon": 33.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.91,
@@ -384,8 +387,8 @@
  {
   "rank": 16,
   "score": 12.9,
-  "lat": 37.58139,
-  "lon": 33.05667,
+  "lat": 37.6,
+  "lon": 33.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -399,8 +402,8 @@
  {
   "rank": 19,
   "score": 11.5,
-  "lat": 37.54881,
-  "lon": 33.14307,
+  "lat": 37.5,
+  "lon": 33.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -414,8 +417,8 @@
  {
   "rank": 2,
   "score": 167.7,
-  "lat": 37.54719,
-  "lon": 33.27499,
+  "lat": 37.5,
+  "lon": 33.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -429,8 +432,8 @@
  {
   "rank": 4,
   "score": 146.7,
-  "lat": 37.56807,
-  "lon": 33.26761,
+  "lat": 37.6,
+  "lon": 33.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -444,8 +447,8 @@
  {
   "rank": 5,
   "score": 144.6,
-  "lat": 37.57311,
-  "lon": 33.27085,
+  "lat": 37.6,
+  "lon": 33.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -459,8 +462,8 @@
  {
   "rank": 8,
   "score": 124.4,
-  "lat": 37.53999,
-  "lon": 33.30055,
+  "lat": 37.5,
+  "lon": 33.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -474,8 +477,8 @@
  {
   "rank": 2,
   "score": 24.3,
-  "lat": 36.76575,
-  "lon": 39.02115,
+  "lat": 36.8,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -495,8 +498,8 @@
  {
   "rank": 5,
   "score": 19.4,
-  "lat": 36.66099,
-  "lon": 39.05301,
+  "lat": 36.7,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -510,8 +513,8 @@
  {
   "rank": 6,
   "score": 19.0,
-  "lat": 36.83217,
-  "lon": 39.04149,
+  "lat": 36.8,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -525,8 +528,8 @@
  {
   "rank": 8,
   "score": 16.0,
-  "lat": 36.69627,
-  "lon": 39.01701,
+  "lat": 36.7,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -540,8 +543,8 @@
  {
   "rank": 9,
   "score": 15.9,
-  "lat": 36.82893,
-  "lon": 39.01107,
+  "lat": 36.8,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -555,8 +558,8 @@
  {
   "rank": 17,
   "score": 12.4,
-  "lat": 36.66837,
-  "lon": 39.05391,
+  "lat": 36.7,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -570,8 +573,8 @@
  {
   "rank": 1,
   "score": 62.6,
-  "lat": 36.86275,
-  "lon": 39.02979,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.93,
@@ -592,8 +595,8 @@
  {
   "rank": 2,
   "score": 51.9,
-  "lat": 36.97363,
-  "lon": 39.07443,
+  "lat": 37.0,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.93,
@@ -614,8 +617,8 @@
  {
   "rank": 3,
   "score": 37.1,
-  "lat": 36.98821,
-  "lon": 39.04653,
+  "lat": 37.0,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.91,
@@ -629,8 +632,8 @@
  {
   "rank": 4,
   "score": 36.2,
-  "lat": 36.91441,
-  "lon": 39.04779,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -644,8 +647,8 @@
  {
   "rank": 5,
   "score": 33.0,
-  "lat": 36.83215,
-  "lon": 39.04149,
+  "lat": 36.8,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -666,8 +669,8 @@
  {
   "rank": 6,
   "score": 31.8,
-  "lat": 36.85969,
-  "lon": 39.03537,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.97,
@@ -681,8 +684,8 @@
  {
   "rank": 7,
   "score": 28.9,
-  "lat": 36.82891,
-  "lon": 39.01107,
+  "lat": 36.8,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -696,8 +699,8 @@
  {
   "rank": 8,
   "score": 26.6,
-  "lat": 36.89389,
-  "lon": 39.01161,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -711,8 +714,8 @@
  {
   "rank": 9,
   "score": 24.2,
-  "lat": 36.95995,
-  "lon": 39.01179,
+  "lat": 37.0,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -726,8 +729,8 @@
  {
   "rank": 11,
   "score": 20.0,
-  "lat": 36.86779,
-  "lon": 39.05463,
+  "lat": 36.9,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.88,
@@ -741,8 +744,8 @@
  {
   "rank": 13,
   "score": 18.7,
-  "lat": 36.97165,
-  "lon": 39.00657,
+  "lat": 37.0,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -756,8 +759,8 @@
  {
   "rank": 14,
   "score": 18.4,
-  "lat": 36.86689,
-  "lon": 39.02097,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -778,8 +781,8 @@
  {
   "rank": 15,
   "score": 17.5,
-  "lat": 36.87427,
-  "lon": 39.03123,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -800,8 +803,8 @@
  {
   "rank": 16,
   "score": 16.9,
-  "lat": 36.86887,
-  "lon": 39.03249,
+  "lat": 36.9,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.95,
@@ -815,8 +818,8 @@
  {
   "rank": 17,
   "score": 16.8,
-  "lat": 36.87301,
-  "lon": 39.07515,
+  "lat": 36.9,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -830,8 +833,8 @@
  {
   "rank": 18,
   "score": 15.6,
-  "lat": 36.87769,
-  "lon": 39.05391,
+  "lat": 36.9,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -845,8 +848,8 @@
  {
   "rank": 19,
   "score": 15.4,
-  "lat": 36.90721,
-  "lon": 39.07695,
+  "lat": 36.9,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -860,8 +863,8 @@
  {
   "rank": 6,
   "score": 6.1,
-  "lat": 36.11819,
-  "lon": 43.39029,
+  "lat": 36.1,
+  "lon": 43.4,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -875,8 +878,8 @@
  {
   "rank": 4,
   "score": 7.7,
-  "lat": 36.42219,
-  "lon": 43.10231,
+  "lat": 36.4,
+  "lon": 43.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -890,8 +893,8 @@
  {
   "rank": 6,
   "score": 9.5,
-  "lat": 36.43515,
-  "lon": 43.34745,
+  "lat": 36.4,
+  "lon": 43.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -912,8 +915,8 @@
  {
   "rank": 8,
   "score": 8.7,
-  "lat": 36.44667,
-  "lon": 43.25331,
+  "lat": 36.4,
+  "lon": 43.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -934,8 +937,8 @@
  {
   "rank": 18,
   "score": 6.4,
-  "lat": 36.29115,
-  "lon": 43.25025,
+  "lat": 36.3,
+  "lon": 43.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -949,8 +952,8 @@
  {
   "rank": 19,
   "score": 6.4,
-  "lat": 36.32229,
-  "lon": 43.24413,
+  "lat": 36.3,
+  "lon": 43.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -964,8 +967,8 @@
  {
   "rank": 2,
   "score": 10.6,
-  "lat": 36.37335,
-  "lon": 39.09419,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -979,8 +982,8 @@
  {
   "rank": 3,
   "score": 10.5,
-  "lat": 36.35355,
-  "lon": 39.06431,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -994,8 +997,8 @@
  {
   "rank": 9,
   "score": 7.7,
-  "lat": 36.38937,
-  "lon": 39.03011,
+  "lat": 36.4,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1009,8 +1012,8 @@
  {
   "rank": 12,
   "score": 7.1,
-  "lat": 36.38811,
-  "lon": 39.09635,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1024,8 +1027,8 @@
  {
   "rank": 14,
   "score": 7.0,
-  "lat": 36.38865,
-  "lon": 39.02255,
+  "lat": 36.4,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1039,8 +1042,8 @@
  {
   "rank": 1,
   "score": 34.2,
-  "lat": 36.48295,
-  "lon": 39.05729,
+  "lat": 36.5,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1060,8 +1063,8 @@
  {
   "rank": 3,
   "score": 16.0,
-  "lat": 36.37333,
-  "lon": 39.09419,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1075,8 +1078,8 @@
  {
   "rank": 5,
   "score": 13.3,
-  "lat": 36.37117,
-  "lon": 39.09023,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1090,8 +1093,8 @@
  {
   "rank": 10,
   "score": 12.1,
-  "lat": 36.38809,
-  "lon": 39.09635,
+  "lat": 36.4,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1105,8 +1108,8 @@
  {
   "rank": 14,
   "score": 10.8,
-  "lat": 36.44659,
-  "lon": 39.03839,
+  "lat": 36.4,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1120,8 +1123,8 @@
  {
   "rank": 16,
   "score": 10.2,
-  "lat": 36.46693,
-  "lon": 39.02759,
+  "lat": 36.5,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1135,8 +1138,8 @@
  {
   "rank": 20,
   "score": 9.7,
-  "lat": 36.46351,
-  "lon": 39.02885,
+  "lat": 36.5,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.85,
@@ -1150,8 +1153,8 @@
  {
   "rank": 1,
   "score": 7.9,
-  "lat": 36.67175,
-  "lon": 39.07295,
+  "lat": 36.7,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1165,8 +1168,8 @@
  {
   "rank": 2,
   "score": 7.8,
-  "lat": 36.56753,
-  "lon": 39.09329,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1180,8 +1183,8 @@
  {
   "rank": 3,
   "score": 7.6,
-  "lat": 36.55385,
-  "lon": 39.03785,
+  "lat": 36.6,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1195,8 +1198,8 @@
  {
   "rank": 6,
   "score": 7.3,
-  "lat": 36.67751,
-  "lon": 39.12317,
+  "lat": 36.7,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1210,8 +1213,8 @@
  {
   "rank": 8,
   "score": 7.2,
-  "lat": 36.61325,
-  "lon": 39.11273,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1225,8 +1228,8 @@
  {
   "rank": 9,
   "score": 7.1,
-  "lat": 36.64727,
-  "lon": 39.12785,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1240,8 +1243,8 @@
  {
   "rank": 11,
   "score": 7.0,
-  "lat": 36.55169,
-  "lon": 39.00887,
+  "lat": 36.6,
+  "lon": 39.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1255,8 +1258,8 @@
  {
   "rank": 12,
   "score": 6.9,
-  "lat": 36.60299,
-  "lon": 39.06953,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1270,8 +1273,8 @@
  {
   "rank": 13,
   "score": 6.8,
-  "lat": 36.57995,
-  "lon": 39.06449,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1285,8 +1288,8 @@
  {
   "rank": 14,
   "score": 6.7,
-  "lat": 36.58139,
-  "lon": 39.06917,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1300,8 +1303,8 @@
  {
   "rank": 15,
   "score": 6.6,
-  "lat": 36.58949,
-  "lon": 39.05765,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1315,8 +1318,8 @@
  {
   "rank": 19,
   "score": 6.3,
-  "lat": 36.62441,
-  "lon": 39.09977,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1330,8 +1333,8 @@
  {
   "rank": 20,
   "score": 6.2,
-  "lat": 36.59759,
-  "lon": 39.05891,
+  "lat": 36.6,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1345,8 +1348,8 @@
  {
   "rank": 1,
   "score": 17.7,
-  "lat": 36.65717,
-  "lon": 39.28389,
+  "lat": 36.7,
+  "lon": 39.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1360,8 +1363,8 @@
  {
   "rank": 2,
   "score": 15.2,
-  "lat": 36.65339,
-  "lon": 39.28497,
+  "lat": 36.7,
+  "lon": 39.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1375,8 +1378,8 @@
  {
   "rank": 4,
   "score": 11.1,
-  "lat": 36.55313,
-  "lon": 39.15591,
+  "lat": 36.6,
+  "lon": 39.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.85,
@@ -1390,8 +1393,8 @@
  {
   "rank": 5,
   "score": 10.1,
-  "lat": 36.58049,
-  "lon": 39.27651,
+  "lat": 36.6,
+  "lon": 39.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1405,8 +1408,8 @@
  {
   "rank": 9,
   "score": 8.6,
-  "lat": 36.65375,
-  "lon": 39.24465,
+  "lat": 36.7,
+  "lon": 39.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1420,8 +1423,8 @@
  {
   "rank": 13,
   "score": 7.7,
-  "lat": 36.67751,
-  "lon": 39.12315,
+  "lat": 36.7,
+  "lon": 39.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1435,8 +1438,8 @@
  {
   "rank": 14,
   "score": 7.7,
-  "lat": 36.60155,
-  "lon": 39.21999,
+  "lat": 36.6,
+  "lon": 39.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1450,8 +1453,8 @@
  {
   "rank": 15,
   "score": 7.6,
-  "lat": 36.59993,
-  "lon": 39.29199,
+  "lat": 36.6,
+  "lon": 39.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1465,8 +1468,8 @@
  {
   "rank": 16,
   "score": 7.5,
-  "lat": 36.64115,
-  "lon": 39.29721,
+  "lat": 36.6,
+  "lon": 39.3,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1480,8 +1483,8 @@
  {
   "rank": 19,
   "score": 7.1,
-  "lat": 36.65879,
-  "lon": 39.24933,
+  "lat": 36.7,
+  "lon": 39.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1495,8 +1498,8 @@
  {
   "rank": 20,
   "score": 7.0,
-  "lat": 36.59939,
-  "lon": 39.21693,
+  "lat": 36.6,
+  "lon": 39.2,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1510,8 +1513,8 @@
  {
   "rank": 1,
   "score": 15.5,
-  "lat": 36.60121,
-  "lon": 40.78573,
+  "lat": 36.6,
+  "lon": 40.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.93,
@@ -1525,8 +1528,8 @@
  {
   "rank": 6,
   "score": 10.9,
-  "lat": 36.57637,
-  "lon": 40.68439,
+  "lat": 36.6,
+  "lon": 40.7,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1540,8 +1543,8 @@
  {
   "rank": 10,
   "score": 9.4,
-  "lat": 36.58933,
-  "lon": 40.75009,
+  "lat": 36.6,
+  "lon": 40.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1555,8 +1558,8 @@
  {
   "rank": 11,
   "score": 9.3,
-  "lat": 36.49177,
-  "lon": 40.80409,
+  "lat": 36.5,
+  "lon": 40.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1570,8 +1573,8 @@
  {
   "rank": 13,
   "score": 8.9,
-  "lat": 36.63919,
-  "lon": 40.68421,
+  "lat": 36.6,
+  "lon": 40.7,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1585,8 +1588,8 @@
  {
   "rank": 14,
   "score": 8.6,
-  "lat": 36.51715,
-  "lon": 40.70059,
+  "lat": 36.5,
+  "lon": 40.7,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1600,8 +1603,8 @@
  {
   "rank": 15,
   "score": 8.1,
-  "lat": 36.57169,
-  "lon": 40.70239,
+  "lat": 36.6,
+  "lon": 40.7,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1615,8 +1618,8 @@
  {
   "rank": 19,
   "score": 7.8,
-  "lat": 36.54991,
-  "lon": 40.78357,
+  "lat": 36.5,
+  "lon": 40.8,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1630,8 +1633,8 @@
  {
   "rank": 20,
   "score": 7.7,
-  "lat": 36.56737,
-  "lon": 40.67521,
+  "lat": 36.6,
+  "lon": 40.7,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1645,8 +1648,8 @@
  {
   "rank": 5,
   "score": 8.1,
-  "lat": 36.59293,
-  "lon": 41.08395,
+  "lat": 36.6,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1660,8 +1663,8 @@
  {
   "rank": 6,
   "score": 7.4,
-  "lat": 36.63649,
-  "lon": 41.03067,
+  "lat": 36.6,
+  "lon": 41.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1682,8 +1685,8 @@
  {
   "rank": 7,
   "score": 7.4,
-  "lat": 36.60445,
-  "lon": 41.07243,
+  "lat": 36.6,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1697,8 +1700,8 @@
  {
   "rank": 11,
   "score": 6.4,
-  "lat": 36.59167,
-  "lon": 41.08773,
+  "lat": 36.6,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1712,8 +1715,8 @@
  {
   "rank": 1,
   "score": 57.2,
-  "lat": 36.66833,
-  "lon": 41.05731,
+  "lat": 36.7,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1734,8 +1737,8 @@
  {
   "rank": 2,
   "score": 49.3,
-  "lat": 36.73943,
-  "lon": 41.12697,
+  "lat": 36.7,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1755,8 +1758,8 @@
  {
   "rank": 3,
   "score": 30.3,
-  "lat": 36.75509,
-  "lon": 41.12463,
+  "lat": 36.8,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1770,8 +1773,8 @@
  {
   "rank": 4,
   "score": 30.3,
-  "lat": 36.78245,
-  "lon": 41.05083,
+  "lat": 36.8,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1785,8 +1788,8 @@
  {
   "rank": 5,
   "score": 26.3,
-  "lat": 36.75221,
-  "lon": 41.02923,
+  "lat": 36.8,
+  "lon": 41.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.87,
@@ -1800,8 +1803,8 @@
  {
   "rank": 7,
   "score": 22.9,
-  "lat": 36.77201,
-  "lon": 41.13561,
+  "lat": 36.8,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1815,8 +1818,8 @@
  {
   "rank": 14,
   "score": 16.6,
-  "lat": 36.71423,
-  "lon": 41.08305,
+  "lat": 36.7,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1830,8 +1833,8 @@
  {
   "rank": 15,
   "score": 16.3,
-  "lat": 36.66203,
-  "lon": 41.09889,
+  "lat": 36.7,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1845,8 +1848,8 @@
  {
   "rank": 16,
   "score": 15.9,
-  "lat": 36.68597,
-  "lon": 41.04687,
+  "lat": 36.7,
+  "lon": 41.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1860,8 +1863,8 @@
  {
   "rank": 18,
   "score": 15.7,
-  "lat": 36.75329,
-  "lon": 41.04471,
+  "lat": 36.8,
+  "lon": 41.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1875,8 +1878,8 @@
  {
   "rank": 19,
   "score": 15.3,
-  "lat": 36.71225,
-  "lon": 41.02887,
+  "lat": 36.7,
+  "lon": 41.0,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,
@@ -1890,8 +1893,8 @@
  {
   "rank": 20,
   "score": 15.0,
-  "lat": 36.68561,
-  "lon": 41.05281,
+  "lat": 36.7,
+  "lon": 41.1,
   "vlm": {
    "class": "ANCIENT",
    "confidence": 0.82,

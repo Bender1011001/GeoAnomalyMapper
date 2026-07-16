@@ -54,6 +54,21 @@ The two motion channels are complementary by physics: OPERA gives mm-precision
 acceleration and time-to-threshold), while on-demand HyP3 interferograms catch
 fast, fresh deformation that decorrelates out of OPERA's masks.
 
+## CORONA: free 1960s ~2 m spy imagery in five lines of Python
+
+Probably the most immediately reusable piece of this repo:
+[`archaeo_intel/corona.py`](archaeo_intel/corona.py) reads the CAST **CORONA
+Atlas** open archive — 217 declassified US reconnaissance missions
+(1960-72, KH-4B at ~1.8 m) — with no account, no bulk downloads:
+whole-strip previews in ~2 s via HTTP range reads, full-resolution windowed
+crops, a ground-control-point workflow with per-point residual QC, panoramic
+distortion fitting, and warping straight to a QGIS-ready GeoTIFF. CLI
+included. The frames pre-date mechanized agriculture and modern conflict, so
+archaeological landscapes long erased on the ground are often crisply
+visible. **Tutorial: [docs/CORONA.md](docs/CORONA.md).** Credit the
+[CORONA Atlas project](https://corona.cast.uark.edu) (CAST, University of
+Arkansas) when you use the data — and be kind to their bandwidth.
+
 ## Validated results
 
 - **Wink, TX (natural ground truth)** — the documented actively-subsiding

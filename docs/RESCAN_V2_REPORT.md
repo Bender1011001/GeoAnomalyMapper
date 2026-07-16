@@ -1,5 +1,7 @@
 # Fixed-Pipeline Rescan of the 33-Tile Heavy Survey (2026-07-14)
 
+> **Coordinate redaction:** site coordinates are rounded to ~11 km in public copies per heritage-protection practice; full precision is available to researchers and heritage authorities on request.
+
 The original heavy survey (Konya / Harran / Nineveh / Balikh / Khabur) ran
 under two recall bugs (ranking starvation + systematic tell misclassification,
 both fixed and committed 245862f/ad6a647). This rescan repeats the exact same
