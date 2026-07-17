@@ -296,3 +296,47 @@ subsidence bowl is VERIFIED in the raw cube BEFORE registering the truth
 coordinate; then one clean registered run decides it. Lesson for the whole
 program: verify the positive control's signal exists in raw data before
 registering a detector against it.
+
+### Cap-1 blind sweep #1 — ANALYZER BUILT + RUN (2026-07-16)
+
+sweep1_analyze.py: streams the 29 succeeded HyP3 coherence rasters
+(gam_cap1_sweep1) via /vsizip//vsicurl (nothing downloaded in bulk), applies
+the pre-registered rule at pixel level (quiet-zone per-pair normalization ->
+baseline from first 8 -> drop > max(5*MAD, 0.15) -> 3-of-4 persistence ->
+cluster >=6px), ranks event clusters by depth*sqrt(size), reports FP rate on
+the pre-registered quiet zone. Top-20 events + dates written to
+data/research/sweep1_events_LOCAL.json (coords LOCAL only, conflict-zone
+redaction). This is the program's FIRST discovery run of a validated tool on
+UNKNOWN ground. Verdict recorded on completion.
+
+NOTE (disk): E:\code.projects\SAR-project reclaimed 48 GB (69->21 GB) —
+removed 6 vibrometry-era Sentinel-1 SLC scenes (re-downloadable free from ASF)
+and redundant local DEM tiles (streamed from AWS on demand). All processed
+outputs, metadata, manifests kept. That folder never held an InSAR archive;
+it held the retired vibrometry experiment's raw inputs.
+
+### Cap-1 blind sweep #1 VERDICT (2026-07-16): NULL — deployed outside validated envelope
+
+21 event clusters, but 16/21 share onset 2023-06-29 spread across 68% of the
+AOI, and the pre-registered quiet zone fired ABOVE scene average (0.164% vs
+0.08%). Diagnosis: BROAD SEASONAL DECORRELATION (spring-green Syrian steppe
+dries scene-wide in summer), not localized disturbance. A single-pair-crash
+rejection (added, caught only 2023-11-20) does NOT fix it because seasonal
+drop is multi-pair, not a spike.
+
+ROOT CAUSE (mine, honest): the detector was VALIDATED on BARE DESERT
+(Eldorado — no vegetation, no seasonal coherence swing). Syrian steppe
+vegetates; the sweep AOI is OUTSIDE the validated envelope. No discoveries;
+NULL result.
+
+TWO CLEAN PATHS (registered, not yet run):
+1. Re-point at genuinely bare/hyper-arid UNKNOWN ground (Rub al Khali fringe,
+   Sahara interior) where the control's no-vegetation assumption holds — the
+   detector should transfer there.
+2. Upgrade to a SEASONAL-BASELINE detector: multi-year stack, flag a pair's
+   coherence drop only if it departs from the SAME calendar-window in other
+   years (isolates anthropogenic from seasonal). Costs more pairs/quota, or
+   use OPERA where the archive is deep + free.
+LESSON: a detector's validated envelope (terrain/vegetation regime) must
+match the deployment AOI. Do not deploy a bare-desert coherence rule on
+vegetated terrain. Cache: scratchpad/sweep1_stack.npz (re-runs instant).
