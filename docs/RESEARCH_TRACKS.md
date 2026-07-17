@@ -169,3 +169,29 @@ RE-REGISTRATION (2026-07-16, before new data): extension skip-pairs
 Corrected rule, frozen now: threshold = baseline + 5*MAD (NO floor), onset =
 3-of-4 triplets above; PASS = onset within Jan-19..May-05 activity window
 and zero flags in Dec. Final registration; fail = track dies.
+
+## Hunts 6-10 (proposed by the Gemini collaborator, 2026-07-16; triaged)
+
+- **Hunt 6 — relief/illumination inversion for CORONA georef: ACCEPTED,
+  PRE-REGISTERED.** Match film to DEM-rendered HILLSHADE under Dec-1967
+  solar geometry (not albedo features, which the 20th century erased), with
+  vignette removal first and MUTUAL INFORMATION as the similarity (the
+  modality-gap metric; none of the 4 failed attempts combined these).
+  PASS: MI peak z>=5 over the rot/scale/flip search AND Kharab Sayyar +
+  Tell Chuera projected in-strip AND the Chuera crop shows the ring.
+- **Hunt 8 — temporal backscatter statistics (speckle texture): ACCEPTED
+  with corrections.** Data path = MPC Sentinel-1 RTC time series (not SLC);
+  claims via the standard site-vs-control AUC harness (not Rayleigh tests);
+  test set restricted to FLAT UNOCCUPIED catalog sites (a man-made-scatterer
+  detector trivially finds the modern village on a tell, not the site).
+- **Hunt 10 — asc/desc anisotropy: ACCEPTED, run jointly with Hunt 8**
+  (same RTC pulls, extra feature). Flat-steppe restriction handles the
+  slope-aspect confounder.
+- **Hunt 9 — moisture->green-up lag: REFRAMED.** Closure per-pixel over the
+  Khabur is quota-prohibitive; RTC backscatter is the free moisture proxy.
+  Irrigation dominates lag in cropland -> steppe sites only. Queued behind
+  8/10 (reuses their stacks).
+- **Hunt 7 — BRDF sun-sweep roughness: PARKED.** Solar zenith and phenology
+  are both functions of day-of-year (collinear); identifiable only via
+  year-to-year rainfall anomalies — needs a real identifiability design
+  before any registration.
