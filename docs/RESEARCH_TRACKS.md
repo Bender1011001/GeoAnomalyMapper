@@ -240,3 +240,37 @@ grain; edge-SIFT; NCC/vignette; Wolfram keypoints/modality; isotropic scale;
 MI overlap bias). Automatic film-to-modern georeferencing is hereby classed
 a RESEARCH PROBLEM, not a task — publishable if solved. Operational path
 remains human GCPs (~10 min/strip, shipped in archaeo_intel/corona.py).
+
+### Track 2 FINAL VERDICT (2026-07-16): PASS
+
+Rule frozen before extension data (base+5*MAD=+0.012, no floor, 3-of-4):
+onset at triplet ending 2021-01-25 = the documented site-work start, ZERO
+pre-onset flags. Curve: flat +0.007 through 2020 -> climb from Jan 25 ->
+peak +0.028 during March grading -> decay as surface stabilizes.
+**Closure phase (the signal every InSAR pipeline discards as calibration
+error) is a VALIDATED construction/disturbance detector on free HyP3 data.**
+Bonus validated claim: closure onset (Jan 25) LEADS coherence-channel onset
+(Mar 14) by ~6 weeks -> closure is an earlier tripwire (dielectric/moisture
+disturbance precedes scatterer destruction). Next: (1) the stretch
+archaeology test (closure over flat catalog sites vs controls); (2) fold
+closure as an early-warning layer alongside the coherence sweep.
+
+## Program scoreboard (2026-07-16, two research sessions)
+
+VALIDATED (new, on data we already held):
+- Closure-phase disturbance detector (Track 2) — PASS, + early-warning lead.
+- TDA H1 ring-sensitivity feature (Track 3) — PASS as a triage feature
+  (bounded: not autonomous at 30 m DEM).
+NEAR-MISS / re-registered:
+- ICA source separation (Track 1) — x19.6 vs 20 bar; Mont Belvieu final test
+  auto-chained.
+CONFIRMED-signal, rule-tuning pending:
+- Coherence-drop (Cap 1) — PASS on control; blind sweep processed, analyzer
+  next.
+NULL / bounded (honestly closed):
+- Step-event catalog (creep, not steps); Crop-mark / Cap 2 & Hunt 12
+  (chance in Khabur); auto-georef (6 failure modes -> research problem);
+  Hunt 14 thermal-inertia (no night Landsat).
+QUEUED: Hunts 8/10/13 (RTC texture+anisotropy+dual-pol intercept, one pull);
+Hunt 9 (moisture-lag, steppe); Hunt 11 (B-perp altimeter, gated on metadata);
+Cap-1 blind-sweep analyzer.
