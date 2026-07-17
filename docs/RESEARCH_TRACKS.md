@@ -92,3 +92,14 @@ from the literature.
   (gam_track2_closure) completing ~14 triplets over the Eldorado control
   scene (quiet baseline + dated construction onset). Analyzer to be built
   against the pre-registered tests above; products persist on HyP3 ~2 weeks.
+
+### Track 1 re-registration (PRE-REGISTERED 2026-07-15 before fetch)
+
+Fresh cube: 24 km OPERA DISP-S1 cube centered (29.88, -94.92) — Mont
+Belvieu / Baytown TX. External truth: the Barbers Hill salt-dome storage
+complex (~29.868, -94.902) has decades-documented localized subsidence
+independent of this project. PASS: among k=6 spatial-ICA components (same
+recipe as the Wink run, unchanged), >=1 concentrates its top-1% |weight|
+within 2 km of the dome center at >=20x chance density with time-course
+|Spearman rho| >= 0.8. This is the second and FINAL registration for the
+claim; fail = Track 1 dies per kill switch.
