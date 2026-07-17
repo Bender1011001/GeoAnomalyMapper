@@ -222,3 +222,21 @@ and zero flags in Dec. Final registration; fail = track dies.
   best single channel, AUC 0.622.) Only path: ECOSTRESS night LST (ISS
   orbit, covers 36.6N; LP DAAC access) — separate feasibility check before
   any registration.
+
+### Hunt 6 field verdict + auto-georef campaign close (2026-07-16 night)
+
+Gemini's synthetic validation (translation-only, MI locks through vignette +
+albedo noise) CONFIRMED the metric but under-modeled the film: real KH-4B
+needed vignette removal (attempt 3's lesson), anisotropic scale (attempt 5's
+lesson), and even then attempt 6 exposed a sixth failure mode: UNNORMALIZED
+MI is biased toward small-overlap combos, so the grid search slides to the
+scale boundary (0.149 "best" with opposite flips near-tied = no geometric
+lock; anchors project outside the strip). Fix specified for any future
+attempt: normalized MI + minimum-overlap guard + per-segment (pan-angle-
+local) scale.
+
+CAMPAIGN STATUS: six attempts, six distinct documented failure modes (SIFT/
+grain; edge-SIFT; NCC/vignette; Wolfram keypoints/modality; isotropic scale;
+MI overlap bias). Automatic film-to-modern georeferencing is hereby classed
+a RESEARCH PROBLEM, not a task — publishable if solved. Operational path
+remains human GCPs (~10 min/strip, shipped in archaeo_intel/corona.py).
