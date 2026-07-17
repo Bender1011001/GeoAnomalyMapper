@@ -131,3 +131,23 @@ claim; fail = Track 1 dies per kill switch.
   (before/after S2 + OSM landuse) before human review. Output register:
   "candidate discrete surface disturbances with dates; expect flood-wash,
   agriculture, and permitted works as confounders."
+
+### Track 3 sweep boundary (2026-07-16) — validated method, bounded deployment
+
+The TDA ring sweep top-N (post flatness-triage) was chip-reviewed: high-H1
+"flat" candidates are natural closed contours (wadi-incised mesa remnants,
+scarp edges, basalt relief), not archaeological rings. A circularity/size
+discriminator was built to separate ring SHAPE from blobs — it FAILED
+decisively: at 30 m Copernicus DEM a 150-200 m Kranzhugel is only 5-7 px
+across, so loop shape is unmeasurable (metric unstable, anchors and
+false-positives both ~1.3-1.7, and it would reject validated ring9).
+
+CONCLUSION (honest, bounds a real method): H1-persistence is a VALIDATED
+ring-SENSITIVITY signal (anchor test passed: Kranzhugel score high) but is
+NOT a standalone discovery detector at free-DEM resolution — the natural
+closed-contour population is not separable from true rings by persistence or
+by shape at 30 m. Correct use: TDA H1 as ONE ranking FEATURE feeding VLM/
+human triage (surfacing ring-candidate tiles), never autonomous. A true
+ring sweep needs higher-resolution elevation (TanDEM-X 12 m paid, or the
+un-built CORONA stereo DEMs). This is the same resolution wall the
+prominence and crop-mark channels hit, now measured for topology too.
