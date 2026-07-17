@@ -413,3 +413,24 @@ passes archived this far back; both stacks independently clean).
   steppe is isotropic) and CHEAP (one free MPC pull, no HyP3 quota).
   NEXT: fold into the combined-ML harness (may push the ensemble above
   0.616); test at larger n and a second AOI before calling it robust.
+
+## Wide-area deployments launched (2026-07-17) — "as much space as possible"
+
+Two validated, zero-cost channels turned into actual searches (not controls):
+
+1. **Bare-desert OPERA sweep**: 65 tiles, free NASA DISP-S1, zero HyP3 quota.
+   Mojave, Great Basin, Sonoran, Permian salt, Salton/Lucerne — every arid
+   OPERA-covered basin. Validated detect_anomalies() per cube. Coordinates
+   are US public land (no redaction needed) -> results go in the public repo
+   once the sweep completes and candidates are verified.
+2. **Anisotropy sweep**: Hunt 10 (asc/desc backscatter anisotropy, AUC 0.639,
+   the new best single free-data channel per the 2026-07-17 RTC verdict)
+   deployed as an 80-tile local-anomaly search over 35.30-37.30N, 38.60-42.30E
+   (the full Jazira). z>4 peak threshold, catalog-distance auto-context.
+   MPC's STAC endpoint hit a live service outage (504s, confirmed via a
+   direct retest of a box that worked minutes earlier — not our bug); a
+   recovery watcher (wait_mpc.py) is chained to auto-launch the sweep the
+   moment the endpoint returns. Coordinates stay LOCAL (conflict-zone
+   redaction rule) until reviewed.
+
+Both self-execute; verdicts land in this file when complete.
