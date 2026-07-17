@@ -103,3 +103,31 @@ recipe as the Wink run, unchanged), >=1 concentrates its top-1% |weight|
 within 2 km of the dome center at >=20x chance density with time-course
 |Spearman rho| >= 0.8. This is the second and FINAL registration for the
 claim; fail = Track 1 dies per kill switch.
+
+### Bench verdicts (2026-07-16)
+
+- **Step-event detector (Wink cube): NULL.** Zero step candidates at SNR>8
+  across 534k pixels. Physics: Wink dissolution subsides by CREEP, and
+  OPERA's recommended mask deletes true fast-collapse pixels (documented).
+  A step catalog needs cubes over abrupt-failure terrain (mining collapses),
+  not dissolution creep.
+- **Auto-georeferencing of CORONA, attempt #4 (Mathematica
+  FindGeometricTransform, affine, 64 m/px): FAIL — "no corresponding
+  points."** Four independent failures (SIFT, edge-SIFT, coarse NCC,
+  Wolfram keypoints) now bound the problem: POINT-feature matching does not
+  cross the 1967-film/modern-optical modality gap. Remaining designs:
+  vignette-removed coarse structural alignment, or human GCPs (supported,
+  released, ~10 min/strip).
+
+### Cap-1 BLIND SWEEP #1 (PRE-REGISTERED 2026-07-16 before submission)
+
+- AOI: 34.70-35.00 N, 38.20-38.60 E (west-of-Palmyra Syrian steppe; arid,
+  high coherence, plausible undocumented ground activity).
+- Stack: 12-day Sentinel-1 pairs spanning 2023 (~30 jobs, gam_cap1_sweep1).
+- Detector: EXACTLY the re-registered rule (frac<0.85 excess vs in-scene
+  quiet reference, baseline+max(5*MAD,0.02), 3-of-4 persistence).
+- Quiet reference / FP zone (pre-registered): 34.75-34.85 N, 38.45-38.55 E.
+- Triage budget: top 20 events by excess magnitude; each auto-explained
+  (before/after S2 + OSM landuse) before human review. Output register:
+  "candidate discrete surface disturbances with dates; expect flood-wash,
+  agriculture, and permitted works as confounders."
