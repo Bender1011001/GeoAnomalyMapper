@@ -195,3 +195,30 @@ and zero flags in Dec. Final registration; fail = track dies.
   are both functions of day-of-year (collinear); identifiable only via
   year-to-year rainfall anomalies — needs a real identifiability design
   before any registration.
+
+## Hunts 11-14 triage (2026-07-16 night)
+
+- **Hunt 11 — B-perp regression as sub-pixel altimeter (DEM-error inversion):
+  ACCEPTED PENDING FEASIBILITY GATE.** Physics textbook-correct; neighbor-
+  differencing kills atmosphere. BUT the simulation assumed raw interferograms
+  — OPERA DISP-S1 removed topographic phase server-side and may already
+  correct residual DEM error. GATE (next session, one granule): does
+  per-epoch perpendicular baseline ship in DISP-S1 metadata, and does the
+  DEM-error residual survive into displacement? No registration until both
+  answer yes.
+- **Hunt 12 — halo-differenced temporal variance: REJECTED (kill-switch
+  precedent).** This is Capability 2 renamed: iteration 2 already swept
+  local background-differencing scales; iteration 3 tested every acquisition
+  individually (29 dates, 46 unoccupied flat sites, max 0.571 vs 0.60 bar).
+  The sim's premise (mixed pixels diverge phenologically) is what the ground
+  truth refuted. Only legal path: ONE fresh registration in temperate
+  rain-fed terrain where crop-mark literature has actual wins.
+- **Hunt 13 — VH/VV temporal-regression intercept: ACCEPTED as a FEATURE**
+  in the Hunt-8/10 RTC harness (same data pull carries both polarizations;
+  zero marginal cost). Not a standalone hunt.
+- **Hunt 14 — day/night apparent thermal inertia: PARKED — DATA-IMPOSSIBLE
+  with Landsat here.** Census over the truth tile 2015-2025: 1000 daytime
+  scenes, ZERO night. (Daytime thermal anomaly alone is already our measured
+  best single channel, AUC 0.622.) Only path: ECOSTRESS night LST (ISS
+  orbit, covers 36.6N; LP DAAC access) — separate feasibility check before
+  any registration.
