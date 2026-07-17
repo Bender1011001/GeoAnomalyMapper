@@ -151,3 +151,21 @@ human triage (surfacing ring-candidate tiles), never autonomous. A true
 ring sweep needs higher-resolution elevation (TanDEM-X 12 m paid, or the
 un-built CORONA stereo DEMs). This is the same resolution wall the
 prominence and crop-mark channels hit, now measured for topology too.
+
+### Track 2 first verdict (2026-07-16): FAIL by letter — candidate EARLY signal
+
+9 triplets computed (Dec 2020 - Mar 2021). Baseline excess +0.008 rad; from
+the triplet containing 2021-01-25 (documented site-work start): sustained
++0.034/+0.016/+0.021/+0.015/+0.015 (2-4x baseline, ZERO pre-onset flags).
+Registered threshold failed the detection only via its blind 0.05-rad floor
+(3x the actual signal scale). NOTE the physics-rich near-miss: closure
+elevation begins ~6 WEEKS BEFORE the coherence rule fired at this site
+(2021-03-14) — moisture/dielectric disturbance from early light activity
+precedes scatterer destruction. If confirmed, closure is an EARLIER tripwire
+than the validated coherence channel.
+
+RE-REGISTRATION (2026-07-16, before new data): extension skip-pairs
+(gam_track2_ext, Mar-Jun 2021) complete triplets through the grading window.
+Corrected rule, frozen now: threshold = baseline + 5*MAD (NO floor), onset =
+3-of-4 triplets above; PASS = onset within Jan-19..May-05 activity window
+and zero flags in Dec. Final registration; fail = track dies.
