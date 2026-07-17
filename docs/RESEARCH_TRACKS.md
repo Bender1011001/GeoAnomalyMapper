@@ -274,3 +274,25 @@ NULL / bounded (honestly closed):
 QUEUED: Hunts 8/10/13 (RTC texture+anisotropy+dual-pol intercept, one pull);
 Hunt 9 (moisture-lag, steppe); Hunt 11 (B-perp altimeter, gated on metadata);
 Cap-1 blind-sweep analyzer.
+
+### Track 1 (ICA) FINAL DISPOSITION (2026-07-16): RETIRED — not robustly validated
+
+Mont Belvieu registered test scored FAIL (best 0.8x vs 20x bar). But an
+independent raw-cumulative-field check (NOT ICA output) shows WHY: the
+Barbers Hill subsidence is real and IN the cube (-14.7 cm bowl at
+~29.841,-94.892) but 3.2 km from the pre-registered truth point
+(29.868,-94.902), OUTSIDE the 2 km disc. The registered coordinate shows
+~0 cm. So the positive control was MIS-SITED (my external-coordinate error),
+which VOIDS the scored test — it is neither a fair PASS nor a fair FAIL.
+
+Discipline call: NOT re-scored against the moved bowl (that is post-hoc
+target selection = p-hacking). And NOT re-registered a third time (endless
+control re-rolls until one passes is itself p-hacking). Track 1 is RETIRED
+as **qualitatively demonstrated (Wink: 19.6x sink enrichment, clean
+atmosphere separation) but NOT robustly validated** — no clean pass of a
+pre-registered EXTERNAL-truth test in two attempts, both undone by control
+geolocation. RE-ENTRY CONDITION (for anyone resuming): pick a control whose
+subsidence bowl is VERIFIED in the raw cube BEFORE registering the truth
+coordinate; then one clean registered run decides it. Lesson for the whole
+program: verify the positive control's signal exists in raw data before
+registering a detector against it.
