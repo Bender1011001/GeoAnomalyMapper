@@ -340,3 +340,31 @@ TWO CLEAN PATHS (registered, not yet run):
 LESSON: a detector's validated envelope (terrain/vegetation regime) must
 match the deployment AOI. Do not deploy a bare-desert coherence rule on
 vegetated terrain. Cache: scratchpad/sweep1_stack.npz (re-runs instant).
+
+### Hunt 11 GATE (2026-07-16): PASSED — feasible on free OPERA data
+
+Inspected an OPERA DISP-S1 granule directly. Ships (all free, no HyP3):
+- corrections/perpendicular_baseline (per-epoch B-perp) — Hunt 11's exact
+  regressor variable, present.
+- short_wavelength_displacement + timeseries_inversion_residuals — two
+  candidate residual layers where a sub-30m-DEM feature (a 2 m tell) would
+  leak.
+Caveat now a testable experiment, not a blocker: OPERA phase-linking may
+already estimate+remove the B-perp-proportional DEM error (CEOS metadata
+shows orbital_baseline_refinement applied). REGISTERED TEST: at a pixel over
+a known sub-DEM feature (small tell / building cluster of known height),
+differenced against a flat neighbor 100 m away, regress residual vs
+perpendicular_baseline; slope != 0 (p<1e-3) => residual survives => Hunt 11
+is a working free sub-pixel altimeter. Next-session build.
+
+### FREE SEARCHES LAUNCHED (2026-07-16, in-envelope, no quota)
+
+- **Bare-desert OPERA displacement sweep** (desert_sweep.py): 65 cubes over
+  Mojave/Great Basin/Sonoran/Permian/Salton — the VALIDATED deformation
+  detector on free OPERA, IN its bare-arid envelope. Streaming; localized
+  accelerating subsidence candidates -> data/research/desert_sweep/. This is
+  the free, no-quota, in-envelope search the coherence sweep could not be.
+- **RTC hunts 8/10/13** (rtc_hunt.py): free MPC Sentinel-1 RTC, both orbits,
+  VV+VH over the Khabur ground-truth tile. Temporal kurtosis + VH/VV
+  intercept + asc/desc anisotropy, AUC vs 14k catalog (flat unoccupied sites
+  only). Streaming.
