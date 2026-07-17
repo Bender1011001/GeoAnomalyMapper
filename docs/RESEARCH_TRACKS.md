@@ -368,3 +368,23 @@ is a working free sub-pixel altimeter. Next-session build.
   VV+VH over the Khabur ground-truth tile. Temporal kurtosis + VH/VV
   intercept + asc/desc anisotropy, AUC vs 14k catalog (flat unoccupied sites
   only). Streaming.
+
+### Cap-1 BLIND SWEEP #1 — RESULT: NULL, real confound found (2026-07-17)
+
+29 pairs analyzed, 21 clustered "events" surfaced by the pre-registered rule.
+Diagnostic BEFORE any claim (per SOP auto-explain discipline): date
+distribution of the 21 events = {2023-04-30: 3, 2023-06-29: 16, 2023-07-11: 2}.
+**81% of flagged pixels (271/336) share ONE onset date.** 21 independent
+ground disturbances would not cluster onto 2-3 dates — this is a SINGLE
+scene-wide decorrelation event (near-certainly a rain cell partially over the
+AOI) that survived the quiet-zone median normalization and got fragmented
+into pseudo-clusters by the connected-component labeler. VERDICT: sweep #1
+is a NULL, not 21 candidates. No site claims from this run.
+
+REAL METHODS BUG FOUND (not present in the Eldorado control test, because
+that control had zero weather events in its window): the quiet-zone
+normalization removes the MEAN scene-wide effect but not its SPATIAL
+gradient (edge-of-rain-cell partial coverage). FIX for sweep #2 (registered
+now, before re-running): add a same-date CROSS-SCENE check — discard any
+onset date where >30% of all flagged pixels cluster on that single date
+(scene-event veto), independent of and in addition to the per-pixel rule.
