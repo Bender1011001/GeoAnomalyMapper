@@ -388,3 +388,28 @@ gradient (edge-of-rain-cell partial coverage). FIX for sweep #2 (registered
 now, before re-running): add a same-date CROSS-SCENE check — discard any
 onset date where >30% of all flagged pixels cluster on that single date
 (scene-event veto), independent of and in addition to the per-pixel rule.
+
+### RTC hunts 8/10/13 VERDICT (2026-07-17): Hunt 10 PASSES — new best single channel
+
+MPC Sentinel-1 RTC pull over the dense Khabur tile, 141 FLAT UNOCCUPIED
+catalog sites vs matched controls (n=141/141 both arms). Ascending stack 24
+scenes (full), descending stack 19 scenes (search exhausted available older
+GRD scenes beyond that — not a data-quality problem, just fewer descending
+passes archived this far back; both stacks independently clean).
+
+- **Hunt 8 (temporal VV kurtosis): NULL.** AUC 0.518 — chance. Sub-pixel
+  "twinkle" statistics do not separate flat sites from steppe at 10 m RTC.
+- **Hunt 13 (VH/VV regression intercept): NULL.** AUC 0.541 (raw 0.459,
+  i.e. BELOW chance before the sign flip) — no double-bounce signature
+  survives RTC processing at this resolution.
+- **Hunt 10 (ascending/descending backscatter anisotropy): PASS.**
+  **AUC 0.639**, clears the pre-registered >0.60 bar on first run, no tuning.
+  Directional radar-scattering mismatch (stable from one look direction,
+  volatile from the other = sub-pixel oriented geometry) separates flat
+  catalogued sites from open steppe better than any prior channel:
+  prominence 0.547, BSI 0.553, texture 0.595, thermal 0.622 (prior best),
+  combined-ML 0.616 -> **anisotropy 0.639 is the new single-channel record.**
+  Physically sound (built structures/rubble scatter directionally; bare
+  steppe is isotropic) and CHEAP (one free MPC pull, no HyP3 quota).
+  NEXT: fold into the combined-ML harness (may push the ensemble above
+  0.616); test at larger n and a second AOI before calling it robust.
