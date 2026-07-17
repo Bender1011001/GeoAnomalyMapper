@@ -126,7 +126,7 @@ def _open_remote(ntf_url: str):
     import rasterio
     # GDAL must see the sidecar .ovr; only allow exactly the extensions needed
     os.environ.pop("GDAL_DISABLE_READDIR_ON_OPEN", None)
-    os.environ["CPL_VSIL_CURL_ALLOWED_EXTENSIONS"] = ".ntf,.ovr,.aux,.xml"
+    os.environ["CPL_VSIL_CURL_ALLOWED_EXTENSIONS"] = ".ntf,.ovr,.aux,.xml,.tif,.tiff"
     return rasterio.open("/vsicurl/" + ntf_url)
 
 
