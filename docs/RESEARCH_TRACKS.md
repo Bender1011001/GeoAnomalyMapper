@@ -434,3 +434,22 @@ Two validated, zero-cost channels turned into actual searches (not controls):
    redaction rule) until reviewed.
 
 Both self-execute; verdicts land in this file when complete.
+
+### Hunt 10 replication test — PRE-REGISTERED 2026-07-17, before running
+
+Correction to process: the wide anisotropy sweep (80 tiles, task above) was
+launched on a SINGLE unreplicated tile's AUC=0.639 without first testing a
+second independent AOI. That is a real process failure, not a nuance — it
+means the wide sweep's premise has not been checked. Registering the fix now,
+before seeing the result:
+
+- Box2 = 41.30-41.80E, 36.55-36.90N (far-east Khabur, ~90 km from the
+  original 40.55-40.95E/36.50-36.75N tile). 1387 catalog sites available;
+  subsampled to <=150 flat-unoccupied for tractable runtime.
+- Identical feature code, identical flat-site filter, identical control
+  sampling.
+- PASS BAR: >0.60 — the SAME threshold set before hunt-8/10/13 was run the
+  first time (not re-picked with knowledge of the 0.639 result).
+- Script: aniso_replicate.py. If this fails to replicate, Hunt 10 is
+  downgraded to NULL alongside 8 and 13, and the wide sweep's output gets
+  reported as exploratory only, not as a validated-channel search.
