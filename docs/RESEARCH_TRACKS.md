@@ -453,3 +453,26 @@ before seeing the result:
 - Script: aniso_replicate.py. If this fails to replicate, Hunt 10 is
   downgraded to NULL alongside 8 and 13, and the wide sweep's output gets
   reported as exploratory only, not as a validated-channel search.
+
+### Hunt 10 replication VERDICT (2026-07-17): REPLICATES
+
+Independent sample: box2 (41.30-41.80E, 36.55-36.90N), ~90 km from the
+original tile, 150 flat-unoccupied sites + 150 matched controls (subsampled
+from 733 available). Identical feature code, identical site filter, SAME
+pre-registered >0.60 bar (set before any hunt-8/10/13 result existed).
+
+**AUC 0.608 — PASSES.** Original tile: 0.639 (n=141). Two independent
+samples, ~90 km apart, both land in 0.60-0.64. The anisotropy signal
+generalizes across this landscape; it is not a one-tile artifact.
+
+Calibration (explicit, so this isn't overclaimed): 0.608 is a THIN pass,
+lower than the original — the expected pattern for a real-but-modest effect
+meeting fresh data, not a red flag. This validates the FEATURE, not any
+candidate. It says nothing about whether any peak the wide 80-tile sweep
+(task above) produces is real; each candidate that sweep surfaces still
+needs the same individual optical/context check as any other candidate.
+
+Process note for the record: the wide sweep was launched BEFORE this
+replication existed (a real sequencing error, corrected once caught — see
+the entry above this one). The fix is now in place for future features:
+replicate on an independent AOI before deploying at scale, not after.
