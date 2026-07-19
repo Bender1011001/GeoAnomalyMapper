@@ -476,3 +476,24 @@ Process note for the record: the wide sweep was launched BEFORE this
 replication existed (a real sequencing error, corrected once caught — see
 the entry above this one). The fix is now in place for future features:
 replicate on an independent AOI before deploying at scale, not after.
+
+### Desert sweep: silent-hang bug found and fixed (2026-07-18)
+
+Twice observed: the driver process stayed alive with zero log output and
+zero network connections for 1-2.5+ hours, immediately after granule search
+succeeded and before any per-window read log line appeared — i.e. NOT
+covered by opera.py's existing internal 180s-per-window read watchdog
+(commit e2333db from an earlier session). Manual kill-and-restart worked
+both times but isn't a fix; it requires a human to notice.
+
+Real fix: restructured into desert_tile_worker.py (does one tile's cube-
+build + detect) invoked by desert_sweep_v2.py via subprocess.run(timeout=
+4h) per tile. A hang anywhere inside the worker — regardless of which
+internal code path is stuck — now gets hard-killed by the OS-level
+subprocess timeout, logged, and the tile is left uncached for automatic
+retry on the next launch. No internal library fix required; the external
+timeout is unconditional.
+
+Progress preserved through both incidents: 9/65 tiles completed with real
+results (up to 44 KB anomaly data per tile) before the v2 fix; the stuck
+10th tile resumed correctly under v2 with zero lost work.
