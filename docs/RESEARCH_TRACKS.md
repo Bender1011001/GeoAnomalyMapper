@@ -612,3 +612,24 @@ Selected from NAIP 1-m before any regression output exists:
   mid-stack and construction-era pixels decorrelate, control evaluation
   uses only reference segments starting >= 2022-01-01 (~170 epochs).
   Farmland negative is evaluated on the same segments.
+
+### TDA x aniso ranked triage: backlog CLOSED, 12/12 top candidates are confounders (2026-07-21)
+
+The pre-registered ranking deployment ran to completion: all 111 TDA flat
+candidates scored (aniso center-minus-annulus excess +0.05..+0.89 dB — the
+subtle regime, exactly as the validated feature should behave), combined
+rank = mean(h1 rank, aniso rank), S2 chip per candidate. Human review of
+the top 12 by combined rank: **12/12 explained** — incised meander loops
+(x2, the predicted "Delta lesson" class), mountain/badland contour loops
+(x6, incl. the h1=52 m top-persistence entry = a dissected massif), modern
+farm compounds (x1, the highest-aniso entry +0.89 dB = its buildings), and
+known-catalog margins (x3 at 0.5-0.7 km from catalog sites). Zero new
+ring-form candidates.
+
+This clears the 111-candidate backlog with a NULL and re-confirms the
+2026-07-16 verdict with the full pipeline: at 30 m DEM the TDA-H1 channel
+cannot do autonomous discovery — the flat-gate (roughness < 8 m) still
+passes badlands and meander spurs. The aniso feature behaved correctly
+(it up-ranked the one real structure cluster); the pool it ranked was
+terrain. Autonomous ring discovery still waits on 10-12 m elevation
+(TanDEM-X or CORONA stereo). Candidates and chips remain LOCAL.
