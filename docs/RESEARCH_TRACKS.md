@@ -929,3 +929,21 @@ Design when run: film-to-film local correlation (same modality — unlike
 the 6 failed cross-modal attempts), Chuera mound parallax must be
 recovered within 30% of prediction as the gate, THEN measure ring 32
 platform. If the gate fails, the method dies without touching the ring.
+
+### Pre-registration: closure-phase archaeology stretch test (2026-07-21)
+
+Question: do FLAT catalogued tell sites carry elevated |closure phase|
+(moisture/dielectric heterogeneity from buried architecture) vs matched
+steppe controls? Uses the VALIDATED Track-2 closure tool in a new
+application. Registered before any job is submitted:
+- AOI: the dense-Khabur hunt-8/10/13 box (36.50-36.75 N, 40.55-40.95 E);
+  sites = the SAME 141 flat unoccupied catalog sites and 141 matched
+  controls already frozen for the RTC hunts (no re-sampling).
+- Data: one Sentinel-1 track, spring window (Mar-Jul 2023, moisture
+  contrast season), sequential 12-day pairs + skip pairs -> triplets.
+  HyP3 INSAR_GAMMA, job name gam_closure_arch (~17 jobs, free quota).
+- Metric: per-site mean |closure| (scene-median referenced, 3x3 window)
+  across all triplets; rank AUC sites-vs-controls.
+- Bar (same as all channels): AUC >= 0.60 = PASS -> new detection channel
+  for buried architecture. AUC < 0.60 = NULL, recorded, no retry beyond
+  the standard N=3 iteration rule.
