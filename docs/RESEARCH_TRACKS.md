@@ -803,3 +803,31 @@ What the three iterations established, for the record:
 Kill counter honored: three pre-registered iterations, controls frozen
 throughout, one change each. Hunt 11 closes as a clean negative with a
 quantified floor — the most useful kind of dead end.
+
+### CORONA verdicts for rings 25/28/32 — ring 32 PROMOTED (2026-07-21)
+
+Same per-target local-registration method as ring 34. Verdicts:
+- **Ring 32 (~36.7N 39.7E rounded; precise LOCAL only): PROMOTED — the
+  best surviving candidate of the whole ring hunt.** 1967 CORONA (2 m):
+  a living village of courtyard houses ON a raised sub-circular platform,
+  central bright mound, a pond/depression at its N edge, dark moisture
+  halo, and hollow ways radiating in all directions (ancient route-hub
+  signature). 2023 S2: village abandoned/leveled; a crisp dark annulus
+  ~350-400 m remains — exactly the TDA-detected DEM ring — with fields
+  encroaching. Three sensors, 56-year baseline, one consistent story:
+  a pre-1967 (probably pre-modern) ringed settlement, not in the
+  Menze-Ur catalog. What CORONA cannot do is date it below "pre-1967";
+  next step is professional follow-up (TanDEM-X 12 m DEM or field
+  survey) — beyond free-data reach, so the candidate is documented and
+  parked, coordinates local.
+- Ring 25: faint sub-circular tonal patch present in BOTH eras — not
+  modern construction; possibly a plow-degraded low mound or natural
+  ring. Stays weak-open.
+- Ring 28: no optical counterpart in either era (DEM-only anomaly).
+  Inconclusive.
+- Ring 9: off-strip (south of da013 footprint); needs the adjacent frame.
+
+Ring-hunt scoreboard after CORONA vetting: 1 promoted (32), 1 killed as
+modern (34), 1 weak-open (25), 1 inconclusive (28), 1 unchecked (9).
+The 60-year baseline changed the verdict on 2 of 4 checkable candidates —
+the channel earns its place in the standard triage chain.
