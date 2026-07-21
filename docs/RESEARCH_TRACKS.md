@@ -831,3 +831,17 @@ Ring-hunt scoreboard after CORONA vetting: 1 promoted (32), 1 killed as
 modern (34), 1 weak-open (25), 1 inconclusive (28), 1 unchecked (9).
 The 60-year baseline changed the verdict on 2 of 4 checkable candidates —
 the channel earns its place in the standard triage chain.
+
+### Mojave desert-sweep candidate: layover hypothesis REFUTED — lead revived (2026-07-21)
+
+Geometry check at the rank-1 desert candidate (34.5591 -116.7685, Mojave):
+Copernicus DEM slope in the central 360 m window is 0.6 deg mean / 1.0 deg
+max (1.3 km window mean 1.2 deg) — there is no steep radar-facing slope;
+the earlier "suspect layover/DEM artifact" note is withdrawn. Status now:
+a localized ~90 m accelerating bowl (-2.5 cm/yr peak, breakpoint mid-2019
+from -0.5 to -3.6 cm/yr, Mogi depth ~250 m, r2 0.87) on FLAT ground near
+the Troy Lake playa margin, no quarry/buildings/pivots in NAIP. Open
+mundane alternatives: single-well pumping cone; playa-margin evaporite
+dissolution (evaporite beds exist locally). Next: cross-check state well
+records / water levels; keep in the verification queue for when the sweep
+completes. This is currently the best unexplained lead in the desert sweep.
