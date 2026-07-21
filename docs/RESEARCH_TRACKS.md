@@ -845,3 +845,28 @@ mundane alternatives: single-well pumping cone; playa-margin evaporite
 dissolution (evaporite beds exist locally). Next: cross-check state well
 records / water levels; keep in the verification queue for when the sweep
 completes. This is currently the best unexplained lead in the desert sweep.
+
+### Ring 9 located on the adjacent frame — provisional (2026-07-21)
+
+da013's footprint misses ring 9 by ~2.5 km south; the adjacent frame
+ds1102-1025da014 (same pass, next frame south — confirmed by it containing
+the Jebel Abd al-Aziz ridge system) covers it. The ring-9 wadi corridor was
+matched by feature signature (double-bend + long straight track crossing +
+bankside settlement clusters, all present in both 1967 and 2023). At the
+predicted position on the west bank, the 1967 frame shows a settlement
+cluster and a possible ~240 m sub-circular feature — the same
+"pre-1967 feature with settlement context" pattern as ring 32. PROVISIONAL:
+da014 needs its own 2-GCP registration pass (transform constants are
+per-frame) before a firm verdict. Queued.
+
+### Tampa deliverable prepared (2026-07-21)
+
+Top-3 localized-subsidence brief written to
+data/reports/tampa_sinkhole_brief_2026-07.md (LOCAL — data/ is gitignored;
+release is the user's call, intended receivers FGS/SWFWMD/county/FDOT).
+Candidates: 28.44303 -82.42280 (-6.8 cm/yr, accelerating -1.7 cm/yr2,
+pasture + relict sinkhole pond); 28.37163 -82.46685 (-4.2 cm/yr,
+accelerating, ~100 m east of the Suncoast Parkway); 28.35692 -82.50001
+(steady -1.4 cm/yr, wetland — peat-compaction alternative stated). NAIP
+context chips alongside. All stated as UNVERIFIED satellite leads with
+uncertainties and receiver actions listed.
