@@ -870,3 +870,20 @@ accelerating, ~100 m east of the Suncoast Parkway); 28.35692 -82.50001
 (steady -1.4 cm/yr, wetland — peat-compaction alternative stated). NAIP
 context chips alongside. All stated as UNVERIFIED satellite leads with
 uncertainties and receiver actions listed.
+
+### Mojave lead strengthened: well-records check + Ridgecrest timing (2026-07-21)
+
+CA DWR Well Completion Reports queried in a ~2.4 km box around the
+candidate (34.5591 -116.7685): exactly ONE well on record — WCR1982-006581,
+domestic supply, 400 ft, drilled 1982, ~0.95 km SE. No agricultural wells.
+A domestic well cannot produce a localized ~65,000 m3/yr volume-loss bowl;
+the pumping-cone explanation is substantially weakened (caveats: WCR
+coverage is incomplete and section-center registered; the Mojave Basin is
+adjudicated, so watermaster pumping records would be the definitive check).
+
+Separately noted: the candidate's fitted breakpoint is 2019.5. The M6.4/
+M7.1 Ridgecrest earthquakes struck 2019-07-04/05 (= 2019.51), ~120 km NW,
+with strong shaking across the Mojave block. Earthquake-triggered onset of
+localized compaction/dissolution collapse fits the observed rate change
+(-0.5 -> -3.6 cm/yr) exactly in time. Recorded as a suggestive coincidence,
+NOT a conclusion. Lead status: best-in-sweep, unexplained, strengthened.
