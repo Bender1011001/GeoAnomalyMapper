@@ -976,3 +976,28 @@ reproject BOTH batches (frames 466 + 471, 42 products) onto a common
 EPSG:4326 grid and mosaic by nanmean of per-frame |closure| triplets;
 evaluate every frozen site/control the mosaic reaches. Same metric, same
 0.60 bar.
+
+### Closure-arch CORRECTION: iteration 1 RETRACTED, root cause found (2026-07-21)
+
+Two errors found and owned before any verdict stands:
+1. **Iteration 1's separability 0.589 is VOID** — the window-read returns
+   only the raster's covered sliver, but the site-sampling function mapped
+   lat/lon assuming the array spanned the full box: sites were sampled at
+   wrong pixels. The number carried no information about sites. Retracted.
+2. **Iteration 2 (correct geometry, two-frame mosaic): DATA-INSUFFICIENT,
+   no verdict** — true finite coverage is 6% of the box; n_ctrl=2. Root
+   cause diagnosed from product footprints: track 123's eastern swath edge
+   sits at 40.68 E — the AOI (40.55-40.95 E) straddles it. Frame 471
+   covers full lat but only the box's western third; frame 466 only the
+   top sliver. This track can never cover the frozen site set.
+
+Kill-counter accounting, stated plainly: NO valid iteration has been
+consumed (an invalid measurement and an unevaluable one give zero
+information about the hypothesis; treating them as FAILs would be as wrong
+as treating them as passes). N remains 0 of 3. Registered next execution
+(same test, same sites, same bar): submit the 21-pair structure on a track
+whose scene footprint CONTAINS the full box — candidates track 50 (desc)
+or 43 (asc) from the original search — with containment verified from
+scene geometry BEFORE submission. Two execution lessons now in the SOP
+list: (a) verify frame containment, (b) never sample a window-read array
+as if it spanned the request box.
