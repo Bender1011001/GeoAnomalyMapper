@@ -947,3 +947,15 @@ application. Registered before any job is submitted:
 - Bar (same as all channels): AUC >= 0.60 = PASS -> new detection channel
   for buried architecture. AUC < 0.60 = NULL, recorded, no retry beyond
   the standard N=3 iteration rule.
+
+### Closure-arch test: execution note (2026-07-21)
+
+First batch (21 jobs) accidentally used track-123 frame 466, which only
+GRAZES the AOI (65-row sliver; lat span 36.72-38.81 vs box top 36.75) —
+scene search by intersection is not containment; the per-date dedup kept
+the wrong frame. All 141 sites fell outside coverage -> n=0, no verdict
+consumed (the registered test is unaffected; no site data was seen).
+Corrective batch gam_closure_arch2 submitted on frame 471 (lat 35.23-37.26,
+fully contains the box), same 21 pair structure. Chained watcher+analyzer
+running; verdict lands automatically. Lesson recorded: check frame
+CONTAINMENT of the AOI before submitting InSAR batches.
