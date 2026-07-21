@@ -633,3 +633,30 @@ passes badlands and meander spurs. The aniso feature behaved correctly
 (it up-ranked the one real structure cluster); the pool it ranked was
 terrain. Autonomous ring discovery still waits on 10-12 m elevation
 (TanDEM-X or CORONA stereo). Candidates and chips remain LOCAL.
+
+### CORONA human-GCP georeferencing operational + first ring verdict (2026-07-21)
+
+Strip ds1102-1025da013 (Dec 1967) georeferenced by human-in-loop GCPs
+(the operator reading rendered images; no auto-matcher). Method that
+worked: catalog-anchor bootstrap — Tell Chuera identified by its
+1-km multi-summit mound + pond + radial hollow-way star (GCP-1), a
+wadi-side mound cluster confirmed the row axis (GCP-2). Findings:
+- The strip is stored 180-deg ROTATED vs geography: col increases WEST
+  (~2.0 m/col), row increases NORTH (~2.0 m/row). Provisional transform:
+  col = 87560 + (39.4997-lon)/2.24e-5; row = 3040 + (lat-36.6489)/1.8e-5.
+  Accuracy ~200 m near Chuera, degrading to ~300-800 m at 25 km
+  extrapolation (panoramic distortion) — refine locally per target via
+  wadi-bend matching (demonstrated at ring34, ~150 m).
+- 1967-vs-2023 portrait pairs produced for Tell Chuera + rings 25/28/32/34
+  (ring 9 lies ~2.5 km south of the strip footprint — off-image).
+- **Ring 34 verdict (first CORONA-vetted candidate): the crisp ~360 m
+  spoked annulus in 2023 S2 does NOT appear in 1967 CORONA** at a local
+  registration good to ~150 m, under low December sun that would shadow-
+  enhance a real bank. 1967 shows only a compact hamlet + faint pale
+  sub-circle. The annulus is very likely POST-1967 (livestock/agricultural
+  enclosure attached to the now-sprawling, now-abandoned village).
+  Ring 34 demoted: probable modern feature, not archaeology. (Residual
+  check if ever needed: a second CORONA date or KH-7 frame.)
+This is the CORONA channel doing its designed job: a 60-year time
+baseline that discriminates modern earthworks from ancient ones —
+a discriminator no amount of modern-only data can replicate.
