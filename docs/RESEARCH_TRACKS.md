@@ -597,3 +597,18 @@ noise). FAIL: no structure-aligned dh or control < 3 m -> Part A dies and
 ticks the N=3 counter. Purpose if validated: sub-DEM-resolution height
 anomalies from FREE data = mound/structure detection below 30 m DEM
 resolution (the resolution wall, attacked from phase geometry).
+
+### Hunt 11 Part A: controls FROZEN from optical only (2026-07-21)
+
+Selected from NAIP 1-m before any regression output exists:
+- POSITIVE: new fractionator train complex at ~(29.8700, -94.9350), box
+  29.8655..29.8760 N, -94.9420..-94.9265 E. NAIP 2016: bare field (only a
+  staging corner). NAIP 2022: full multi-train plant with tall columns
+  (long shadows). Built 2017-2021 => guaranteed absent from the 2011-2015
+  COP-DEM. Expected dh strongly positive (tens of m at the columns).
+- NEGATIVE: farmland at (29.9250, -94.9450) +-500 m — open fields in both
+  NAIP years. Expected |dh| < ~2 m (DEM noise floor).
+- Amendment (specified now, pre-output): because the plant was built
+  mid-stack and construction-era pixels decorrelate, control evaluation
+  uses only reference segments starting >= 2022-01-01 (~170 epochs).
+  Farmland negative is evaluated on the same segments.
