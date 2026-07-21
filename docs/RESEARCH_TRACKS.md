@@ -573,3 +573,27 @@ capability worked as designed end-to-end: it detected real surface change
 every event without human archaeology review being needed. The Palmyra-west
 2023 window simply contains no unexplained discrete disturbance above the
 validated threshold. Coordinates stay LOCAL per conflict-zone rule.
+
+### Hunt 11 GATE PASSED + Part A registration (2026-07-21)
+
+Gate (metadata): DISP-S1 granules carry corrections/perpendicular_baseline
+as a FULL-RES per-pair layer (7830x9512 float32, verified on F38238).
+B-perp spread across 14 sampled pairs: std 80 m, range -109..+201 m —
+enough regression leverage (est. per-pixel height-error floor ~2 m at 434
+epochs, ~5 mm epoch noise, R*sin(theta)~550 km).
+
+**Part A registered BEFORE any displacement-vs-baseline regression is run:**
+Data: Mont Belvieu cube already on disk (434 epochs, 400x400 px) + per-epoch
+window-mean B-perp fetched from the granules' baseline layer only.
+Model: within each single-reference segment, per-pixel OLS
+d_k = a + v*t_k + c*B_k; height error dh = c * R*sin(theta) (theta from
+granule metadata if present, else 37 deg documented fallback).
+Positive control: >=1 structure built AFTER 2015 (post-COP-DEM) at the Mont
+Belvieu NGL complex, identified from S2 imagery BEFORE any regression
+output is viewed. Negative control: flat farmland pixels.
+PASS bar: post-2015 structure shows |dh| >= 3 m at >= 3 sigma vs farmland
+AND the |dh| map is structure-aligned (visibly tracks buildings/tanks, not
+noise). FAIL: no structure-aligned dh or control < 3 m -> Part A dies and
+ticks the N=3 counter. Purpose if validated: sub-DEM-resolution height
+anomalies from FREE data = mound/structure detection below 30 m DEM
+resolution (the resolution wall, attacked from phase geometry).
