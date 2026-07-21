@@ -685,3 +685,23 @@ preserving the plant signal. Same segments, same controls, same bar
 (3 m at 3 sigma vs farmland + structure alignment). Ceiling note recorded
 in advance: even a pass at sigma~1-3 m leaves 3-5 m tells marginal — this
 hunt's archaeological payoff requires the floor to land under ~2 m.
+
+### Hunt 11 iteration 2: FAIL (N=2 of 3) — but the failure is the control, not the physics (2026-07-21)
+
+The registered high-pass did its job: per-segment median |dh| fell from
+7-23 m to 1.3-3.0 m (atmosphere removed, as predicted). New numbers:
+FARM +8.01 +- 5.89 m, PLANT p95 15.5 m / max 35.1 m, 0% over the 3-sigma
+bar (17.7 m). FAIL as registered. Diagnosis: DISP-S1 only retains
+COHERENT pixels — in "farmland" those are the farm BUILDINGS, so the
+negative control measures real structure heights (+8 m ~ barns), and the
+plant's 35 m max ~ fractionator columns. Both controls are height-bearing;
+the null was ill-posed. This is consistent with the estimator actually
+RECOVERING heights — but per SOP the iteration fails against its bar.
+
+Iteration 3 (FINAL) registered before any new run, ONE change: negative
+control redefined as ROAD pixels — OSM motorway/trunk/primary/secondary
+polylines inside the cube box, rasterized with a 1-px buffer. Pavement is
+flat (true dh ~ 0), coherent, and selected geometrically from OSM, not
+from any regression output. Same segments, same estimator (iter-2
+high-pass), same bar: plant p95 >= 3 m at >= 3 sigma vs road-pixel std
+AND structure alignment. If it fails, Hunt 11 dies at N=3.
