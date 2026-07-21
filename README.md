@@ -44,6 +44,9 @@ deformation_intel/
 tools/insar_prototype/   HyP3 short-pair stacks — the complementary channel
                          for FAST deformation that OPERA's quality masking
                          deletes (proven necessary at Wink)
+archaeo_intel/           archaeology surface-proxy channel: DEM prominence
+                         ranking -> VLM triage -> human review, plus the
+                         CORONA 1960s film module (see below)
 blind_validation.py      methodology-agnostic blind validation harness
                          (frozen candidates, withheld labels, hash-pinned
                          reproducibility) + geoanomaly.py CLI
@@ -69,6 +72,27 @@ visible. **Tutorial: [docs/CORONA.md](docs/CORONA.md).** Credit the
 [CORONA Atlas project](https://corona.cast.uark.edu) (CAST, University of
 Arkansas) when you use the data — and be kind to their bandwidth.
 
+## Archaeology channel and the research program
+
+[`archaeo_intel/`](archaeo_intel/README.md) applies the same
+validated-detector discipline to landscape archaeology: DEM-prominence
+ranking plus VLM triage, measured against a 14,324-site ground-truth catalog
+(Menze & Ur 2012, Upper Khabur). The measured free-data ceiling is honest and
+published in that README (best single feature AUC 0.639, fusion ceiling
+~0.62): free data *ranks* candidates for human review; it does not discover
+sites autonomously. Candidate coordinates in conflict zones are never
+published (public artifacts round to ~11 km).
+
+Since 2026-07-15 a pre-registered research program
+([docs/RESEARCH_TRACKS.md](docs/RESEARCH_TRACKS.md), governed by
+[docs/DISCOVERY_SOP.md](docs/DISCOVERY_SOP.md)) has mined signal that
+standard pipelines discard. Validated so far: a closure-phase disturbance
+detector with a ~6-week early-warning lead, SAR asc/desc anisotropy as the
+best single archaeology ranking feature (replicated), TDA persistence as a
+ring-form feature, and CORONA human-GCP georeferencing. Dead ends are
+recorded with the same care as wins — see the status summary at the top of
+that file.
+
 ## Validated results
 
 - **Wink, TX (natural ground truth)** — the documented actively-subsiding
@@ -84,7 +108,8 @@ Arkansas) when you use the data — and be kind to their bandwidth.
   detections), rather than misreporting it as void collapse.
 
 Records of these experiments (including the failed-approach control runs) are in
-`docs/experiment_records/`.
+`docs/experiment_records/`; see [docs/README.md](docs/README.md) for the full
+documentation index.
 
 ## Quickstart
 

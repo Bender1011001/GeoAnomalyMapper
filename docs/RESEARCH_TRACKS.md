@@ -5,6 +5,78 @@ from the SAME archives by processing signal that standard pipelines discard or
 never look at. Every track is pre-registered (hypothesis, test, numeric pass,
 kill criterion) per docs/DISCOVERY_SOP.md before its first result is seen.
 
+## Program status summary (maintained; last updated 2026-07-21)
+
+Everything below this section is an append-only chronological ledger. This
+section is the current state, so a reader does not have to replay it.
+
+**Validated new capabilities (from data we already held):**
+
+- **Closure-phase disturbance detector (Track 2) — PASS.** Onset flagged at
+  the documented Eldorado site-work date with zero pre-onset flags, and a
+  ~6-week early-warning lead over the validated coherence channel
+  (dielectric/moisture disturbance precedes scatterer destruction).
+- **Asc/desc backscatter anisotropy (Hunt 10) — PASS, replicated.** AUC 0.639
+  (n=141) + 0.608 on an independent AOI ~90 km away — the best single
+  free-data archaeology feature measured to date. Validated as a RANKING
+  feature only: the autonomous z>4 peak sweep returned 12/12 confounders
+  (it is a structure detector — buildings, ruins, pylons, cliffs — not a
+  tell detector).
+- **TDA H1 persistence (Track 3) — PASS as a ring-sensitivity feature.**
+  Tell Chuera anchor + 3/5 ring candidates above control p90. NOT autonomous
+  at 30 m DEM: the 111-candidate flat backlog triaged to NULL (12/12 top
+  combined-rank candidates were terrain or modern).
+- **Coherence-drop transient detector (Cap 1) — validated, envelope-bounded.**
+  6-8 sigma on the bare-desert control; only valid on non-vegetating terrain,
+  and the rule now carries the >30%-same-date scene-event veto.
+- **CORONA human-GCP georeferencing — operational.** ~200 m near anchors,
+  refinable to ~150 m locally; first vetted use demoted ring 34 (annulus
+  absent in 1967 = probable modern enclosure).
+
+**Closed negatives (quantified, honestly dead):**
+
+- **Track 1 (ICA) — RETIRED.** Qualitatively demonstrated at Wink (19.6x sink
+  enrichment, clean atmosphere separation) but both registered external-truth
+  tests were voided by mis-sited positive controls; not re-rolled per
+  anti-p-hacking discipline.
+- **Hunt 11 (B-perp sub-pixel altimeter) — KILLED at N=3.** The height signal
+  is real (plant excess ~3x the road-pixel floor, correct magnitudes) but the
+  achievable floor is ~3 m and DISP-S1's coherence masking deletes exactly
+  the pixels of interest — the 3-5 m archaeological regime is out of reach
+  on this data.
+- **Hunts 8/13 — NULL** (kurtosis 0.518, VH/VV intercept 0.541). **Hunt 12 —
+  rejected** (Capability-2 kill-switch precedent). **Hunts 7/14 — parked**
+  (collinearity; no night Landsat).
+- **Auto-georeferencing of CORONA film — classed a research problem** after
+  six attempts with six distinct documented failure modes; the operational
+  path is human GCPs (~10 min/strip, shipped in archaeo_intel/corona.py).
+- **Step-event catalog — NULL** on creep terrain (Wink); needs
+  abrupt-failure terrain.
+- **Cap-1 blind sweep #1 (Palmyra-west 2023) — clean NULL.** Post-veto, every
+  event auto-explained (rain scene event, harvest, phenology); zero
+  unexplained disturbances in the window.
+
+**In flight:**
+
+- **Bare-desert OPERA displacement sweep** — 39/65 tiles complete as of
+  2026-07-21, drivers running (desert_sweep_v2.py / v2b.py, subprocess-per-
+  tile with 4 h hard timeout); per-tile results + window caches in
+  data/research/desert_sweep/; triage via desert_triage.py.
+
+**Queued:** Hunt 9 (moisture-lag, steppe sites, reuses RTC stacks);
+closure-phase archaeology stretch test + early-warning fold-in alongside the
+coherence channel; anisotropy into the combined-ML ensemble (current ceiling
+AUC 0.616); Cap-1 clean paths (hyper-arid re-point, or seasonal-baseline
+rule on OPERA); CORONA stereo DEMs (bench, unregistered).
+
+**Provenance note (2026-07-21):** the per-experiment scripts named in ledger
+entries (cap1_*, track1/2/3_*, hunt*, aniso_*, desert_sweep*, tda_*,
+sweep1_*, corona/GCP scripts) were written in a session scratchpad under
+Temp; all 149 are preserved verbatim in `data/research/scripts/`
+(gitignored, local-only). They are experiment records, not maintained
+package code. Anything promoted into the public repo must first be vetted
+for precise candidate coordinates per the redaction rule.
+
 ## Track 1 — Blind source separation (spatial ICA) of OPERA displacement cubes
 
 Standard practice (ours included) collapses the ~270-epoch cube into
