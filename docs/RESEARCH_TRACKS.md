@@ -553,3 +553,23 @@ rank). This is a RANKING deployment of a validated weak feature (AUC
 0.61-0.64), not a detection test: no pass/fail bar, no discovery claims.
 Deliverable = re-ranked triage queue + S2 chips for human review, chips
 reviewed in combined-rank order. Candidates remain LOCAL-only (Syria).
+
+### Cap-1 sweep #1 CLOSED: post-veto re-analysis, all events explained (2026-07-21)
+
+The pre-registered scene-event veto (registered 2026-07-18, before this
+re-run) applied to the cached sweep-1 stack: the 2023-06-29 date held 412
+of 611 flagged pixels (67% > 30% bar) -> vetoed as the known rain event.
+Post-veto: 4 events. Auto-explain (S2 before/after):
+
+- Three clusters, one story: ~8 ha of valley-bottom FIELDS at ~34.865N
+  38.457E, onset 2023-04-30, green in late March -> cut/plowed by June 1.
+  Harvest — the Syrian wheat/barley window. Agriculture, mundane.
+- One weak event (9 px, depth 0.15, onset 2023-07-11): steppe drainage
+  shrub patches green in March, dried by June. Phenology, mundane.
+
+**Sweep #1 final verdict: clean NULL — zero unexplained candidates.** The
+capability worked as designed end-to-end: it detected real surface change
+(rain, harvest, dry-down) and the veto + auto-explain pipeline attributed
+every event without human archaeology review being needed. The Palmyra-west
+2023 window simply contains no unexplained discrete disturbance above the
+validated threshold. Coordinates stay LOCAL per conflict-zone rule.
