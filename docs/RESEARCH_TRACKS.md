@@ -705,3 +705,29 @@ flat (true dh ~ 0), coherent, and selected geometrically from OSM, not
 from any regression output. Same segments, same estimator (iter-2
 high-pass), same bar: plant p95 >= 3 m at >= 3 sigma vs road-pixel std
 AND structure alignment. If it fails, Hunt 11 dies at N=3.
+
+### Hunt 11 KILLED at N=3 (2026-07-21) — signal real, floor too high
+
+Iteration 3 (road-pixel negative, registered above): ROAD control behaves
+as a true null — mean +0.54 m, std 2.91 m, n=558 (the estimator is
+unbiased on flat coherent ground). PLANT: p95 8.27 m, max 27.61 m
+(~fractionator column heights), but 3-sigma = 8.72 m and only 1% of plant
+pixels clear it. FAIL against the registered bar; per the N=3 kill switch
+Hunt 11 is DEAD.
+
+What the three iterations established, for the record:
+1. The B-perp height-error signal EXISTS in free DISP-S1 products and the
+   per-pixel OLS recovers it (plant excess ~3x the road floor, correct
+   sign, magnitudes matching real structure heights).
+2. The achievable per-pixel floor with ~105 post-2022 epochs is ~3 m
+   (after the high-pass that removes atmosphere), and DISP-S1's coherence
+   masking leaves few valid pixels on exactly the structures of interest.
+3. For archaeology (3-5 m mounds, often in seasonally decorrelating
+   fields) the floor and the pixel-retention pattern are both wrong —
+   the channel cannot reach its target regime on this data. A future
+   revisit would need full-archive segments (2016+, ~3x epochs) or
+   CSLC-level phase, i.e. a different experiment, separately registered.
+
+Kill counter honored: three pre-registered iterations, controls frozen
+throughout, one change each. Hunt 11 closes as a clean negative with a
+quantified floor — the most useful kind of dead end.
