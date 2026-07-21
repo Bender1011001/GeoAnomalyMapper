@@ -959,3 +959,20 @@ Corrective batch gam_closure_arch2 submitted on frame 471 (lat 35.23-37.26,
 fully contains the box), same 21 pair structure. Chained watcher+analyzer
 running; verdict lands automatically. Lesson recorded: check frame
 CONTAINMENT of the AOI before submitting InSAR batches.
+
+### Closure-arch iteration 1: FAIL 0.589 (partial coverage), iteration 2 registered (2026-07-21)
+
+Frame-471 batch: 21/21 jobs, 10 triplets, but the product rasters cover
+only ~11 km of the box E-W -> 31/141 sites sampled. Separability 0.589
+(below 0.60 bar) = FAIL, N=1 of 3. Notable and recorded before iteration
+2: the polarity is REVERSED from the naive hypothesis — sites show LOWER
+|closure| than controls (0.0452 vs 0.0547 rad median), consistent with
+compacted anthropic sediment retaining less moisture than steppe soil.
+The separability metric is polarity-agnostic (same standard as the RTC
+hunts), so no hypothesis change is needed or made.
+
+Iteration 2 registered NOW, ONE change (coverage fix, not tuning):
+reproject BOTH batches (frames 466 + 471, 42 products) onto a common
+EPSG:4326 grid and mosaic by nanmean of per-frame |closure| triplets;
+evaluate every frozen site/control the mosaic reaches. Same metric, same
+0.60 bar.
