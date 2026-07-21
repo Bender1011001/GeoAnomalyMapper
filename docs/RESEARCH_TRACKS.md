@@ -887,3 +887,27 @@ with strong shaking across the Mojave block. Earthquake-triggered onset of
 localized compaction/dissolution collapse fits the observed rate change
 (-0.5 -> -3.6 cm/yr) exactly in time. Recorded as a suggestive coincidence,
 NOT a conclusion. Lead status: best-in-sweep, unexplained, strengthened.
+
+### Ring 9 first-look verdict + campaign wrap (2026-07-21)
+
+Ring 9 zoom pair via single-anchor local registration on da014 (~300-400 m
+residual, quantified by the wadi offset between panes): 2023 S2 shows a
+clear ~350-400 m sub-circular enclosure with darker rim on the wadi's west
+bank. 1967 CORONA shows bankside settlement/ruin clusters and a FAINT pale
+sub-circular zone at the corresponding position — no crisp bank visible,
+but also no sharp modern enclosure (the ring-34 modern-kill pattern does
+NOT apply; the modern feature reads degraded, not new-built). Verdict:
+**weak-positive, open** — one rung below ring 32. Firming it up requires a
+proper 2-GCP registration pass on da014. Queued.
+
+**Ring campaign final scoreboard (5 DEM-detected candidates through the
+60-yr CORONA baseline): ring 32 PROMOTED (strongest — 1967 village on
+ringed platform, radial hollow ways); ring 9 weak-positive; ring 25
+weak-open; ring 28 inconclusive; ring 34 KILLED (modern).** One promotion,
+one kill, three opens from five — the baseline changed or sharpened the
+verdict on every candidate it could see.
+
+Also this session: Tampa brief finalized with FGS incident-database
+cross-check (0 reported incidents within 1.1 km of any of the 3
+candidates — all new signals); Mojave lead strengthened (1 domestic well
+in 2.4 km box; breakpoint 2019.5 = Ridgecrest timing).
