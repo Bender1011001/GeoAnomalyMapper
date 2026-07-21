@@ -911,3 +911,21 @@ Also this session: Tampa brief finalized with FGS incident-database
 cross-check (0 reported incidents within 1.1 km of any of the 3
 candidates — all new signals); Mojave lead strengthened (1 domestic well
 in 2.4 km box; breakpoint 2019.5 = Ridgecrest timing).
+
+### CORONA stereo experiment: queued with feasibility math (2026-07-21)
+
+Forward camera confirmed held: 1102-1025df/, 36 frames. Frame-to-frame
+correspondence with the aft camera is NOT trivial (df012/df013 probed at
+the da col bands show different ground — along-track and scan-start
+offsets differ; df012 cols 83-93k contains a bright serrated ridge system
+absent from da013). Frame localization should proceed via whole-strip
+quicklooks (factor 64) before any zoom probing.
+
+Feasibility (recorded before the experiment): KH-4B fore/aft convergence
+~30 deg -> height = parallax x ~1.87 at 2 m GSD. Tell Chuera's ~18 m
+mound = ~5 px parallax (clean positive control); ring 32's bank at 1-2 m
+= <1 px (below floor); ring 32's PLATFORM registers only if >= ~4-5 m.
+Design when run: film-to-film local correlation (same modality — unlike
+the 6 failed cross-modal attempts), Chuera mound parallax must be
+recovered within 30% of prediction as the gate, THEN measure ring 32
+platform. If the gate fails, the method dies without touching the ring.
