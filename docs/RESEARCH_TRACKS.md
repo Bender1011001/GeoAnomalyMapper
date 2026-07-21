@@ -540,3 +540,16 @@ for OSM-dark regions (found real settlements, ruins and infrastructure that
 OSM lacks). That capability could serve humanitarian mapping (e.g. HOT-
 style unmapped-settlement detection) — publishable as a tool WITHOUT
 publishing any conflict-zone coordinates.
+
+### Pre-registration: aniso as ranking feature on the 111 TDA flat candidates (2026-07-21)
+
+Registered BEFORE any anisotropy value is computed at these locations.
+Feature: per candidate, mean |mean_VV_asc - mean_VV_desc| dB inside r<500 m
+MINUS the same in a 750-1250 m annulus (background-subtracted so values are
+comparable across tiles; the validated form was absolute-within-tile, this
+is the cross-tile adaptation). Stacks: MPC RTC 2020-2023, <=10 scenes per
+orbit. Combined rank = mean of (h1max_m descending rank, aniso descending
+rank). This is a RANKING deployment of a validated weak feature (AUC
+0.61-0.64), not a detection test: no pass/fail bar, no discovery claims.
+Deliverable = re-ranked triage queue + S2 chips for human review, chips
+reviewed in combined-rank order. Candidates remain LOCAL-only (Syria).
