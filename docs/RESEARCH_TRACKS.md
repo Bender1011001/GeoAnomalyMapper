@@ -660,3 +660,28 @@ wadi-side mound cluster confirmed the row axis (GCP-2). Findings:
 This is the CORONA channel doing its designed job: a 60-year time
 baseline that discriminates modern earthworks from ancient ones —
 a discriminator no amount of modern-only data can replicate.
+
+### Hunt 11 Part A iteration 1: FAIL (2026-07-21) — N=1 of 3
+
+Ran exactly as registered (7 post-2022 segments, 105 epochs, per-pixel OLS
+d=a+v*t+c*B, dh=c*R*sin37). Results: FARM negative control mean +0.36 m
+(unbiased) but std 10.97 m — the noise floor is ~11 m, not the ~2 m
+back-of-envelope (only 105 usable epochs after the registered post-2022
+restriction, and per-epoch atmosphere is 10-15 mm, not 5 mm; the numbers
+reconcile exactly). PLANT positive control: p95 17.0 m, max 35.1 m —
+real excess over farmland (17 vs 11) but 0% of pixels clear the 3-sigma
+(33 m) bar, and the dh map is speckle, not structure-shaped. Additional
+finding: the 80%-completeness mask leaves only ~250 valid pixels per
+control box (DISP-S1 masks low-coherence epochs) — the naive estimator is
+also data-starved. **FAIL on both registered criteria. Hunt-11 kill
+counter: 1 of 3.**
+
+Iteration 2 registered NOW, before any new run, ONE change: spatially
+HIGH-PASS each epoch's displacement field before the regression (subtract
+a 500-m Gaussian blur, sigma ~17 px at 30 m). Physical basis: DEM-error
+signal lives at structure scale (pixels-100s m); atmospheric delay lives
+at km scale — high-pass should cut the farmland floor several-fold while
+preserving the plant signal. Same segments, same controls, same bar
+(3 m at 3 sigma vs farmland + structure alignment). Ceiling note recorded
+in advance: even a pass at sigma~1-3 m leaves 3-5 m tells marginal — this
+hunt's archaeological payoff requires the floor to land under ~2 m.
