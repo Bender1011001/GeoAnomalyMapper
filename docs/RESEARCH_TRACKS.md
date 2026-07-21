@@ -497,3 +497,46 @@ timeout is unconditional.
 Progress preserved through both incidents: 9/65 tiles completed with real
 results (up to 44 KB anomaly data per tile) before the v2 fix; the stuck
 10th tile resumed correctly under v2 with zero lost work.
+
+### Hunt-10 wide sweep: COMPLETE, triaged, verdict NULL for archaeology (2026-07-21)
+
+The 80-tile Jazira anisotropy sweep finished: 228 z>4 peaks, 193 >=1.5 km
+from any Menze-Ur catalog site. Full SOP auto-explain triage over all 228:
+
+- **107 MODERN** — OSM settlement/building/industrial/dam/tower within 1 km.
+- **12 SLOPE** — mean Copernicus-DEM slope > 5 deg in a 1-km window.
+- **6 UNKNOWN** — API failures.
+- **103 nominal survivors** — but OSM coverage in rural Syria/Iraq is thin,
+  so "no OSM features" is weak evidence there.
+
+Chain analysis (RANSAC collinearity, >=4 points within 0.6 km of a line):
+27 chains over all 228 peaks. **Null-tested** (20 scrambled fields, both
+uniform and marginal-preserving): random fields give 20-23 chains and up to
+7-point chains — so only the two chains with >=8 members (10 and 8 points,
+spans 80/43 km) exceed chance; they are engineered corridors (the r1c0/r2c0
+fan matches the Tabqa-dam transmission grid). Most 4-6-point "chains" are
+chance-compatible; the chain kill is a deprioritizer, not proof. After
+chains + pair-clusters: 36 isolated survivors.
+
+Optical review (Sentinel-2, 2 km chips) of the top 12 isolated survivors:
+**12/12 explained.** 7 unmapped modern settlements/farm compounds, 2-3
+ruined or destroyed villages (Sinjar district — conflict damage; these
+coordinates stay LOCAL, never published), 2 canyon-rim layover (the 1-km
+MEAN slope check dilutes cliff walls — future triage should use p90 local
+slope), 1 isolated small object on a straight desert lineament (pipeline
+valve-station signature). **Zero plausible archaeological candidates.**
+
+**Channel verdict, stated plainly:** a z>4 anisotropy PEAK sweep is a
+structure detector, not an archaeology detector. The validated tell signal
+is a subtle 1-3 dB distributional shift (AUC 0.61-0.64 — weak, ranking-
+grade); the sweep's 5-27 dB peaks are buildings, ruins, pylons and cliffs.
+Physics said this in advance; the optical review confirmed it 12/12.
+Correct future use of the validated feature: as a RANKING FEATURE scored at
+candidate locations from the prominence channel (like TDA-H1), never as an
+autonomous peak sweep.
+
+Salvage worth recording: the sweep IS a working unmapped-structure detector
+for OSM-dark regions (found real settlements, ruins and infrastructure that
+OSM lacks). That capability could serve humanitarian mapping (e.g. HOT-
+style unmapped-settlement detection) — publishable as a tool WITHOUT
+publishing any conflict-zone coordinates.
