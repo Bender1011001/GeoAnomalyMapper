@@ -1030,3 +1030,22 @@ replication box (41.30-41.80 E, 36.55-36.90 N, ~90 km away), same recipe
 Mar-Jul season, 21-pair triplet structure, frozen flat-site/control
 sampling seed 11), same 0.60 bar. PASS -> validated dual-AOI channel;
 FAIL -> stays a single-AOI curiosity, N counter starts.
+
+### Closure-phase archaeology REPLICATES: 0.603 on the independent AOI (2026-07-21)
+
+The registered replication ran immediately: track 50 frame 471 turns out
+to CONTAIN both boxes, so the finished products covered AOI-2 directly
+(independence lives in the sites — 733 flat catalog sites + 733 matched
+controls, 90 km from AOI-1 — not in the interferograms; the 21 duplicate
+gam_closure_rep jobs submitted before realizing this are redundant and
+void). Result: **separability 0.603, over the 0.60 bar, same polarity
+(sites 0.0912 vs controls 0.0688 rad), 100% coverage, n=733/733.**
+
+Channel status: **dual-AOI validated, ranking-grade** — 0.619 and 0.603,
+both thin. Stated ceiling context: every validated free-data channel on
+this ground truth lands in 0.55-0.64 (prominence 0.547, texture 0.595,
+combined-ML 0.616, thermal 0.622, aniso 0.639/0.608, closure 0.619/0.603)
+— a consistent family ceiling around ~0.6. Closure joins the ensemble as
+a ranking feature; next natural step is folding it into the combined-ML
+harness to test whether the ensemble finally beats 0.64. No autonomous
+detection claims; mechanism (subsurface moisture) remains inferred.
