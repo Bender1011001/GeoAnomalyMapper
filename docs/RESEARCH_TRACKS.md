@@ -1062,3 +1062,23 @@ specify (and afford) full stacks. If ensemble work continues, the next
 legitimate step is a PRE-REGISTERED cross-validated weighted combination
 on full-depth stacks — n=141 with thin signals makes unregistered weight
 fitting an overfitting machine, so it is not attempted casually.
+
+### Stereo prep: fore/aft frame pairing unresolved after systematic probing (2026-07-22)
+
+Findings recorded for the next session: (1) FGDC/NITF metadata positions
+carry DIFFERENT biases per camera (da013 metadata center is ~0.11 deg
+north of its empirically verified ground; df007 metadata says 36.7N but
+shows Tigris-style canyon country; df012 metadata says 36.1N but shows a
+major E-W ridge). Metadata cannot pair the cameras. (2) Probe log — df007:
+big meandering canyon river (Tigris?); df011: E-W serrated ridge with
+tell-dotted steppe NW + a DISTINCTIVE pentagon-walled compound (band cols
+84-92k, upper right); df012: E-W ridge (Abd al-Aziz or Sinjar); df013:
+cloudy steppe; df014: dissected wadi country with dark pond. The two
+ridge frames are Abd al-Aziz vs Sinjar in some order — resolving WHICH
+pins the whole df sequence (0.13 deg per frame step).
+NEXT-SESSION RECIPE (no more roulette): S2-verify df011's pentagon
+compound against both ridge hypotheses (one chip each at the ridge-relative
+predicted spot); one match anchors df011 absolutely; da013's twin then
+follows by frame arithmetic; then the Chuera parallax gate runs.
+Also noted: ensemble increment 1 closed NO-GAIN (see entry above); desert
+sweep 54/65 at this writing.
