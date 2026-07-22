@@ -1001,3 +1001,32 @@ or 43 (asc) from the original search — with containment verified from
 scene geometry BEFORE submission. Two execution lessons now in the SOP
 list: (a) verify frame containment, (b) never sample a window-read array
 as if it spanned the request box.
+
+### Closure-phase archaeology: PASS 0.619 on first valid iteration (2026-07-21)
+
+Track 50 frame 471 (verified to CONTAIN the box): 21/21 jobs, 10 triplets,
+**coverage 100%, n=141 sites vs n=141 controls — separability 0.619,
+clears the pre-registered 0.60 bar with zero tuning.** Sites show HIGHER
+mean |closure| than steppe controls (0.0595 vs 0.0505 rad) — the original
+hypothesis direction (moisture heterogeneity over archaeological sediment).
+The earlier reversed-polarity hint from the invalid partial batch did not
+survive valid geometry.
+
+Calibration, stated before anyone overclaims: 0.619 is a THIN pass —
+ranking-grade, same family as anisotropy (0.61-0.64) and thermal (0.622).
+It is a population-level statistical signal, NOT a site detector. And the
+mechanism is INFERRED (subsurface-moisture heterogeneity), not proven —
+a surface-texture correlate cannot be excluded from this test alone.
+
+What makes it notable anyway: closure phase is a signal every standard
+InSAR pipeline discards as error, and it carries archaeological site
+information on free data. We are not aware of prior use of closure phase
+for archaeology (not claimed as fact — as absence-of-known-precedent).
+
+REPLICATION REGISTERED NOW, before any wider deployment (the rule learned
+from the aniso sequencing error): independent second AOI = the aniso
+replication box (41.30-41.80 E, 36.55-36.90 N, ~90 km away), same recipe
+(one containing track/frame — containment verified BEFORE submission —
+Mar-Jul season, 21-pair triplet structure, frozen flat-site/control
+sampling seed 11), same 0.60 bar. PASS -> validated dual-AOI channel;
+FAIL -> stays a single-AOI curiosity, N counter starts.
