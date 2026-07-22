@@ -1049,3 +1049,16 @@ combined-ML 0.616, thermal 0.622, aniso 0.639/0.608, closure 0.619/0.603)
 a ranking feature; next natural step is folding it into the combined-ML
 harness to test whether the ensemble finally beats 0.64. No autonomous
 detection claims; mechanism (subsurface moisture) remains inferred.
+
+### Ensemble increment 1: NO GAIN from naive rank-mean (2026-07-22)
+
+closure+aniso rank-mean on the AOI-1 frozen sites: 0.598 — BELOW the best
+in-test single channel (closure 0.619, which reproduced exactly). The
+weaker channel drags the unweighted mean down; no ensemble benefit from
+naive combination. Secondary finding worth its own line: aniso re-measured
+on the SAME box at 16 scenes/orbit gives 0.578 vs 0.639 at 24 scenes —
+the anisotropy channel is sensitive to stack depth; any use of it must
+specify (and afford) full stacks. If ensemble work continues, the next
+legitimate step is a PRE-REGISTERED cross-validated weighted combination
+on full-depth stacks — n=141 with thin signals makes unregistered weight
+fitting an overfitting machine, so it is not attempted casually.
