@@ -1180,3 +1180,26 @@ localized bowl in the North-America sweep, with evaporite-margin
 dissolution (Troy Lake playa) the leading natural hypothesis. The
 remaining definitive checks are HUMAN-GATED: MWA watermaster pumping
 records, or field GPR/microgravity. Logged as a LEAD, not a discovery.
+
+### Ring 9 firming attempt: 2023 detection UPGRADED, 1967 registration still blocked (2026-07-22)
+
+Attempted to firm ring 9 (weak-positive) via a local da014 registration.
+Two results:
+1. **2023 detection UPGRADED weak->distinct.** A tight 400 m Sentinel-2
+   crop centered on ring 9 shows a clear, well-defined ~380 m circular
+   enclosure with a darker rim, immediately west of the meandering wadi at
+   a track crossing — NOT the "faint sub-circular patch" of the first look.
+   Ring 9 is a real, distinct circular feature on modern imagery,
+   regardless of the 1967 comparison.
+2. **1967 co-registration still blocked by local frame rotation.** The
+   CORONA da014 wadi near ring 9 runs ~E-W while the same wadi runs ~N-S in
+   S2 — i.e. the local rotation of the tilted panoramic frame here is not
+   captured by the global 180-deg model. Re-centering the CORONA window on
+   the shared wadi crossing improved the match but did not resolve the
+   rotation, so the 1967 presence/absence of the enclosure cannot yet be
+   called at the needed ~150 m precision.
+Verdict: ring 9 stays OPEN, but with a firmer 2023 anchor. Firming the
+1967 side needs the full per-frame tilt+rotation model (the documented
+da014 multi-anchor task) — same tedious geometry as the stereo pairing,
+deprioritized for the same reason (marginal payoff vs effort; ring 32
+remains the lead candidate). Honest boundary, logged.
