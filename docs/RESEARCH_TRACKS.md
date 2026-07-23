@@ -1270,3 +1270,30 @@ Final real-data table (veto = "agricultural pumping bowl, not a void"):
 All correct. 45/45 package tests incl. grid + parallel-lineation + terrain-
 block regressions. Commits 765cfe0 -> e46f96a -> afe3610. The Mojave lead's
 ag=0.00 (barren) is now a triple-checked, reproducible number.
+
+### Desert survivors re-screened with the validated detector: value proven + a self-correction (2026-07-22)
+
+Applied the now-validated imagery agriculture detector + DEM-slope rule to
+the 20 desert-sweep survivors that had only ever seen the OSM-only pass
+(the tool that missed Gila Bend). Closes the loop: gap -> fix -> apply.
+
+Result (data/research/desert_survivors_rescreened.json):
+- **9/20 newly confirmed as agriculture that OSM MISSED** (imagery ag>=0.4,
+  flat): the Sonoran/Gila Bend bowl (ag 1.0), several Salton/Coachella
+  fields, one Great Basin. Real payoff — the detector catches on live
+  candidates exactly the confounds OSM's absent farmland tags let through.
+- **HONEST SELF-CORRECTION:** the earlier claim "all 20 explained as
+  agriculture/geothermal" was too strong. The 9 Carson Sink (GreatBasin
+  39.6-39.7N, -118.4/-118.6) survivors score ag~0.0 — they are flat and
+  genuinely NON-agricultural. Their dismissal rests on CONTEXT, not
+  cultivation: a tight ~15 km cluster of 9 low-velocity (-1.3 to -2.5 cm/yr)
+  bowls in the Carson Sink closed basin, 8-20 km from the Stillwater/Soda
+  Lake geothermal fields = a regional geothermal/groundwater process (a
+  cluster is not 9 independent voids). Stated as contextual, not point-proven.
+- 2 Salton points (ag 0.26-0.27) remain ambiguous in the geothermal/ag belt.
+
+Why the Mojave lead still stands apart from the Carson Sink cluster: it is
+ISOLATED (not clustered), higher velocity (accelerating to -3.6 cm/yr), on
+an evaporite playa margin, and NOT near any geothermal field — so no
+regional process explains it, unlike Carson Sink. It remains the single
+genuinely-unexplained bowl of the sweep.
