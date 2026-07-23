@@ -194,13 +194,15 @@ def slope_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
 
 
 def is_cultivated_confound(agriculture: float, slope_deg: float,
-                           slope_max: float = 3.0) -> bool:
+                           slope_max: float = 5.0) -> bool:
     """Decision rule for 'this subsidence is agricultural pumping, not a void'.
     Requires BOTH a high imagery agriculture score AND flat terrain, because
     the straight-line agriculture detector also fires on steep parallel
     mountain lineations (real-data validation 2026-07-22: barren Mojave
     Preserve / Cabeza Prieta mountains scored high on lines but are excluded
-    here by slope)."""
+    here by slope). slope_max=5 deg (matches the pipeline's own slope filter)
+    admits gently-sloping irrigated alluvial fans, e.g. Coachella at 3.8 deg,
+    while still excluding genuine mountains (>~19 deg after the grid gate)."""
     if not np.isfinite(agriculture):
         return False
     if agriculture < AGRICULTURE_THRESHOLD:

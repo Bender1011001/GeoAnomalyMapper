@@ -134,9 +134,11 @@ def test_cultivated_confound_requires_flat_and_high_ag():
     from deformation_intel.context import is_cultivated_confound
     # flat + cultivated -> agricultural pumping bowl (veto as void)
     assert is_cultivated_confound(0.9, 0.6) is True
-    # cultivated-looking but STEEP -> mountain lineations, NOT agriculture
-    # (the Mojave Preserve / Cabeza Prieta real-data failure mode)
-    assert is_cultivated_confound(1.0, 12.0) is False
+    # gently-sloping irrigated fan (Coachella 3.8 deg) is still agriculture
+    assert is_cultivated_confound(1.0, 3.8) is True
+    # cultivated-looking but genuinely STEEP -> mountain lineations, NOT
+    # agriculture (the Cabeza Prieta 19-deg real-data failure mode)
+    assert is_cultivated_confound(1.0, 19.0) is False
     # flat but low agriculture score -> genuine bare ground (e.g. Mojave lead)
     assert is_cultivated_confound(0.07, 0.6) is False
     # unknown slope must NOT veto on agriculture alone (mountain risk)
