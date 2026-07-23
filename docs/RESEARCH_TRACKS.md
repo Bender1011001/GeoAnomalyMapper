@@ -1297,3 +1297,17 @@ ISOLATED (not clustered), higher velocity (accelerating to -3.6 cm/yr), on
 an evaporite playa margin, and NOT near any geothermal field — so no
 regional process explains it, unlike Carson Sink. It remains the single
 genuinely-unexplained bowl of the sweep.
+
+### Closure-phase method promoted to a tested repo module (2026-07-22)
+
+The program's most novel validated result — closure phase (the signal every
+InSAR pipeline discards) separating tell sites from steppe, AUC 0.619 and
+replicated 0.603 — existed only as gitignored scratchpad scripts. Now a
+first-class capability: archaeo_intel/closure.py with the pure core
+(triplet_closure = phi_12+phi_23-phi_13 scene-referenced; closure_magnitude_
+stack; separability rank-AUC). 7 synthetic unit tests (a consistent triplet
+closes to ~0, an injected disturbance raises |closure|, scene-offset removal,
+site separability) PLUS a real-data check: the module REPRODUCES the
+validated 0.619 exactly (n=141/141) on the saved track-50 stat. 25/25 archaeo
+tests green. Commit befd4f5. The crown result is now reusable and verified,
+not a throwaway script.
