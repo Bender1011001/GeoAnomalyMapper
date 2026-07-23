@@ -1082,3 +1082,24 @@ predicted spot); one match anchors df011 absolutely; da013's twin then
 follows by frame arithmetic; then the Chuera parallax gate runs.
 Also noted: ensemble increment 1 closed NO-GAIN (see entry above); desert
 sweep 54/65 at this writing.
+
+### Stereo prep: FRAME-TILT discovered — the root cause of all pairing failures (2026-07-22)
+
+Decisive observation: df009 shows the Khabur/Kawkab country (36.55 N) at
+its east end and the Abd al-Aziz north flank (~36.45 N) at mid-strip —
+one 14-km-tall frame spanning both is impossible unless the frame's
+footprint is TILTED, drifting tens of km in latitude across its 215-km
+length (consistent with the ~10-deg rotation the inflated FGDC bboxes
+implied). Consequence: "frame = latitude band" arithmetic is invalid for
+BOTH cameras; every one of the 15 failed pairing probes assumed it. Even
+da013's validated transform is a LOCAL fit (cols 76-93k) — extrapolation
+to strip ends will drift.
+
+Fix (recorded for the next stereo session): build a per-frame tilted-line
+model lat(col) from 2-3 anchors SPREAD ALONG each frame (west/mid/east),
+harvested from the existing factor-32 montages (dfm_007..012 on disk).
+With tilt models for df007-df009, Chuera's frame+col follows analytically.
+No more single-point probes. Probe log extended this session: df008
+62-70k = tell checkerboard plains; df009 62-70k = rolling steppe; df009
+44-62k = Abd al-Aziz north fan; frame-edge zooms negative for Chuera;
+df008 68.5-73.5k = walled village on wadi (not Chuera).
