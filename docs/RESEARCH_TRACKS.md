@@ -1155,3 +1155,28 @@ flat, unfarmed, one distant 1982 domestic well, onset at Ridgecrest 2019.5,
 on an evaporite playa margin. Definitive next check remains Mojave Basin
 watermaster pumping/water-level records (Mojave Water Agency adjudication;
 human-gated data portal). This is a LEAD, not a discovery.
+
+### Mojave lead: groundwater check hits a monitoring gap (2026-07-22)
+
+Attempted the definitive water-level check. Findings:
+- NO groundwater monitoring well within 5.6 km of the anomaly (queried
+  USGS NWIS: 95 GW sites in a 0.24-deg box, nearest 5.6 km, and those
+  nearest ones have no post-2015 readings).
+- Nearest well with a recent multi-year record is 7.2 km away
+  (343152116502501, 2004-2025, n=20) — but it sits on the FARMED basin
+  floor near Newberry Springs, a different hydrologic setting from the
+  unfarmed mountain-front bajada where the anomaly is. Not diagnostic.
+- The legacy NWIS gwlevels time-series API was DECOMMISSIONED (Fall 2025);
+  values now require the new USGS OGC API (schema not yet resolved here)
+  or the Mojave Water Agency watermaster annual reports (PDF, human-gated).
+
+Honest status: free automated verification of the Mojave lead is EXHAUSTED.
+It has now passed every falsification test available at zero cost —
+terrain/layover (flat 0.6 deg), agriculture (barren in 5.5 km NAIP, unlike
+all 20 sweep survivors), well proximity (one 1982 domestic well, no
+irrigation wells), and it sits in a monitoring gap so no water-level series
+can confirm pumping. It remains the single best unexplained accelerating
+localized bowl in the North-America sweep, with evaporite-margin
+dissolution (Troy Lake playa) the leading natural hypothesis. The
+remaining definitive checks are HUMAN-GATED: MWA watermaster pumping
+records, or field GPR/microgravity. Logged as a LEAD, not a discovery.
