@@ -1103,3 +1103,37 @@ No more single-point probes. Probe log extended this session: df008
 62-70k = tell checkerboard plains; df009 62-70k = rolling steppe; df009
 44-62k = Abd al-Aziz north fan; frame-edge zooms negative for Chuera;
 df008 68.5-73.5k = walled village on wadi (not Chuera).
+
+### Bare-desert OPERA sweep: COMPLETE, honest verdict = NO new void, pipeline validated (2026-07-22)
+
+65-tile North-America desert sweep finished (Mojave/GreatBasin/Sonoran/
+PermianSalt/SaltonLucerne). Raw: 6,379 deduped anomalies, 743 classified
+accelerating_subsidence. Strict localized-void filter (is_localized +
+accelerating + rate_reliable + |regional_correlation|<0.30 + area<0.10km2
++ void_likelihood>=0.9) -> 20 survivors after OSM/slope auto-explain.
+
+Cluster + wider-context check demolished all 20 as known processes:
+- **GreatBasin (~11 survivors, 39.3-39.7N -118.4/-118.6):** the Carson
+  Sink / Fallon closed basin — 8.5 km from Stillwater geothermal, and the
+  classic USGS groundwater-subsidence province (Newlands irrigation).
+  Eleven "decoupled localized bowls" = individual pump/geothermal cones.
+- **SaltonLucerne (~7):** Imperial-Coachella geothermal+ag belt; loudest
+  survivor (-7.7 cm/yr, 33.27/-115.60) has 2 geothermal + 1 gas plant
+  within 15 km.
+- **Sonoran (1, 33.00/-113.30):** looked cleanest (OSM=0, isolated) but
+  NAIP shows it sits on the rim of a center-pivot irrigation complex near
+  Gila Bend AZ. Agricultural drawdown. (Lesson: OSM farmland tags are
+  ABSENT for AZ desert agriculture -> the auto-explain MUST include an
+  imagery/center-pivot stage, not OSM alone. Filed as an SOP fix.)
+
+**Verdict: zero new void discoveries.** The sweep is a POSITIVE validation
+that the pipeline correctly lights up real subsidence provinces, and an
+honest NEGATIVE on void discovery: at 30 m free data the detector cannot
+separate a pumping/geothermal bowl from a collapse void inside an active
+groundwater basin (each pump makes its own decoupled local cone, defeating
+the regional_correlation filter). The single best remaining lead is
+unchanged and stands apart precisely because it has NO such explanation:
+the earlier Mojave bowl 34.5591/-116.7685 (flat, one distant domestic well,
+onset at Ridgecrest 2019.5, isolated from any ag/geothermal). Everything
+survives as data (data/research/desert_survivors.json); coordinates are US
+public land, no redaction.
