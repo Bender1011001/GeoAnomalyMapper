@@ -1243,3 +1243,30 @@ package tests green.
 Bonus for the Mojave lead: it now carries a REPRODUCIBLE agriculture score
 of 0.00 (vs the confounds' 0.73), replacing "barren by eyeball" with a
 measured number — one more falsification test it passes cleanly.
+
+### Agriculture confound detector: 10-point real validation -> two fixes -> clean (2026-07-22)
+
+Extended the real-data validation from 2 to 10 sites (the 2-point set was
+insufficient - same lesson as always). It exposed 2 false positives on
+barren MOUNTAIN/FAN terrain whose parallel lineations the straight-line
+detector counted as fields. Two principled fixes, each real-data validated:
+
+1. GRID gate in field_regularity_score: agriculture is two perpendicular
+   line families; parallel fan/drainage lineations have perp_fraction ~0
+   and are demoted. Fixed the flat alluvial-fan case (Mojave Preserve
+   1.00 -> 0.18) that DEM slope could NOT catch (its slope is only 1.1 deg).
+2. slope_sampler + is_cultivated_confound(ag, slope): the void-veto requires
+   high agriculture AND flat terrain, since genuinely steep mountains
+   (Cabeza Prieta 19 deg) still produce crossing lineations. DEM slope is the
+   right flat-vs-mountain discriminator; NAIP texture is not.
+
+Final real-data table (veto = "agricultural pumping bowl, not a void"):
+  Mojave LEAD    ag 0.00  slope 1.2   -> NO veto (barren)      OK
+  Dixie Valley   ag 0.13  (flat)      -> NO veto (barren)      OK
+  Mojave Preserve ag 0.18 slope 1.1   -> NO veto (fan, gridfix) OK
+  Cabeza Prieta  ag 0.53  slope 19    -> NO veto (mtn, slopefix)OK
+  Gila Bend      ag 0.73  slope 0.5   -> VETO (irrigation)     OK
+  Imperial/Yuma/Central Valley/Coachella  ag 1.00 (flat) -> VETO  OK
+All correct. 45/45 package tests incl. grid + parallel-lineation + terrain-
+block regressions. Commits 765cfe0 -> e46f96a -> afe3610. The Mojave lead's
+ag=0.00 (barren) is now a triple-checked, reproducible number.
