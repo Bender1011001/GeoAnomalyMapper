@@ -1137,3 +1137,21 @@ the earlier Mojave bowl 34.5591/-116.7685 (flat, one distant domestic well,
 onset at Ridgecrest 2019.5, isolated from any ag/geothermal). Everything
 survives as data (data/research/desert_survivors.json); coordinates are US
 public land, no redaction.
+
+### Mojave lead survives the falsification test that killed the rest (2026-07-22)
+
+Applied the SAME imagery-based agriculture check that busted the Gila Bend
+"survivor" to the project's best lead (34.5591/-116.7685), holding it to
+the identical standard: 5.5 km NAIP mosaic (2022). Result — barren desert
+bajada at the foot of the Newberry Mtns; NO center-pivot ag, NO fields, NO
+cultivation, NO quarry anywhere in view. Unlike every one of the 20 sweep
+survivors, this point has no agricultural/geothermal explanation. New
+observation: a bright evaporite/playa flat sits ~150 m SW of the anomaly
+centroid (Troy Lake margin) — supports the playa-margin EVAPORITE
+DISSOLUTION hypothesis (a genuine natural void-forming process) over both
+the pumping artifact and pure collapse. Status: the one genuinely
+unexplained accelerating localized bowl in the entire NA desert sweep;
+flat, unfarmed, one distant 1982 domestic well, onset at Ridgecrest 2019.5,
+on an evaporite playa margin. Definitive next check remains Mojave Basin
+watermaster pumping/water-level records (Mojave Water Agency adjudication;
+human-gated data portal). This is a LEAD, not a discovery.
