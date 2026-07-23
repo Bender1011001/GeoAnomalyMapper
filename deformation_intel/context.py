@@ -45,11 +45,14 @@ def _norm(gray: np.ndarray) -> np.ndarray:
 
 
 def center_pivot_score(gray: np.ndarray, px_per_m: float = 0.1) -> float:
-    """Detect center-pivot irrigation circles. Returns [0,1] (Hough peak).
+    """EXPERIMENTAL — Hough-circle response for center-pivot irrigation.
 
-    px_per_m: pixels per metre of the input chip (default 0.1 = 10 m/px).
-    Pivots are ~400-800 m diameter -> 200-400 m radius. Score is the strongest
-    Hough-circle accumulator peak in that radius band; >~0.3 indicates a pivot.
+    Returns [0,1]. NOT reliable on real NAIP at <~5 m/px and NOT part of
+    agriculture_score: real-data validation (2026-07-22) showed it scores
+    barren mountain terrain (arc-like ridges -> false circles) HIGHER than
+    actual pivot fields (whose crop patterns fragment the circle edge). Kept
+    for high-resolution / synthetic use; use field_regularity_score for real
+    imagery. px_per_m: pixels per metre (default 0.1 = 10 m/px).
     """
     from skimage.feature import canny
     from skimage.transform import hough_circle, hough_circle_peaks
@@ -71,30 +74,39 @@ def center_pivot_score(gray: np.ndarray, px_per_m: float = 0.1) -> float:
 
 
 def field_regularity_score(gray: np.ndarray) -> float:
-    """Detect cultivated fields by block-tone contrast. Returns [0,1].
+    """Detect cultivated land by counting long straight edges. Returns [0,1].
 
-    Irrigated fields form large blocks of extreme tone (dark wet/vegetated
-    or bright bare) that survive field-scale blurring; natural desert blurs
-    to a near-uniform mid-tone. Score = fraction of the blurred image whose
-    tone is far from the median. Robust to high-frequency desert texture
-    (which averages out) and to irregular wash edges (thin, small area)."""
-    from scipy.ndimage import uniform_filter
+    This is the primary, real-data-validated agriculture signal. Cultivated
+    land — gridded fields AND center-pivot complexes (which carry access
+    roads, canal lines and rectangular remnant plots) — produces many long
+    STRAIGHT boundaries. Natural desert is curved/fractal (washes meander,
+    ridges arc) and yields few straight lines, even where terrain has strong
+    tonal contrast. Validated 2026-07-22 on real NAIP: barren Mojave bajada
+    = 2 lines, Gila Bend irrigation = 16 lines (block-tone contrast, tried
+    first, FAILED here — it fired on mountains/playa; straight-line count
+    does not)."""
+    from skimage.feature import canny
+    from skimage.transform import probabilistic_hough_line
 
     g = _norm(gray)
     if g.shape[0] < 40 or g.shape[1] < 40:
         return 0.0
-    k = max(int(0.06 * min(g.shape)), 3)     # ~field-scale smoothing window
-    blur = uniform_filter(g, size=k)
-    med = np.median(blur)
-    extreme = np.abs(blur - med) > 0.22      # clearly dark/bright blocks
-    frac = extreme.mean()
-    return float(np.clip(frac / 0.20, 0, 1))  # ~20% extreme area -> score 1
+    edges = canny(g, sigma=2.0)
+    minlen = int(0.12 * min(g.shape))
+    lines = probabilistic_hough_line(edges, threshold=10, line_length=minlen,
+                                     line_gap=3)
+    # Floor of 5 discards the handful of chance-straight segments that even
+    # natural texture yields; /15 puts the threshold (0.4 -> 11 lines) inside
+    # the real-data gap (barren Mojave 2 lines, Gila Bend irrigation 16).
+    return float(np.clip((len(lines) - 5) / 15.0, 0, 1))
 
 
 def agriculture_score(gray: np.ndarray, px_per_m: float = 0.1) -> float:
-    """Combined imagery agriculture score [0,1] = max(pivot, field)."""
-    return max(center_pivot_score(gray, px_per_m),
-               field_regularity_score(gray))
+    """Imagery agriculture score [0,1]. Uses the real-data-validated
+    straight-line field detector (field_regularity_score). The Hough-circle
+    center_pivot_score is intentionally NOT combined in: it is unreliable on
+    real NAIP (see its docstring). px_per_m kept for signature compatibility."""
+    return field_regularity_score(gray)
 
 
 def naip_agriculture_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
