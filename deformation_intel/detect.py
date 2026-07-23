@@ -94,8 +94,12 @@ def detect_anomalies(
     samplers()`` — it adds 'osm_infra' AND an imagery 'naip_agriculture' check.
     The imagery check exists because OSM landuse tags are routinely absent for
     desert agriculture: a Gila-Bend candidate once passed an OSM-only screen but
-    sat on a center-pivot irrigation complex. Treat naip_agriculture >=
-    context.AGRICULTURE_THRESHOLD as "cultivated -> pumping bowl, not a void".
+    sat on a center-pivot irrigation complex. Decide with
+    ``context.is_cultivated_confound(a.context['naip_agriculture'],
+    a.context['slope_deg'])`` — it requires a high agriculture score AND flat
+    terrain, because the line-based agriculture detector also fires on steep
+    parallel mountain lineations (real-data validation, 2026-07-22).
+    make_default_samplers supplies both 'naip_agriculture' and 'slope_deg'.
     """
     disp = np.asarray(cube["cube"], dtype=np.float64)
     t = np.asarray(cube["t"], dtype=np.float64)

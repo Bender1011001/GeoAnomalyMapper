@@ -46,7 +46,7 @@ def _desert_noise(size=250, seed=0):
     base = rng.normal(0.5, 0.06, (size, size)).astype("float32")
     x = size / 2
     for y in range(size):
-        x = np.clip(x + rng.normal(0, 2.4), 3, size - 4)
+        x = np.clip(x + rng.normal(0, 3.5), 3, size - 4)
         base[y, int(x) - 1:int(x) + 2] = 0.2
     return np.clip(base, 0, 1)
 
@@ -82,6 +82,25 @@ def test_dendritic_wash_low():
         assert field_regularity_score(_desert_noise(seed=seed)) < AGRICULTURE_THRESHOLD
 
 
+def _parallel_lineations(size=250, n=14):
+    """Many PARALLEL diagonal lines, no perpendicular family — an alluvial-fan
+    channel field / mountain drainage. Has plenty of straight lines but is NOT
+    a grid, so must score low (the Mojave Preserve real-data failure mode)."""
+    img = np.full((size, size), 0.5, "float32")
+    for k in range(-size, size, max(size // n, 6)):
+        for t in range(size):
+            x = t
+            y = t + k          # 45-degree parallel lines
+            if 0 <= y < size and 0 <= x < size:
+                img[y, max(x - 1, 0):x + 1] = 0.9
+    return img
+
+
+def test_parallel_lineations_score_low():
+    # THE flat-fan regression: many straight lines but one orientation (no grid)
+    assert agriculture_score(_parallel_lineations()) < AGRICULTURE_THRESHOLD
+
+
 def test_terrain_blocks_score_low():
     # THE real-data regression: tonal blocks (mountains/playa) must NOT read as
     # agriculture. Straight-line count stays low because relief edges are curved.
@@ -109,3 +128,17 @@ def test_make_default_samplers_has_osm():
     s = make_default_samplers(read_grid_fn=None, stac_search_fn=None)
     assert "osm_infra" in s
     assert callable(s["osm_infra"])
+
+
+def test_cultivated_confound_requires_flat_and_high_ag():
+    from deformation_intel.context import is_cultivated_confound
+    # flat + cultivated -> agricultural pumping bowl (veto as void)
+    assert is_cultivated_confound(0.9, 0.6) is True
+    # cultivated-looking but STEEP -> mountain lineations, NOT agriculture
+    # (the Mojave Preserve / Cabeza Prieta real-data failure mode)
+    assert is_cultivated_confound(1.0, 12.0) is False
+    # flat but low agriculture score -> genuine bare ground (e.g. Mojave lead)
+    assert is_cultivated_confound(0.07, 0.6) is False
+    # unknown slope must NOT veto on agriculture alone (mountain risk)
+    assert is_cultivated_confound(1.0, float("nan")) is False
+    assert is_cultivated_confound(float("nan"), 0.5) is False

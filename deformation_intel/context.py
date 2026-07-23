@@ -9,12 +9,25 @@ routinely absent for desert agriculture, so a settlement/void screen that
 trusts OSM alone will mis-promote irrigation bowls.
 
 This module adds an IMAGERY-based agriculture check to complement OSM:
-- `center_pivot_score(gray)`  : pure, network-free circle detector (Hough).
-- `field_regularity_score(gray)`: pure straight-field-edge detector.
-- `agriculture_score(gray)`   : max of the two -> [0,1].
+- `field_regularity_score(gray)`: straight-field-edge count (primary, real-
+  data validated). `center_pivot_score` (Hough circles) is EXPERIMENTAL only.
+- `agriculture_score(gray)`   : imagery cultivation score -> [0,1].
 - `naip_agriculture_sampler`  : fetches a NAIP chip and scores it.
+- `slope_sampler`             : Copernicus-DEM mean slope (deg).
 - `osm_infrastructure_sampler`: Overpass count of mines/wells/plants/farmland.
+- `is_cultivated_confound(ag, slope)`: the DECISION rule.
 - `make_default_samplers`     : dict ready for detect_anomalies(context_samplers=...).
+
+IMPORTANT limitation (real-data validation, 2026-07-22): the straight-line
+agriculture detector also fires on steep PARALLEL MOUNTAIN LINEATIONS
+(drainage gullies / ridges). Two barren mountain sites (Mojave Preserve,
+Cabeza Prieta) scored as cultivated on lines alone. Agriculture is flat, so
+the correct confound test pairs a high agriculture score with LOW terrain
+slope from the DEM (image texture cannot tell fields from mountains; slope
+can). Use `is_cultivated_confound(agriculture, slope_deg)`, not the
+agriculture score by itself. Validated separation on FLAT sites:
+barren Mojave 0.07 / Dixie Valley 0.13 vs irrigation Gila Bend / Imperial /
+Yuma / Central Valley / Coachella all 1.00.
 
 The pure scorers are unit-tested on synthetic imagery (no network).
 """
@@ -95,10 +108,26 @@ def field_regularity_score(gray: np.ndarray) -> float:
     minlen = int(0.12 * min(g.shape))
     lines = probabilistic_hough_line(edges, threshold=10, line_length=minlen,
                                      line_gap=3)
+    n = len(lines)
     # Floor of 5 discards the handful of chance-straight segments that even
     # natural texture yields; /15 puts the threshold (0.4 -> 11 lines) inside
     # the real-data gap (barren Mojave 2 lines, Gila Bend irrigation 16).
-    return float(np.clip((len(lines) - 5) / 15.0, 0, 1))
+    base = np.clip((n - 5) / 15.0, 0, 1)
+    if base <= 0 or n < 4:
+        return float(base)
+    # GRID gate: cultivated land is a grid (two ~perpendicular line families);
+    # parallel lineations (alluvial-fan channels, mountain drainage) are one
+    # family. Demote parallel-only line fields — they are NOT agriculture even
+    # when flat (real-data: Mojave Preserve fan, 15 lines, 0.0 perpendicular).
+    angs = np.array([np.degrees(np.arctan2(y1 - y0, x1 - x0)) % 180
+                     for (x0, y0), (x1, y1) in lines])
+    hist, edg = np.histogram(angs, bins=18, range=(0, 180))
+    dom = edg[np.argmax(hist)] + 5.0
+    perp = (dom + 90.0) % 180.0
+    d_perp = np.minimum(np.abs(angs - perp), 180 - np.abs(angs - perp))
+    perp_frac = (d_perp < 20).mean()
+    grid_factor = 1.0 if perp_frac >= 0.12 else 0.3
+    return float(np.clip(base * grid_factor, 0, 1))
 
 
 def agriculture_score(gray: np.ndarray, px_per_m: float = 0.1) -> float:
@@ -141,6 +170,45 @@ def naip_agriculture_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
         return agriculture_score(acc, px_per_m=1.0 / m_per_px)
 
     return sampler
+
+
+def slope_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
+                  half_deg: float = 0.006, px: int = 44):
+    """Build a (lat, lon) -> mean terrain slope (degrees) sampler from the
+    Copernicus 30 m DEM. Agriculture is flat; this is the reliable
+    flat-vs-mountain discriminator (NAIP texture is NOT — parallel mountain
+    drainage lineations mimic field edges; see agriculture_score notes).
+    Fails safe (nan)."""
+    def sampler(lat: float, lon: float) -> float:
+        grid = (lon - half_deg, lat - half_deg, lon + half_deg, lat + half_deg)
+        try:
+            f = stac_search_fn("cop-dem-glo-30", list(grid), limit=1)
+            dem = read_grid_fn(f[0]["assets"]["data"]["href"], grid, px, px)
+            d = np.nan_to_num(dem, nan=float(np.nanmedian(dem)))
+            gy, gx = np.gradient(d, 30.0)
+            return float(np.degrees(np.arctan(np.hypot(gx, gy))).mean())
+        except Exception:
+            return float("nan")
+
+    return sampler
+
+
+def is_cultivated_confound(agriculture: float, slope_deg: float,
+                           slope_max: float = 3.0) -> bool:
+    """Decision rule for 'this subsidence is agricultural pumping, not a void'.
+    Requires BOTH a high imagery agriculture score AND flat terrain, because
+    the straight-line agriculture detector also fires on steep parallel
+    mountain lineations (real-data validation 2026-07-22: barren Mojave
+    Preserve / Cabeza Prieta mountains scored high on lines but are excluded
+    here by slope)."""
+    if not np.isfinite(agriculture):
+        return False
+    if agriculture < AGRICULTURE_THRESHOLD:
+        return False
+    # slope unknown -> do not veto on agriculture alone (mountain risk)
+    if not np.isfinite(slope_deg):
+        return False
+    return slope_deg <= slope_max
 
 
 def osm_infrastructure_sampler(radius_m: int = 1500, retries: int = 3):
@@ -191,4 +259,5 @@ def make_default_samplers(read_grid_fn: Optional[Callable] = None,
     if read_grid_fn is not None and stac_search_fn is not None:
         samplers["naip_agriculture"] = naip_agriculture_sampler(read_grid_fn,
                                                                 stac_search_fn)
+        samplers["slope_deg"] = slope_sampler(read_grid_fn, stac_search_fn)
     return samplers
