@@ -87,6 +87,15 @@ def detect_anomalies(
     cube must provide: 'cube' (T,H,W) meters, 't' (decimal yr), 'x','y' (meters,
     projected grid), 'crs_wkt'. Velocity is referenced to the AOI robust median
     so a broad regional signal doesn't swamp local bowls.
+
+    context_samplers: optional {name: (lat, lon) -> float} annotators stored in
+    each Anomaly.context. For confound screening (mines/wells/agriculture that
+    mimic void subsidence), pass ``deformation_intel.context.make_default_
+    samplers()`` — it adds 'osm_infra' AND an imagery 'naip_agriculture' check.
+    The imagery check exists because OSM landuse tags are routinely absent for
+    desert agriculture: a Gila-Bend candidate once passed an OSM-only screen but
+    sat on a center-pivot irrigation complex. Treat naip_agriculture >=
+    context.AGRICULTURE_THRESHOLD as "cultivated -> pumping bowl, not a void".
     """
     disp = np.asarray(cube["cube"], dtype=np.float64)
     t = np.asarray(cube["t"], dtype=np.float64)
