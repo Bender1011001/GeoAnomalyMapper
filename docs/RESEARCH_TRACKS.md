@@ -1311,3 +1311,51 @@ site separability) PLUS a real-data check: the module REPRODUCES the
 validated 0.619 exactly (n=141/141) on the saved track-50 stat. 25/25 archaeo
 tests green. Commit befd4f5. The crown result is now reusable and verified,
 not a throwaway script.
+
+### SELF-CRITIQUE + confidence intervals computed for the first time (2026-07-22)
+
+Adversarial review written to docs/CRITIQUE.md. The most consequential finding
+is statistical: **CIs were never computed for any AUC in this program.**
+Hanley-McNeil 95% CIs, computed now:
+
+  closure AOI-1   0.619 [0.554, 0.684]  n=141
+  closure AOI-2   0.603 [0.574, 0.632]  n=733   <- most robust number we have
+  aniso original  0.639 [0.575, 0.703]  n=141
+  aniso replicate 0.608 [0.544, 0.672]  n=150
+  thermal         0.622 [0.557, 0.687]  n=141
+  combined-ML     0.616 [0.551, 0.681]  n=141
+
+**Every channel excludes chance (CI lower bound > 0.5) — the effects are real.
+NONE is statistically distinguishable from the 0.60 pass bar.** So the
+pass/fail language used throughout this ledger is over-precise: the honest
+statement is "a small but above-chance effect, ~0.60 +- 0.06". A run scoring
+0.58 ("fail") is not statistically different from one scoring 0.62 ("pass").
+This does not retract any result; it retracts the PRECISION of the wording.
+
+Other Tier-1 issues raised against ourselves (detail in CRITIQUE.md):
+- The closure "independent replication" shares track 50/frame 471, season and
+  processing chain with run 1 — it is a SPATIAL replication, not a fully
+  independent one. A different-track/dry-season run is needed to earn the word.
+- **Controls are not covariate-matched.** Tells sit in non-random landscape
+  positions (drainage, soils, routes); random steppe controls differ before any
+  buried architecture is considered. ~0.60 is exactly the magnitude a
+  landscape-position confound would produce. This affects EVERY archaeology
+  channel, and the matched-control re-run is the highest-value free experiment
+  available.
+- Moisture seasonality uncontrolled: both closure runs used the same Mar-Jul
+  window; the dry-season test that would discriminate structural from seasonal
+  causes was never run.
+- No family-wise correction across ~12 tested channels; the 0.616 "ceiling" and
+  the cluster of 0.60+ channels are partly a selection effect.
+
+Tier-2 (candidates): Tampa Mogi depths (478-663 m) contradict Florida
+cover-collapse physics (tens of metres) and must be flagged or removed BEFORE
+the brief is sent; all Mogi fits rest on 8-9 pixels with no uncertainty
+propagated; ring 9/25/28 registration residual (~350 m) equals the feature size;
+ring 32's promotion is unblinded single-analyst reading; "not in Menze-Ur" is
+not "unknown to archaeology" (it was a living village in 1967).
+
+Tier-3 (structural): most analyses live in gitignored scripts and are NOT
+reproducible from the repo (only agriculture + closure are tested modules); no
+false-negative/recall testing anywhere, so the desert sweep's "no voids" has an
+unknown detection limit; all validation is self-administered.
