@@ -1222,3 +1222,24 @@ Every anomaly now carries an imagery agriculture score in its .context, so a
 future sweep auto-demotes irrigation bowls instead of trusting OSM's gaps.
 6 network-free unit tests (synthetic pivot/field/dendritic-wash fixtures);
 full deformation_intel suite 42/42 green. Committed 765cfe0.
+
+### Real-data validation catches (and fixes) the agriculture detector (2026-07-22)
+
+The project's core discipline in action: the first agriculture detector
+(block-tone contrast) passed 6 synthetic unit tests but FAILED on real
+NAIP — it scored the barren Mojave bajada as CULTIVATED (mountains + playa
+= large tonal blocks). Synthetic tests alone were not enough, exactly as
+the whole program insists. Diagnosed the real discriminator by measurement:
+long-straight-edge COUNT separates cleanly (real barren Mojave = 2 lines,
+real Gila Bend irrigation = 16), because natural desert is curved/fractal
+while cultivation is rectilinear. Redesigned field_regularity_score around
+straight-line count; the Hough-circle center_pivot detector was demoted to
+experimental (it scored barren terrain 0.40 vs real pivots 0.27 — actively
+harmful). Re-validated on real chips: **Mojave 0.00 (barren), Gila Bend
+0.73 (cultivated).** Added a terrain-blocks regression test that locks the
+failure out. Commits 765cfe0 (initial) -> e46f96a (real-data fix); 43/43
+package tests green.
+
+Bonus for the Mojave lead: it now carries a REPRODUCIBLE agriculture score
+of 0.00 (vs the confounds' 0.73), replacing "barren by eyeball" with a
+measured number — one more falsification test it passes cleanly.
