@@ -1203,3 +1203,22 @@ Verdict: ring 9 stays OPEN, but with a firmer 2023 anchor. Firming the
 da014 multi-anchor task) — same tedious geometry as the stereo pairing,
 deprioritized for the same reason (marginal payoff vs effort; ring 32
 remains the lead candidate). Honest boundary, logged.
+
+### SOP fix IMPLEMENTED: imagery agriculture check in the pipeline (2026-07-22)
+
+The desert-sweep Gila Bend miss (OSM reported zero farmland; NAIP showed a
+center-pivot complex) is now fixed in code, not just filed. New module
+deformation_intel/context.py provides context_samplers for detect_anomalies:
+- center_pivot_score() — Hough-circle detector for irrigation pivots (the
+  exact morphology OSM missed).
+- field_regularity_score() — block-tone contrast detector for rectangular
+  cultivated fields (robust to desert texture: fields survive field-scale
+  blur, natural texture averages out).
+- agriculture_score() = max of the two; AGRICULTURE_THRESHOLD = 0.4.
+- naip_agriculture_sampler() / osm_infrastructure_sampler() /
+  make_default_samplers() — ready to drop into detect_anomalies(
+  context_samplers=...).
+Every anomaly now carries an imagery agriculture score in its .context, so a
+future sweep auto-demotes irrigation bowls instead of trusting OSM's gaps.
+6 network-free unit tests (synthetic pivot/field/dendritic-wash fixtures);
+full deformation_intel suite 42/42 green. Committed 765cfe0.
