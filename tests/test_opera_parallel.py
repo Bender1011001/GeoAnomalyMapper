@@ -124,3 +124,13 @@ def test_build_aoi_cube_accepts_workers_kwarg():
     sig = inspect.signature(build_aoi_cube)
     assert "workers" in sig.parameters
     assert sig.parameters["workers"].default == 1   # opt-in, no behaviour change
+
+
+def test_build_aoi_cube_accepts_cache_only_kwarg():
+    # cache_only assembles from the prefetch cache and NEVER re-attempts the
+    # network for uncached granules (the wet-region hang fix). Opt-in default.
+    import inspect
+    from deformation_intel.opera import build_aoi_cube
+    sig = inspect.signature(build_aoi_cube)
+    assert "cache_only" in sig.parameters
+    assert sig.parameters["cache_only"].default is False

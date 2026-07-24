@@ -1639,3 +1639,28 @@ moisture; buried-structure vs anthrosol-texture not separated."
 
 Caveat: dry window is sparser (5 triplets vs 10 wet); CI accordingly wide but
 still excludes 0.5.
+
+### Florida sweep: driver bug fixed + honest data finding (2026-07-24)
+
+First real multi-frame wet-region run of the new sweep driver surfaced a bug
+AND a data limit.
+
+BUG (fixed): build_frame_cubes delegated per-tile assembly to build_aoi_cube,
+which re-attempted the NETWORK for every granule the parallel prefetch had
+already found unusable — on a wet frame (~90% coherence-masked) that meant
+~310 failing lazy reads at ~25 s each = a multi-hour per-tile hang. Fix:
+build_aoi_cube(cache_only=True) skips any uncached granule instead of
+re-fetching. Verified: one Florida tile now assembles in 18.4 s (was hours)
+from its 31 cached windows. Opt-in kwarg, tested; 16/16 opera+sweep tests green.
+
+DATA FINDING (honest): Florida "Sinkhole Alley" is largely coverage-limited for
+a blanket sweep. Frame F32240 (Pasco/Hernando interior) yields only ~31 usable
+epochs over ~1.0 yr at 50% pixel coverage — too thin/short for reliable cm/yr
+velocity. This is NOT the same as the Spring Hill frame that produced the Tampa
+candidates (269 epochs, 2016-2025): OPERA DISP-S1 archive DEPTH varies by frame
+(some fully back-processed to 2016, others only recent months), and wet/
+vegetated karst loses coherence. So the "run the whole belt" demo does not work
+uniformly on free data — the good Tampa result came from a good frame, and that
+remains the honest state. The throughput fixes stand; the binding constraint in
+wet regions is coverage/archive depth, not speed (consistent with every prior
+wet-region finding: Cahokia 0%, Mont Belvieu 83% masked).

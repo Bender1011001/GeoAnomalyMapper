@@ -456,6 +456,7 @@ def build_aoi_cube(
     allow_download: bool = True,
     asf_session=None,
     workers: int = 1,
+    cache_only: bool = False,
 ) -> dict:
     """Stream an OPERA DISP-S1 AOI displacement cube via lazy windowed reads.
 
@@ -588,6 +589,14 @@ def build_aoi_cube(
                 result = (z["disp"], z["x"], z["y"], str(z["crs"]))
             except Exception:
                 result = None
+
+        if result is None and cache_only:
+            # pure-cache assembly: a granule not already cached is one the
+            # prefetch found unusable (coherence collapse) — skip it, never
+            # re-attempt the network. Without this a wet-region sweep re-tries
+            # hundreds of failing lazy reads at ~25 s each (Florida hang, fixed).
+            skipped += 1
+            continue
 
         if result is None:
             nc_url = _granule_nc_url(g) if fs is not None else None
@@ -793,7 +802,8 @@ def build_frame_cubes(
             out[key] = build_aoi_cube(
                 lat, lon, half_width_km=half_width_km,
                 coherence_threshold=coherence_threshold, max_epochs=max_epochs,
-                cache_dir=tdir, allow_download=False, progress=False, workers=1)
+                cache_dir=tdir, allow_download=False, progress=False, workers=1,
+                cache_only=True)
         except Exception as exc:
             logger.warning("assemble %s failed: %s", key, type(exc).__name__)
             unassigned.append(key)
