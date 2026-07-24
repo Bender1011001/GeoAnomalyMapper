@@ -1359,3 +1359,45 @@ Tier-3 (structural): most analyses live in gitignored scripts and are NOT
 reproducible from the repo (only agriculture + closure are tested modules); no
 false-negative/recall testing anywhere, so the desert sweep's "no voids" has an
 unknown detection limit; all validation is self-administered.
+
+### PRE-REGISTRATION: covariate-matched controls (CRITIQUE 1.3) — 2026-07-22
+
+Registered BEFORE the matched controls are drawn or any matched AUC is seen.
+This test can INVALIDATE the program's archaeology results; it is registered
+precisely so the answer cannot be negotiated afterwards.
+
+QUESTION: does the closure-phase site-vs-control separability survive when
+controls are matched on landscape position rather than drawn at random?
+Rationale: tells are not randomly sited (drainage, soils, subtle rises, route
+corridors). Random steppe controls differ from tells in those variables before
+any buried architecture is considered, and ~0.60 is exactly the magnitude such
+a confound could produce.
+
+DATA: the ALREADY-COMPUTED AOI-1 closure statistic (closure_arch4_stat.npz,
+track 50 frame 471, 10 triplets, 100% coverage). No new closure data is
+produced, so there is no measurement freedom on the signal side.
+
+COVARIATES (Copernicus GLO-30, one fetch over the AOI):
+  1. elevation (m)
+  2. slope (deg)
+  3. TPI = elevation - gaussian(elevation, sigma ~500 m)  [captures "tells sit
+     on subtle rises", the most obvious positional confound]
+
+MATCHING (fixed, one procedure, no tuning): candidate control pool = 3000
+random points >=0.5 km from ANY catalog site (seed 11, same rule as before).
+Standardize the 3 covariates over sites+pool (z-scores). For each of the 141
+flat sites, take the nearest unused pool point in Euclidean z-space
+(greedy, without replacement). Report mean absolute z-distance achieved.
+
+METRIC: identical separability + Hanley-McNeil 95% CI.
+
+PRE-REGISTERED INTERPRETATION (fixed now):
+  - matched CI lower bound > 0.5  -> effect NOT explained by landscape
+    position; the buried-architecture interpretation is strengthened.
+  - matched CI includes 0.5       -> the original signal was substantially
+    landscape position; the archaeology claim is DOWNGRADED accordingly and
+    the ledger is corrected.
+  - point estimate falls but CI still excludes 0.5 -> partial confound;
+    report the reduced effect size as the honest number.
+One run, one procedure. No re-matching, no covariate swapping after seeing
+the result.
