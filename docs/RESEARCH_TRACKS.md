@@ -1401,3 +1401,36 @@ PRE-REGISTERED INTERPRETATION (fixed now):
     report the reduced effect size as the honest number.
 One run, one procedure. No re-matching, no covariate swapping after seeing
 the result.
+
+### RESULT: covariate-matched controls — the archaeology signal SURVIVES (2026-07-22)
+
+Ran exactly as pre-registered above, on BOTH closure AOIs, one procedure, no tuning.
+
+                    RANDOM controls          MATCHED controls
+  AOI-1 (n=141)   0.619 [0.553,0.684]  ->  0.589 [0.523,0.655]   (-0.030)
+  AOI-2 (n=733)   0.603 [0.574,0.631]  ->  0.614 [0.585,0.642]   (+0.011)
+
+**The confound was REAL but does NOT explain the signal.** Sites genuinely
+occupy different landscape positions than random controls — AOI-1 sites sit
+LOWER than their surroundings (TPI -0.65 vs pool +0.09); AOI-2 sites are on
+slightly steeper, higher-TPI ground (slope 0.69 vs 0.35 deg, TPI +0.29 vs
+-0.07). Matching removed those differences (AOI-1 mean match distance 0.198 z;
+AOI-2 0.539 z). **On both AOIs the matched CI excludes 0.5** -> pre-registered
+verdict SURVIVES on both. The AOI-1 fall and AOI-2 rise are each well within
+one SE, i.e. noise, not signal.
+
+**New best estimate for the closure archaeology channel: 0.614 [0.585, 0.642]
+(AOI-2, matched, n=733)** — the largest sample, the tightest interval, and
+now positionally controlled. This REPLACES 0.619/0.603 as the headline number.
+
+Honest residual caveats:
+- Only THREE covariates were matched (elevation, slope, TPI). Soil unit,
+  distance to water, and land-use history remain unmatched — the positional
+  confound is reduced, not eliminated.
+- AOI-2's matching is looser (0.539 z) because 733 sites compete for a
+  3000-point pool; later matches are worse. A larger pool would tighten it.
+- CRITIQUE 1.1 still stands: at these n the 0.60 "bar" language remains
+  over-precise. Report the interval, not the pass/fail.
+
+CRITIQUE 1.3 is substantially ADDRESSED: the archaeology result is not an
+artifact of where tells sit on the landscape.
