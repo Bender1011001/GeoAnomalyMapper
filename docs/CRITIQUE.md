@@ -11,6 +11,28 @@ what would fix it.
 
 ---
 
+## FIX STATUS (updated 2026-07-22, remediation in progress)
+
+| # | Issue | Status |
+|---|---|---|
+| 1.1 | No confidence intervals | **FIXED** — `auc_ci()` added to `archaeo_intel/closure.py`; `separability()` now returns se/ci_low/ci_high; ledger retro-annotated with all CIs |
+| 1.2 | Replication not fully independent | OPEN — needs a different-track / dry-season run |
+| 1.3 | Controls not covariate-matched | **FIXED & TESTED** — pre-registered matched-control test run on **both** AOIs. Signal **SURVIVES**. New headline **0.614 [0.585, 0.642]** (AOI-2 matched, n=733) |
+| 1.4 | Moisture seasonality uncontrolled | OPEN — dry-season run designed, not yet run |
+| 1.5 | No family-wise correction | OPEN |
+| 2.1 | Tampa depths contradict FL karst physics | **FIXED** — depths **withdrawn** from the brief with an explanation; observables retained |
+| 2.2 | Mogi fits underdetermined at 8–9 px | **FIXED in the brief** (no depth/volume claimed); the detector still reports them internally |
+| 2.3 | Ring registration ≈ feature size | OPEN — rings 9/25/28 remain provisional |
+| 2.4 | Ring 32 unblinded reading | OPEN |
+| 2.5 | "Not in catalog" ≠ unknown | **FIXED** — wording corrected in the write-ups |
+| 2.6 | Mojave filter circularity | OPEN |
+| 3.1 | Most analyses not reproducible from repo | PARTIAL — agriculture + closure are tested modules; others still gitignored |
+| 3.2 | No recall/false-negative testing | OPEN — the highest-value remaining fix |
+| 3.3 | Self-administered validation | OPEN (structural) |
+| 3.4 | Language outruns statistics | **FIXED** — CI language adopted; see 1.1 |
+
+---
+
 ## TIER 1 — Issues that weaken the headline claims
 
 ### 1.1 No confidence intervals were ever computed. The "0.60 bar" is over-precise.

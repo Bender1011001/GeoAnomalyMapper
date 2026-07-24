@@ -102,6 +102,44 @@ def test_separability_recovers_sites():
     assert res["site_median"] > res["control_median"]
 
 
+def test_auc_ci_matches_known_values():
+    from archaeo_intel.closure import auc_ci
+    # the two headline closure results (docs/CRITIQUE.md 1.1)
+    se, lo, hi = auc_ci(0.619, 141, 141)
+    assert abs(se - 0.0332) < 0.002
+    assert lo > 0.5           # genuinely above chance
+    assert lo < 0.60          # but NOT significantly above the 0.60 bar
+    se2, lo2, hi2 = auc_ci(0.603, 733, 733)
+    assert se2 < se           # bigger n -> tighter interval
+    assert lo2 > 0.5 and lo2 < 0.60
+
+
+def test_auc_ci_degenerate_inputs():
+    from archaeo_intel.closure import auc_ci
+    assert all(np.isnan(v) for v in auc_ci(0.6, 0, 10))
+    assert all(np.isnan(v) for v in auc_ci(float("nan"), 10, 10))
+
+
+def test_separability_reports_ci():
+    h, w = 60, 60
+    box = (40.0, 36.0, 40.5, 36.5)
+    stat = np.full((h, w), 0.1, "float32")
+    rng = np.random.default_rng(7)
+    sites, controls = [], []
+    for _ in range(15):
+        r, c = rng.integers(3, h - 3), rng.integers(3, w - 3)
+        stat[r, c] = 0.9
+        sites.append((box[3] - (r + 0.5) / h * (box[3] - box[1]),
+                      box[0] + (c + 0.5) / w * (box[2] - box[0])))
+        r2, c2 = rng.integers(3, h - 3), rng.integers(3, w - 3)
+        controls.append((box[3] - (r2 + 0.5) / h * (box[3] - box[1]),
+                         box[0] + (c2 + 0.5) / w * (box[2] - box[0])))
+    res = separability(stat, box, sites, controls)
+    for k in ("se", "ci_low", "ci_high"):
+        assert k in res
+    assert res["ci_low"] <= res["separability"] <= res["ci_high"]
+
+
 def test_separability_safe_when_empty():
     box = (40.0, 36.0, 40.5, 36.5)
     stat = np.full((10, 10), np.nan, "float32")

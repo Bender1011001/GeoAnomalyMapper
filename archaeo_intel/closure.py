@@ -69,6 +69,25 @@ def closure_magnitude_stack(pairs: Dict[Tuple[str, str], np.ndarray],
         return np.nanmean(stack, axis=0)
 
 
+def auc_ci(auc: float, n_pos: int, n_neg: int,
+           z: float = 1.96) -> Tuple[float, float, float]:
+    """Hanley-McNeil standard error and CI for a rank AUC.
+
+    Returns (se, lo, hi). Reporting an AUC without this is how the project
+    ended up describing 0.619 [0.554, 0.684] as "clears the 0.60 bar" — a
+    point estimate whose interval comfortably includes 0.55. Always report it.
+    """
+    if n_pos <= 0 or n_neg <= 0 or not np.isfinite(auc):
+        return (float("nan"), float("nan"), float("nan"))
+    a = float(auc)
+    q1 = a / (2.0 - a)
+    q2 = 2.0 * a * a / (1.0 + a)
+    var = (a * (1 - a) + (n_pos - 1) * (q1 - a * a)
+           + (n_neg - 1) * (q2 - a * a)) / (n_pos * n_neg)
+    se = float(np.sqrt(max(var, 0.0)))
+    return (se, float(a - z * se), float(a + z * se))
+
+
 def _sample(stat: np.ndarray, box: Tuple[float, float, float, float],
             lat: float, lon: float, rad: int = 2) -> float:
     """Median of `stat` in a (2*rad+1) window at (lat, lon). box = (lon_min,
@@ -86,10 +105,14 @@ def separability(stat: np.ndarray, box: Tuple[float, float, float, float],
                  controls: Sequence[Tuple[float, float]], rad: int = 2) -> dict:
     """Rank-AUC separability of `stat` between sites and controls.
 
-    Returns {'auc': raw site>control AUC, 'separability': max(auc, 1-auc),
-    'n_sites', 'n_controls', 'site_median', 'control_median'}. Separability
-    is polarity-agnostic (as used for the archaeology channels): >=0.60 was
-    the pre-registered validation bar.
+    Returns {'auc', 'separability' (=max(auc,1-auc)), 'se', 'ci_low',
+    'ci_high', 'n_sites', 'n_controls', 'site_median', 'control_median'}.
+    Separability is polarity-agnostic (as used for the archaeology channels);
+    >=0.60 was the pre-registered validation bar.
+
+    ALWAYS read the CI, not just the point estimate: at n~141 the 95% interval
+    on an AUC is about +-0.065, so 0.60-bar pass/fail language is not
+    statistically meaningful at that sample size (see docs/CRITIQUE.md 1.1).
     """
     s = np.array([_sample(stat, box, la, lo, rad) for la, lo in sites])
     c = np.array([_sample(stat, box, la, lo, rad) for la, lo in controls])
@@ -97,12 +120,17 @@ def separability(stat: np.ndarray, box: Tuple[float, float, float, float],
     c = c[np.isfinite(c)]
     if len(s) == 0 or len(c) == 0:
         return {"auc": float("nan"), "separability": float("nan"),
+                "se": float("nan"), "ci_low": float("nan"),
+                "ci_high": float("nan"),
                 "n_sites": int(len(s)), "n_controls": int(len(c)),
                 "site_median": float("nan"), "control_median": float("nan")}
     allv = np.concatenate([s, c])
     rk = allv.argsort().argsort().astype(float)
     auc = (rk[:len(s)].sum() - len(s) * (len(s) - 1) / 2) / (len(s) * len(c))
-    return {"auc": float(auc), "separability": float(max(auc, 1 - auc)),
+    sep = float(max(auc, 1 - auc))
+    se, lo, hi = auc_ci(sep, len(s), len(c))
+    return {"auc": float(auc), "separability": sep,
+            "se": se, "ci_low": lo, "ci_high": hi,
             "n_sites": int(len(s)), "n_controls": int(len(c)),
             "site_median": float(np.median(s)),
             "control_median": float(np.median(c))}
