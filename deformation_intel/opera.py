@@ -197,31 +197,153 @@ def _read_one_window(open_ds, lon, lat, half, coherence_threshold):
 
     ds = open_ds()
     try:
-        crs_wkt = ds["spatial_ref"].attrs["crs_wkt"]
-        tr = Transformer.from_crs("EPSG:4326", crs_wkt, always_xy=True)
-        cx, cy = tr.transform(lon, lat)
-        x = ds["x"].values
-        y = ds["y"].values
-        xs = np.where((x >= cx - half) & (x <= cx + half))[0]
-        ys = np.where((y >= cy - half) & (y <= cy + half))[0]
-        if xs.size == 0 or ys.size == 0:
-            return None
-        ysl = slice(int(ys.min()), int(ys.max()) + 1)
-        xsl = slice(int(xs.min()), int(xs.max()) + 1)
-        disp = ds["displacement"].isel(y=ysl, x=xsl).values.astype(np.float32)
-        coh = ds["temporal_coherence"].isel(y=ysl, x=xsl).values
-        mask = np.isfinite(disp) & np.isfinite(coh) & (coh >= coherence_threshold)
-        if "recommended_mask" in ds.variables:
-            mask &= (ds["recommended_mask"].isel(y=ysl, x=xsl).values > 0)
-        if "water_mask" in ds.variables:
-            mask &= (ds["water_mask"].isel(y=ysl, x=xsl).values > 0)
-        disp = np.where(mask, disp, np.nan)
-        return disp, x[xsl], y[ysl], crs_wkt
+        return _extract_window(ds, lon, lat, half, coherence_threshold)
     finally:
         try:
             ds.close()
         except Exception:
             pass
+
+
+def read_many_aois(open_ds, aois, half, coherence_threshold):
+    """GRANULE-MAJOR read: serve MANY AOIs from ONE granule open.
+
+    aois: {key: (lat, lon)}. Returns {key: (disp, x, y, crs) | None}.
+
+    This is the structural fix for sweep throughput. The tile-major loop
+    re-opened every granule once per tile, paying ~4.5 s of HTTP/HDF5 metadata
+    latency each time; serving N tiles from a single open amortises that cost
+    by ~N. Actual pixel transfer is negligible (0.64 MB per window).
+    """
+    ds = open_ds()
+    out = {}
+    try:
+        for key, (lat, lon) in aois.items():
+            try:
+                out[key] = _extract_window(ds, lon, lat, half,
+                                           coherence_threshold)
+            except Exception:
+                out[key] = None
+        return out
+    finally:
+        try:
+            ds.close()
+        except Exception:
+            pass
+
+
+def window_indices(x, y, cx, cy, half):
+    """Index slices for the AOI window in a granule's projected grid.
+
+    Pure helper (unit-tested): x, y are the granule's 1-D coordinate arrays in
+    projected metres, (cx, cy) the AOI centre in the same CRS, half the
+    half-width in metres. Returns (yslice, xslice) or None if the AOI misses
+    the granule footprint.
+    """
+    import numpy as np
+
+    xs = np.where((x >= cx - half) & (x <= cx + half))[0]
+    ys = np.where((y >= cy - half) & (y <= cy + half))[0]
+    if xs.size == 0 or ys.size == 0:
+        return None
+    return (slice(int(ys.min()), int(ys.max()) + 1),
+            slice(int(xs.min()), int(xs.max()) + 1))
+
+
+def _extract_window(ds, lon, lat, half, coherence_threshold):
+    """Pull one masked AOI window out of an ALREADY-OPEN granule dataset.
+
+    Split out of _read_one_window so a single opened granule can serve MANY
+    AOIs (granule-major sweeps) instead of re-paying the ~4.5 s open cost per
+    tile. Returns (disp, x_sub, y_sub, crs_wkt) or None if the AOI is off-grid.
+    """
+    import numpy as np
+    from pyproj import Transformer
+
+    crs_wkt = ds["spatial_ref"].attrs["crs_wkt"]
+    tr = Transformer.from_crs("EPSG:4326", crs_wkt, always_xy=True)
+    cx, cy = tr.transform(lon, lat)
+    x = ds["x"].values
+    y = ds["y"].values
+    sl = window_indices(x, y, cx, cy, half)
+    if sl is None:
+        return None
+    ysl, xsl = sl
+    disp = ds["displacement"].isel(y=ysl, x=xsl).values.astype(np.float32)
+    coh = ds["temporal_coherence"].isel(y=ysl, x=xsl).values
+    mask = np.isfinite(disp) & np.isfinite(coh) & (coh >= coherence_threshold)
+    if "recommended_mask" in ds.variables:
+        mask &= (ds["recommended_mask"].isel(y=ysl, x=xsl).values > 0)
+    if "water_mask" in ds.variables:
+        mask &= (ds["water_mask"].isel(y=ysl, x=xsl).values > 0)
+    disp = np.where(mask, disp, np.nan)
+    return disp, x[xsl], y[ysl], crs_wkt
+
+
+# ---- process-pool granule reading -------------------------------------------
+# Remote HDF5 reads cost ~4.5 s each and are almost entirely per-request
+# latency, NOT bandwidth (a 400x400 float32 window is 0.64 MB — 17 ms at
+# 300 Mbps). THREADS DO NOT HELP: h5py/HDF5 holds a global lock, measured at
+# only 1.4x on 8 threads. Processes do: 3.5x on 8 workers. Hence a process
+# pool with a one-time auth per worker.
+_WORKER_FS = None
+
+
+def _pool_init():
+    global _WORKER_FS
+    import earthaccess
+    earthaccess.login(strategy="environment")
+    try:
+        _WORKER_FS = earthaccess.get_fsspec_https_session()
+    except Exception:
+        _WORKER_FS = None
+
+
+def _pool_read(task):
+    """(url, lon, lat, half, coh) -> (disp, x, y, crs) | None. Runs in a worker."""
+    url, lon, lat, half, coh = task
+    global _WORKER_FS
+    if _WORKER_FS is None:
+        _pool_init()
+    try:
+        ds = _open_authenticated(url, _WORKER_FS)
+    except Exception:
+        return None
+    try:
+        return _extract_window(ds, lon, lat, half, coh)
+    except Exception:
+        return None
+    finally:
+        try:
+            ds.close()
+        except Exception:
+            pass
+
+
+def read_windows_parallel(urls, lon, lat, half, coherence_threshold,
+                          workers: int = 8, timeout_s: float = 600.0):
+    """Read the same AOI window from many granules using a PROCESS pool.
+
+    Returns a list aligned with `urls`; entries are (disp, x, y, crs) or None.
+    workers<=1 falls back to a serial loop (used by the tests, and safe when
+    the caller is already inside a worker process).
+    """
+    tasks = [(u, lon, lat, half, coherence_threshold) for u in urls]
+    if workers <= 1:
+        return [_pool_read(t) for t in tasks]
+    from concurrent.futures import ProcessPoolExecutor
+    out = [None] * len(tasks)
+    with ProcessPoolExecutor(max_workers=workers,
+                             initializer=_pool_init) as ex:
+        futs = {ex.submit(_pool_read, t): i for i, t in enumerate(tasks)}
+        from concurrent.futures import as_completed
+        for fut in as_completed(futs, timeout=timeout_s):
+            i = futs[fut]
+            try:
+                out[i] = fut.result()
+            except Exception:
+                out[i] = None
+    return out
 
 
 def _read_window_hard_timeout(open_ds, lon, lat, half, coherence_threshold,
@@ -263,6 +385,7 @@ def build_aoi_cube(
     read_timeout_s: float = 180.0,
     allow_download: bool = True,
     asf_session=None,
+    workers: int = 1,
 ) -> dict:
     """Stream an OPERA DISP-S1 AOI displacement cube via lazy windowed reads.
 
@@ -270,6 +393,12 @@ def build_aoi_cube(
     frames), coherence-masks, then stitches the OPERA reference eras into one
     continuous cumulative series. Requires earthaccess + h5netcdf + pyproj and
     EARTHDATA_USERNAME/PASSWORD in the environment.
+
+    workers > 1 reads the granules through a PROCESS pool. The per-granule cost
+    is ~4.5 s of HTTP/HDF5 request latency versus ~17 ms of actual transfer at
+    300 Mbps, so this is pure overhead hiding; measured 3.5x on 8 workers.
+    Threads are useless here (h5py holds a global lock — measured 1.4x).
+    Cached granules are served from disk first and never re-fetched.
 
     Returns dict: cube (T,H,W) meters LOS continuous cumulative, t (decimal yr),
     sec_dates, ref_dates, x/y (UTM meters), crs_wkt, frame.
@@ -342,12 +471,48 @@ def build_aoi_cube(
     ref_shape = None
     skipped = 0
 
+    # ---- PARALLEL PREFETCH -------------------------------------------------
+    # Fill the granule cache through a process pool, then let the (unchanged)
+    # serial assembly loop below read it back. Granule reads are ~4.5 s of
+    # request latency each and only ~17 ms of transfer, so overlapping them is
+    # where essentially all of the speedup lives.
+    prefetched: Dict[tuple, tuple] = {}
+    if workers > 1 and fs is not None:
+        pending = []
+        for g in granules:
+            rd, sd = _dates(g)
+            cp = (cache_dir / f"{frame}_{rd}_{sd}.npz") if cache_dir is not None else None
+            if cp is not None and cp.exists():
+                continue
+            u = _granule_nc_url(g)
+            if u:
+                pending.append((rd, sd, u, cp))
+        if pending:
+            logger.info("parallel prefetch: %d granules on %d workers",
+                        len(pending), workers)
+            res = read_windows_parallel([p[2] for p in pending], lon, lat, half,
+                                        coherence_threshold, workers=workers)
+            got = 0
+            for (rd, sd, _u, cp), r in zip(pending, res):
+                if r is None:
+                    continue
+                got += 1
+                if cp is not None:
+                    try:
+                        np.savez_compressed(cp, disp=r[0], x=r[1], y=r[2],
+                                            crs=r[3])
+                        continue
+                    except Exception:
+                        pass
+                prefetched[(rd, sd)] = r
+            logger.info("prefetch recovered %d/%d granules", got, len(pending))
+
     for i, g in enumerate(granules):
         rd, sd = _dates(g)
         cache_path = (cache_dir / f"{frame}_{rd}_{sd}.npz") if cache_dir is not None else None
-        result = None
+        result = prefetched.pop((rd, sd), None)
 
-        if cache_path is not None and cache_path.exists():
+        if result is None and cache_path is not None and cache_path.exists():
             try:
                 z = np.load(cache_path, allow_pickle=False)
                 result = (z["disp"], z["x"], z["y"], str(z["crs"]))

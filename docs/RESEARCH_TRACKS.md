@@ -1482,3 +1482,45 @@ masking. Arid desert cubes have far better coherence, so true desert recall is
 likely BETTER than this table. Treat these as a pessimistic floor, and note
 separately that for wet/vegetated sites COVERAGE, not sensitivity, is the
 binding constraint.
+
+### THROUGHPUT FIX: OPERA reads were latency-bound, not bandwidth-bound (2026-07-22)
+
+A 300 Mbps speed test exposed a wrong diagnosis. The sweep had been described
+as "download-bound (~3 h/tile)". It is not. Measured facts:
+
+- A tile pulls ~350 epochs x a 400x400 float32 window = **224 MB of actual
+  pixels**. At 300 Mbps that is **6 seconds** of transfer. We were spending
+  ~1.8 HOURS. **~99.9% of the time was overhead, not data.**
+- Cause: each epoch is a separate remote HDF5 (.nc) file. Reading one small
+  window costs an authenticated HTTPS open + HDF5 superblock/B-tree metadata
+  walk + chunk fetches = dozens of round-trips at ~100 ms each. Measured
+  **~4.5 s per granule** to move 0.64 MB.
+
+Measured remedies (per-granule effective cost):
+  serial                       4.50 s
+  8 THREADS                    3.10 s   (1.4x)  <- h5py holds a GLOBAL LOCK
+  8 PROCESSES                  1.30 s   (3.5x)
+
+**Implemented in deformation_intel/opera.py:**
+1. `read_windows_parallel()` + `_pool_init`/`_pool_read` — process-pool granule
+   reads with one-time auth per worker.
+2. `build_aoi_cube(..., workers=N)` — parallel PREFETCH fills the granule cache,
+   then the unchanged serial assembly loop reads it back. Opt-in (default 1),
+   so no existing behaviour changes.
+3. `read_many_aois()` + `window_indices()` — GRANULE-MAJOR primitive: serve many
+   AOIs from ONE granule open. A frame is ~250 km across = ~100 tiles of 24 km,
+   so a dense sweep currently re-opens every granule ~100x. This primitive is
+   the fix; the sweep driver still needs rewiring to use it.
+
+**End-to-end verification** (fresh Permian AOI, empty caches, 24 epochs):
+  serial      444.1 s
+  parallel-8   95.1 s   -> **4.7x**
+  max |difference| on common valid pixels **0.000e+00 m — IDENTICAL OUTPUT**
+  (finite fraction 0.9397 both). 61/61 package tests green.
+
+**Revised scaling.** CONUS deformation = 14,028 tiles. Pure-transfer floor at
+300 Mbps is ~**1 day**. At the old serial rate it was ~2.9 years; at the
+measured 4.7x it is ~220 days on one machine; granule-major (~100x fewer
+opens on a dense sweep) plus more workers is what closes the remaining gap.
+The earlier "55 years for all land" figure was an artifact of a fixable
+implementation problem, not a data or physics limit.
