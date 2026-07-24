@@ -27,7 +27,7 @@ what would fix it.
 | 2.5 | "Not in catalog" ≠ unknown | **FIXED** — wording corrected in the write-ups |
 | 2.6 | Mojave filter circularity | OPEN |
 | 3.1 | Most analyses not reproducible from repo | PARTIAL — agriculture + closure are tested modules; others still gitignored |
-| 3.2 | No recall/false-negative testing | OPEN — the highest-value remaining fix |
+| 3.2 | No recall/false-negative testing | **FIXED & MEASURED** — injection testing gives a detection envelope: hard size floor ~90 m across, rate floor ~2–3 cm/yr. Desert null is now bounded; Tampa brief updated. (v1 harness retracted — it measured coverage, not recall) |
 | 3.3 | Self-administered validation | OPEN (structural) |
 | 3.4 | Language outruns statistics | **FIXED** — CI language adopted; see 1.1 |
 
