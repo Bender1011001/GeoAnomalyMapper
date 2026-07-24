@@ -20,7 +20,8 @@ what would fix it.
 | 1.3 | Controls not covariate-matched | **FIXED & TESTED** — pre-registered matched-control test run on **both** AOIs. Signal **SURVIVES**. New headline **0.614 [0.585, 0.642]** (AOI-2 matched, n=733) |
 | 1.4 | Moisture seasonality uncontrolled | OPEN — dry-season run designed, not yet run |
 | **1.6** | **Novelty claim was wrong** | **RETRACTED & FIXED** — closure-phase soil-moisture retrieval is a mature published field; "discarded as error" framing deleted; novelty narrowed to the archaeology *application*, stated as a non-exhaustive search. **Publication-critical.** |
-| 1.5 | No family-wise correction | OPEN |
+| 1.5 | No family-wise correction | **FIXED — and it SURVIVED.** Bonferroni over 9 channels: closure still p=2.5e-3; family-wise chance of any channel reaching 0.60 is only 1.6%. The 0.60+ cluster is real, not selection. See 1.5 detail |
+| P2 | No benchmark vs prior art | **FIXED** — prior art (Menze & Ur 2012, Orengo 2020) reports NO AUC (qualitative/site-count validation), so no head-to-head number exists; but honest framing added: ours is a single WEAK channel, not an operational discovery system. See P2 detail |
 | 2.1 | Tampa depths contradict FL karst physics | **FIXED** — depths **withdrawn** from the brief with an explanation; observables retained |
 | 2.2 | Mogi fits underdetermined at 8–9 px | **FIXED in the brief** (no depth/volume claimed); the detector still reports them internally |
 | 2.3 | Ring registration ≈ feature size | OPEN — rings 9/25/28 remain provisional |
@@ -169,6 +170,30 @@ validated against a 14,324-site catalog on two areas with covariate-matched
 controls and reported with confidence intervals. That is a modest, careful,
 publishable-as-a-note result — not a discovery of a discarded signal.
 
+### P2 Benchmark against prior art (resolved 2026-07-22)
+
+The two landmark automated tell/mound-detection papers were read:
+- **Menze & Ur 2012 (PNAS)** — the source of our 14,324-site ground truth.
+  Builds the catalog by classifying anthrosols in multispectral time series +
+  DEM mound volume. Reports site counts, NOT a held-out AUC.
+- **Orengo et al. 2020 (PNAS)** — random-forest probability field on
+  multisensor/multitemporal SAR+multispectral, Cholistan. Trained on 5 mounds,
+  validated on 20; detected 337 clusters at >0.55 probability, 266 new. Reports
+  NO accuracy/precision/recall/AUC; validation is qualitative + legacy-match.
+
+**Consequence for our claim:** there is no published AUC to run a head-to-head
+against — the field standard is "we detected N sites, M were new," not a
+separability metric on a held-out catalog. So two honest points, both now in
+the write-ups:
+1. Our AUC-vs-catalog evaluation is arguably MORE quantitatively rigorous than
+   the field norm — but that cuts both ways, because it also means our number
+   isn't directly comparable and shouldn't be presented as beating anyone.
+2. **Scope honestly: those are operational, multi-feature discovery SYSTEMS
+   (Orengo's RF ingests a whole SAR+optical stack). Closure phase is ONE weak
+   single channel (0.61).** The correct claim is NOT "competitive detector" but
+   "a novel single feature that could be ADDED to such a stack." Any
+   publication must frame it as a feature-level contribution, not a system.
+
 ### 1.5 Multiple comparisons across channels were never accounted for
 
 The program has tested roughly a dozen channels against the same ground truth:
@@ -188,6 +213,30 @@ that happened to land high.
 or — better, since the channels are correlated — report the *joint* result: "of 12
 channels tested, 4 exceeded 0.60, with CIs overlapping heavily," which is a much
 more honest summary than a leaderboard.
+
+**RESOLVED 2026-07-22 — and the correction SURVIVED, which was not guaranteed.**
+Bonferroni over the K = 9 channels scored against the same ground truth (null
+AUC = 0.5, Mann-Whitney null SE = 0.0344 at n = 141):
+
+| channel | AUC | z | p (1-sided) | p·9 (Bonf) | sig @0.05 |
+|---|---|---|---|---|---|
+| anisotropy | 0.639 | 4.04 | 2.7e-5 | 2.5e-4 | **yes** |
+| thermal | 0.622 | 3.54 | 2.0e-4 | 1.8e-3 | **yes** |
+| closure | 0.619 | 3.46 | 2.8e-4 | 2.5e-3 | **yes** |
+| combined-ML | 0.616 | 3.37 | 3.8e-4 | 3.4e-3 | **yes** |
+| texture | 0.595 | 2.76 | 2.9e-3 | 2.6e-2 | **yes** |
+| BSI | 0.553 | 1.54 | 6.2e-2 | 0.56 | no |
+| prominence | 0.547 | 1.36 | 8.6e-2 | 0.78 | no |
+| VH/VV | 0.541 | 1.19 | 0.12 | 1.0 | no |
+| kurtosis | 0.518 | 0.52 | 0.30 | 1.0 | no |
+
+Family-wise: P(a single channel ≥ 0.60 by chance) = 0.002; **P(≥1 of 9 ≥ 0.60
+by chance) = 0.016**; expected number exceeding 0.60 by chance = 0.02, versus
+4 observed. **So the 0.60+ cluster is NOT a selection artifact — closure phase
+survives Bonferroni at p = 2.5e-3.** The multiple-comparisons check, which I
+expected might deflate the result, instead confirmed it. (This tests
+significance-vs-chance, which is robust; it does not rescue the point-estimate
+*precision* issue of 1.1 — the effect is significant AND small.)
 
 ---
 

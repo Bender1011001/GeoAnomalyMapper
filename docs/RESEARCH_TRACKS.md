@@ -1577,3 +1577,29 @@ Capability status: the deformation sweep is now push-button over any bbox, at
 ~12x the old throughput on dense grids, resumable, with confound screening and
 ranked output. CONUS is now a configuration (bbox + workers + machines), not a
 research project.
+
+### Publication-safety: prior-art benchmark (P2) + family-wise correction (1.5) — 2026-07-22
+
+**P2 — prior art read.** Menze & Ur 2012 (PNAS; our ground-truth source) and
+Orengo et al. 2020 (PNAS; RF mound detection, Cholistan) both report site
+COUNTS and qualitative/legacy-match validation — NEITHER reports a held-out
+AUC. So no head-to-head number exists. Honest framing locked in: those are
+operational MULTI-FEATURE discovery systems; closure phase is ONE weak single
+channel (0.61). Publication claim must be "a novel feature that could be added
+to such a stack", never "competitive detector". (docs/CRITIQUE.md P2.)
+
+**1.5 — family-wise correction SURVIVED.** Bonferroni over K=9 channels vs the
+same ground truth: anisotropy/thermal/closure/combined-ML/texture ALL remain
+significant at 0.05 after x9 correction (closure p_Bonf=2.5e-3). Family-wise
+P(any channel >=0.60 by chance)=0.016; expected number by chance=0.02 vs 4
+observed. **The 0.60+ cluster is real signal, not a selection artifact.** The
+check I expected to deflate the result confirmed it.
+
+Two long jobs launched to close 1.4 and demonstrate the fast pipeline:
+- gam_closure_dry: 11 DRY-season (Aug-Oct 2023) HyP3 pairs, same AOI-1/track
+  50/frame 471 as the validated wet-season run — the mechanism test (does the
+  site>control closure signal persist out of the moisture-contrast season?).
+- Florida Sinkhole Alley sweep: deformation_intel.sweep over -82.75/28.0 to
+  -81.9/29.4 (Tampa Bay north through the karst belt) at full tile density,
+  using the new granule-major driver — the first real use of the sped-up
+  pipeline and a genuinely shareable public-safety demonstration.
