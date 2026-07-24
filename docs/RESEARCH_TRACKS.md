@@ -1550,3 +1550,30 @@ bandwidth floor, gated now by frame count and worker count, not per-tile opens.
 
 Tests: tests/test_opera_parallel.py (window_indices math, one-open-per-frame
 contract, serial fallback, workers kwarg). 61+ package tests green.
+
+### Push-button region sweep driver (deformation_intel/sweep.py) — 2026-07-22
+
+Wired the granule-major reader into a runnable, TESTED, resumable region sweep
+(also chips at CRITIQUE 3.1 — this is a repo module, not a gitignored script).
+
+  run_region_sweep(bbox, out_dir, tile_km=24, workers=8, ...)
+  CLI: python -m deformation_intel.sweep --bbox LON0 LAT0 LON1 LAT1 --out DIR
+
+Flow: bbox -> tile_grid -> iterate frame-by-frame (build_frame_cubes on a 3-deg
+neighborhood of the next unbuilt tile) -> detect_anomalies with confound
+samplers -> per-tile JSON -> aggregate candidates_ranked.json + summary.json.
+Resumable (existing per-tile JSON skipped) and crash-safe (per-tile granule
+cache). Pure helpers tile_grid/rank_candidates/_neighborhood unit-tested
+(tests/test_sweep.py, 8 tests).
+
+End-to-end verified on a fresh 2-tile Permian bbox: RUN1 built 2/2 tiles in
+179 s (fresh, 16 epochs, 8 workers), RESUME built 0 (resume works), 0 localized
+candidates (correct — quiet patch, not over an active field). Caught+fixed a
+Windows-spawn footgun: caller scripts MUST guard `if __name__=="__main__":`
+(pool workers re-import the entry module); documented in the module and the CLI
+is already guarded.
+
+Capability status: the deformation sweep is now push-button over any bbox, at
+~12x the old throughput on dense grids, resumable, with confound screening and
+ranked output. CONUS is now a configuration (bbox + workers + machines), not a
+research project.
