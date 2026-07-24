@@ -19,6 +19,7 @@ what would fix it.
 | 1.2 | Replication not fully independent | OPEN — needs a different-track / dry-season run |
 | 1.3 | Controls not covariate-matched | **FIXED & TESTED** — pre-registered matched-control test run on **both** AOIs. Signal **SURVIVES**. New headline **0.614 [0.585, 0.642]** (AOI-2 matched, n=733) |
 | 1.4 | Moisture seasonality uncontrolled | OPEN — dry-season run designed, not yet run |
+| **1.6** | **Novelty claim was wrong** | **RETRACTED & FIXED** — closure-phase soil-moisture retrieval is a mature published field; "discarded as error" framing deleted; novelty narrowed to the archaeology *application*, stated as a non-exhaustive search. **Publication-critical.** |
 | 1.5 | No family-wise correction | OPEN |
 | 2.1 | Tampa depths contradict FL karst physics | **FIXED** — depths **withdrawn** from the brief with an explanation; observables retained |
 | 2.2 | Mogi fits underdetermined at 8–9 px | **FIXED in the brief** (no depth/volume claimed); the detector still reports them internally |
@@ -124,6 +125,49 @@ exists and was skipped.
 **Fix.** Run the identical recipe on a dry-season window (Aug–Oct). A signal that
 vanishes entirely suggests seasonal-moisture/vegetation confound; one that persists
 argues for a structural cause.
+
+### 1.6 THE NOVELTY CLAIM WAS WRONG — retracted 2026-07-22 (publication-critical)
+
+Throughout this project I repeatedly wrote that closure phase is "the signal
+every InSAR pipeline discards as calibration error" and that "no prior use of
+closure phase for archaeology is known." **I had never actually searched the
+literature.** A search finally done on 2026-07-22 shows:
+
+**Closure phase for soil moisture is a mature, active research field.** It is
+not discarded and it is not obscure. Representative published work includes
+De Zan et al. on whether InSAR coherence and closure phase can estimate soil
+moisture changes; "Vegetation and soil moisture inversion from SAR closure
+phases"; "Modeling, prediction, and retrieval of surface soil moisture from
+InSAR closure phase"; "Fine-Resolution Measurement of Soil Moisture From
+Cumulative InSAR Closure Phase"; and IEEE work on estimating soil moisture from
+interferometry with closure phases. Triplet-closure stacking is also used to
+estimate fading/bias signals, with soil moisture as a by-product.
+
+**SAR for archaeology also already exists** (e.g. "Detection of Archaeological
+Residues in Vegetated Areas Using Satellite Synthetic Aperture Radar",
+Remote Sensing 2017), and **automated tell detection is an established field
+with published benchmarks** — Menze & Ur (PNAS 2012, the very catalog used
+here as ground truth) and machine-learning mound classification from
+multisensor/multitemporal satellite data (PNAS 2020).
+
+**What must change before any publication or public post:**
+1. **Delete the "discarded as error" framing entirely.** It is false and it is
+   the single most reviewer-baiting sentence in the project.
+2. **Soften the novelty claim** to what is actually supportable: *"we found no
+   prior application of closure phase specifically to archaeological site
+   detection in a non-exhaustive search."* Two web searches are not a
+   literature review.
+3. **Benchmark against the existing literature.** An AUC of 0.614 must be
+   presented next to what published tell-detection methods already achieve. If
+   the PNAS 2020 ML approach substantially outperforms it, then this result is
+   *a single weak novel channel*, not a competitive detector — and it must be
+   framed that way or it will look naive.
+
+**Honest residual contribution** (still worth something, stated narrowly):
+applying closure phase as a *ranking channel for archaeological site detection*,
+validated against a 14,324-site catalog on two areas with covariate-matched
+controls and reported with confidence intervals. That is a modest, careful,
+publishable-as-a-note result — not a discovery of a discarded signal.
 
 ### 1.5 Multiple comparisons across channels were never accounted for
 
@@ -322,3 +366,56 @@ To keep the review calibrated — these hold up:
 6. **Promote load-bearing scripts into tested modules** (3.1) — the structural debt
 7. **Blind chip test on ring 32** (2.4) — cheap, firms or deflates the top candidate
 8. **Different-track closure replication** (1.2) — makes "replicated" fully earned
+
+---
+
+## PUBLICATION / PUBLIC-POST SAFETY CHECKLIST
+
+Added 2026-07-22 in response to "make sure we will not be fools if we publish."
+These are the things that would actually cause embarrassment or harm.
+
+### MUST FIX BEFORE ANY PUBLICATION (blocking)
+
+| # | Risk | Status |
+|---|---|---|
+| P1 | **False novelty claim** — "closure phase is discarded as error" / "no prior use". Closure-phase soil-moisture retrieval is a mature published field; the first reviewer would cite it immediately | **FIXED** (see 1.6) — framing deleted, claim narrowed, non-exhaustive search stated |
+| P2 | **No benchmark against prior art.** AUC 0.614 must be shown against published tell-detection performance (Menze & Ur PNAS 2012; ML mound classification PNAS 2020), or it looks naive | **OPEN — blocking.** Must read those papers and report their numbers alongside ours |
+| P3 | **Publishing precise coordinates.** Syrian sites = looting risk. Tampa candidates = private property, and "your land is sinking" is defamatory-adjacent if wrong | Syria redacted ✓. **Tampa coords must NOT be published** — they go to agencies only, never in a public post |
+| P4 | **Not reproducible.** Most analyses are gitignored scratchpad scripts (3.1). A public claim nobody can re-run is a liability | **OPEN** — promote the load-bearing scripts first |
+| P5 | **Unregistered multiple comparisons** (1.5). ~12 channels tested; a reviewer will ask | **OPEN** — report the family, not a leaderboard |
+
+### MUST NOT SAY (retired claims)
+
+- ❌ "closure phase is a signal everyone throws away" — **false**
+- ❌ "no prior use of closure phase for archaeology" — unsupported; say *"we found none in a non-exhaustive search"*
+- ❌ "clears the 0.60 bar" / "PASS" — statistically meaningless at n≈141 (1.1)
+- ❌ "the new best single channel" / "record" — already walked back once; CIs overlap
+- ❌ any legacy mineral-prospectivity number (8.5×, 32.4 %, >7σ) — unverified
+- ❌ "discovery", "we found a lost city", "confirmed void" — nothing is ground-verified
+- ❌ Mogi depths for Tampa — withdrawn as physically inconsistent (2.1)
+
+### SAFE TO SAY (defensible today)
+
+- ✓ "A pre-registered, covariate-matched analysis finds closure-phase magnitude
+  separates known tell sites from matched controls at AUC 0.614 [0.585, 0.642],
+  n = 733 — a small but reliably above-chance effect."
+- ✓ "Ranking-grade, not a detector. Mechanism inferred, not demonstrated."
+- ✓ "A 65-tile desert survey produced no void candidates above a measured
+  detection limit of ~90 m diameter and ~2–3 cm/yr."
+- ✓ "CORONA 1967 imagery discriminates modern from pre-modern earthworks; it
+  killed one ring candidate and promoted another."
+- ✓ The kill list — this is the most defensible content in the project.
+- ✓ The methods/code, with tests, as an open-source contribution.
+
+### THE HONEST ELEVATOR PITCH (if posting publicly)
+
+> An open, free-data pipeline for ranking archaeological candidates and
+> detecting active ground deformation, with unusually explicit validation: every
+> method pre-registered, confidence intervals on every score, controls matched on
+> landscape covariates, a measured detection limit, and a documented list of the
+> methods that **failed**. Headline result is deliberately modest — a small,
+> replicated, positionally-controlled effect — and the failures are published
+> alongside it.
+
+That framing is defensible, useful, and cannot be embarrassed by a reviewer,
+because it claims exactly what was measured and nothing more.

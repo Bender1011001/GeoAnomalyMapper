@@ -1,10 +1,17 @@
-"""Closure-phase analysis — the discarded InSAR signal, repurposed.
+"""Closure-phase analysis applied to archaeological site ranking.
 
-Every standard InSAR pipeline throws away *closure phase* as calibration
-error: for three SAR acquisitions 1,2,3 the sum of the unwrapped
-interferometric phases around the loop, C = phi_12 + phi_23 - phi_13, should
-be ~0 for an ideal scatterer. Non-zero closure encodes soil-moisture /
-dielectric heterogeneity and physical change on the ground.
+For three SAR acquisitions 1,2,3 the sum of the unwrapped interferometric
+phases around the loop, C = phi_12 + phi_23 - phi_13, is ~0 for an ideal
+scatterer. Non-zero closure encodes soil-moisture / dielectric heterogeneity
+and physical change on the ground.
+
+NOTE ON PRIOR WORK (corrected 2026-07-22): closure phase is NOT an ignored or
+discarded signal. Retrieving soil moisture from InSAR closure phase is an
+established, active research area (De Zan et al. and others; see
+docs/CRITIQUE.md 1.6). What this module contributes is narrower: using closure
+magnitude as a RANKING CHANNEL for archaeological site detection, validated
+against a large ground-truth catalog. We found no prior work doing that in a
+NON-EXHAUSTIVE search — which is not the same as it being novel.
 
 Validated in this project on free HyP3 data:
 - Construction/disturbance detector: closure rises at a documented site-work
