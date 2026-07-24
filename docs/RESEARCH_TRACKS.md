@@ -1524,3 +1524,29 @@ measured 4.7x it is ~220 days on one machine; granule-major (~100x fewer
 opens on a dense sweep) plus more workers is what closes the remaining gap.
 The earlier "55 years for all land" figure was an artifact of a fixable
 implementation problem, not a data or physics limit.
+
+### GRANULE-MAJOR sweep driver: 11.9x on a 3x3 grid, identical output (2026-07-22)
+
+Second half of the throughput fix. build_frame_cubes(tiles, workers=N) in
+deformation_intel/opera.py: discovers the shared OPERA frame once, then opens
+each granule ONCE and serves every tile in the frame (read_many_aois /
+_pool_cache_many), instead of the tile-major path that re-opened every granule
+once PER tile. Windows stream to per-tile caches; assembly is delegated to
+build_aoi_cube(cache_dir=..., allow_download=False), so reference-era stitching
+is byte-identical to the single-AOI path.
+
+**Benchmark (fresh Permian frame F20698, empty caches, 20 epochs, 8 workers):**
+  granule-major, 9 tiles :  299.2 s  (33.2 s/tile)
+  tile-major,    1 tile  :  396.5 s
+  implied tile-major 9x  : 3568.4 s
+  **SPEEDUP 11.9x**; same-tile r1c1 cube max|diff| = 0.000e+00 m (IDENTICAL).
+
+Scaling note: 3x3 barely exercises the amortization. A DISP-S1 frame is
+~250 km across = ~100 tiles of 24 km, so a full-frame sweep approaches the
+~100x-fewer-opens ceiling (times process-pool parallelism). Combined with the
+earlier 4.7x single-cube prefetch, the sweep bottleneck is essentially removed:
+CONUS deformation moves from a ~2.9-year serial estimate toward the ~1-day
+bandwidth floor, gated now by frame count and worker count, not per-tile opens.
+
+Tests: tests/test_opera_parallel.py (window_indices math, one-open-per-frame
+contract, serial fallback, workers kwarg). 61+ package tests green.

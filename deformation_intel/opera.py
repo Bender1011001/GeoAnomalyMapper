@@ -320,6 +320,76 @@ def _pool_read(task):
             pass
 
 
+def _pool_read_many(task):
+    """(url, aois_dict, half, coh) -> {key: (disp,x,y,crs)|None}. One granule
+    open serves EVERY tile — the granule-major payload for the process pool."""
+    url, aois, half, coh = task
+    global _WORKER_FS
+    if _WORKER_FS is None:
+        _pool_init()
+    try:
+        ds = _open_authenticated(url, _WORKER_FS)
+    except Exception:
+        return {k: None for k in aois}
+    try:
+        out = {}
+        for key, (lat, lon) in aois.items():
+            try:
+                out[key] = _extract_window(ds, lon, lat, half, coh)
+            except Exception:
+                out[key] = None
+        return out
+    finally:
+        try:
+            ds.close()
+        except Exception:
+            pass
+
+
+def _pool_cache_many(task):
+    """Granule-major CACHING worker: open one granule, write each tile's window
+    to that tile's own cache dir as {frame}_{rd}_{sd}.npz, return {key: bool}.
+
+    Streaming to disk (not returning arrays) keeps memory O(1) in the number of
+    tiles and makes the sweep crash-resumable — a re-launch skips cached tiles.
+    Assembly is then delegated to build_aoi_cube reading from these caches, so
+    the proven reference-era stitching is reused unchanged.
+    """
+    import numpy as np
+    url, aois, half, coh, cache_root, frame, rd, sd = task
+    global _WORKER_FS
+    if _WORKER_FS is None:
+        _pool_init()
+    from pathlib import Path as _P
+    root = _P(cache_root)
+    try:
+        ds = _open_authenticated(url, _WORKER_FS)
+    except Exception:
+        return {k: False for k in aois}
+    out = {}
+    try:
+        for key, (lat, lon) in aois.items():
+            try:
+                r = _extract_window(ds, lon, lat, half, coh)
+                if r is None:
+                    out[key] = False
+                    continue
+                d = root / str(key)
+                d.mkdir(parents=True, exist_ok=True)
+                np.savez_compressed(d / f"{frame}_{rd}_{sd}.npz",
+                                    disp=r[0], x=r[1], y=r[2],
+                                    crs=np.str_(r[3]))
+                out[key] = True
+            except Exception:
+                out[key] = False
+        return out
+    finally:
+        try:
+            ds.close()
+        except Exception:
+            pass
+
+
 def read_windows_parallel(urls, lon, lat, half, coherence_threshold,
                           workers: int = 8, timeout_s: float = 600.0):
     """Read the same AOI window from many granules using a PROCESS pool.
@@ -622,6 +692,114 @@ def build_aoi_cube(
         "center_lat": lat,
         "center_lon": lon,
     }
+
+
+def build_frame_cubes(
+    tiles: Dict[str, Tuple[float, float]],
+    *,
+    half_width_km: float = 6.0,
+    coherence_threshold: float = 0.6,
+    max_epochs: Optional[int] = None,
+    workers: int = 8,
+    min_epochs: int = 8,
+    cache_root: Optional[Path] = None,
+    progress: bool = True,
+) -> Tuple[Dict[str, dict], List[str]]:
+    """GRANULE-MAJOR sweep: build cubes for MANY AOIs sharing one OPERA frame,
+    opening each granule ONCE for all tiles instead of once PER tile.
+
+    tiles: {key: (lat, lon)}. Returns ({key: cube_dict}, unassigned_keys),
+    where unassigned tiles fell outside this frame or lacked >= min_epochs
+    (the caller re-submits them for their own frame).
+
+    Why this exists: a DISP-S1 frame is ~250 km across, so a dense grid puts
+    ~100 tiles on the same frame. The tile-major path re-opened every granule
+    ~100x (each open ~4.5 s of request latency). Here each granule opens once
+    and serves every tile in the frame -> ~100x fewer opens, on top of the
+    process-pool parallelism. Windows stream to per-tile caches; assembly is
+    delegated to build_aoi_cube(cache_dir=..., allow_download=False) so the
+    reference-era stitching is identical to the single-AOI path.
+    """
+    import earthaccess
+    import numpy as np
+
+    earthaccess.login(strategy="environment")
+    lats = [v[0] for v in tiles.values()]
+    lons = [v[1] for v in tiles.values()]
+    clat, clon = sum(lats) / len(lats), sum(lons) / len(lons)
+
+    results = earthaccess.search_data(short_name="OPERA_L3_DISP-S1_V1",
+                                      point=(clon, clat), count=4000)
+
+    def _fr(g):
+        m = GRANULE_RE.search(g["umm"]["GranuleUR"])
+        return m.group("frame") if m else "unknown"
+
+    def _dt(g):
+        m = GRANULE_RE.search(g["umm"]["GranuleUR"])
+        return (m.group("ref"), m.group("sec")) if m else (None, None)
+
+    by_frame: Dict[str, list] = {}
+    for g in results:
+        by_frame.setdefault(_fr(g), []).append(g)
+    frame = max(by_frame, key=lambda k: len(by_frame[k]))
+    granules = [g for g in by_frame[frame] if _dt(g)[1]]
+    granules.sort(key=lambda g: _dt(g)[1])
+    if max_epochs and len(granules) > max_epochs:
+        pairs = [_dt(g) for g in granules]
+        keep = subsample_epochs_preserving_bridges(pairs, max_epochs)
+        granules = [granules[i] for i in keep]
+    logger.info("frame %s: %d granules serving %d tiles (granule-major)",
+                frame, len(granules), len(tiles))
+
+    if cache_root is None:
+        import tempfile
+        cache_root = Path(tempfile.mkdtemp(prefix="opera_frame_"))
+    cache_root = Path(cache_root)
+    half = half_width_km * 1000.0
+
+    # one process-pool task per granule; each serves ALL tiles
+    tasks = []
+    for g in granules:
+        rd, sd = _dt(g)
+        u = _granule_nc_url(g)
+        if u:
+            tasks.append((u, dict(tiles), half, coherence_threshold,
+                          str(cache_root), frame, rd, sd))
+
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    done = 0
+    with ProcessPoolExecutor(max_workers=workers, initializer=_pool_init) as ex:
+        futs = [ex.submit(_pool_cache_many, t) for t in tasks]
+        for fut in as_completed(futs):
+            try:
+                fut.result()
+            except Exception:
+                pass
+            done += 1
+            if progress and done % 25 == 0:
+                logger.info("  granule-major read %d/%d granules", done, len(tasks))
+
+    # assemble each tile from its cache using the proven single-AOI path
+    out: Dict[str, dict] = {}
+    unassigned: List[str] = []
+    for key, (lat, lon) in tiles.items():
+        tdir = cache_root / str(key)
+        n_cached = len(list(tdir.glob("*.npz"))) if tdir.exists() else 0
+        if n_cached < min_epochs:
+            unassigned.append(key)
+            continue
+        try:
+            out[key] = build_aoi_cube(
+                lat, lon, half_width_km=half_width_km,
+                coherence_threshold=coherence_threshold, max_epochs=max_epochs,
+                cache_dir=tdir, allow_download=False, progress=False, workers=1)
+        except Exception as exc:
+            logger.warning("assemble %s failed: %s", key, type(exc).__name__)
+            unassigned.append(key)
+    logger.info("frame %s: %d cubes built, %d unassigned",
+                frame, len(out), len(unassigned))
+    return out, unassigned
 
 
 def assemble_cube(
