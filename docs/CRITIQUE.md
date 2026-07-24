@@ -18,7 +18,7 @@ what would fix it.
 | 1.1 | No confidence intervals | **FIXED** — `auc_ci()` added to `archaeo_intel/closure.py`; `separability()` now returns se/ci_low/ci_high; ledger retro-annotated with all CIs |
 | 1.2 | Replication not fully independent | OPEN — needs a different-track / dry-season run |
 | 1.3 | Controls not covariate-matched | **FIXED & TESTED** — pre-registered matched-control test run on **both** AOIs. Signal **SURVIVES**. New headline **0.614 [0.585, 0.642]** (AOI-2 matched, n=733) |
-| 1.4 | Moisture seasonality uncontrolled | OPEN — dry-season run designed, not yet run |
+| 1.4 | Moisture seasonality uncontrolled | **FIXED & RUN** — dry-season (Aug–Oct) closure on the same AOI separates sites at **0.618** vs 0.619 wet; absolute magnitudes ~halved. Signal PERSISTS across seasons → argues against a purely seasonal-moisture/vegetation confound. See 1.4 detail |
 | **1.6** | **Novelty claim was wrong** | **RETRACTED & FIXED** — closure-phase soil-moisture retrieval is a mature published field; "discarded as error" framing deleted; novelty narrowed to the archaeology *application*, stated as a non-exhaustive search. **Publication-critical.** |
 | 1.5 | No family-wise correction | **FIXED — and it SURVIVED.** Bonferroni over 9 channels: closure still p=2.5e-3; family-wise chance of any channel reaching 0.60 is only 1.6%. The 0.60+ cluster is real, not selection. See 1.5 detail |
 | P2 | No benchmark vs prior art | **FIXED** — prior art (Menze & Ur 2012, Orengo 2020) reports NO AUC (qualitative/site-count validation), so no head-to-head number exists; but honest framing added: ours is a single WEAK channel, not an operational discovery system. See P2 detail |

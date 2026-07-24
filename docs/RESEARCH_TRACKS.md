@@ -1603,3 +1603,39 @@ Two long jobs launched to close 1.4 and demonstrate the fast pipeline:
   -81.9/29.4 (Tampa Bay north through the karst belt) at full tile density,
   using the new granule-major driver — the first real use of the sped-up
   pipeline and a genuinely shareable public-safety demonstration.
+
+### RESULT: dry-season closure = mechanism test PASSED (CRITIQUE 1.4) — 2026-07-22
+
+Identical recipe, same AOI-1/track 50/frame 471, DRY season (Aug-Oct 2023),
+11 HyP3 pairs -> 5 triplets, 100% coverage, n=141/141.
+
+  season   separability   CI              site_med / ctrl_med (rad)
+  WET      0.619          [0.554,0.684]   0.0595 / 0.0505
+  DRY      0.618          [0.553,0.683]   0.0282 / 0.0242
+
+**Two things at once, both diagnostic:**
+1. The site-vs-control SEPARABILITY is unchanged across seasons (0.618 vs
+   0.619). The signal PERSISTS out of the moisture-contrast window.
+2. The ABSOLUTE closure magnitudes roughly halve in the dry season (site
+   0.028 vs 0.060 rad) — consistent with moisture being the *medium* (less
+   water overall -> smaller closure), while the site/control *contrast*
+   survives.
+
+**Interpretation (stated carefully):** persistence across seasons argues
+AGAINST a purely seasonal moisture / vegetation-phenology confound — that
+would be season-specific and should have collapsed. It is consistent with a
+PERSISTENT sub-surface / soil property of tell sites. It does NOT uniquely
+isolate "buried architecture": a persistent anthrosol soil-texture / compaction
+difference would look the same. So the honest mechanism statement upgrades from
+"inferred" to "a persistent (non-seasonal) site property, medium = soil
+moisture; buried-structure vs anthrosol-texture not separated."
+
+**Stability across everything now tested** (all 0.59-0.62):
+  wet AOI-1 random 0.619 | wet AOI-1 matched 0.589 | wet AOI-2 n=733 random
+  0.603 / matched 0.614 | dry AOI-1 0.618. Four+ measurements — two seasons,
+  two areas 90 km apart, random and covariate-matched controls — all land in a
+  0.03-wide band. That consistency is the strongest single argument that the
+  effect is real (if small).
+
+Caveat: dry window is sparser (5 triplets vs 10 wet); CI accordingly wide but
+still excludes 0.5.
