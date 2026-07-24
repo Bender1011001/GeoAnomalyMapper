@@ -1434,3 +1434,51 @@ Honest residual caveats:
 
 CRITIQUE 1.3 is substantially ADDRESSED: the archaeology result is not an
 artifact of where tells sit on the landscape.
+
+### RECALL / DETECTION LIMIT measured by injection (CRITIQUE 3.2) — 2026-07-22
+
+First direct measurement of the deformation pipeline's SENSITIVITY. Every prior
+validation measured false positives; nothing ever measured whether a real bowl
+would survive. Method: inject synthetic Gaussian subsidence bowls of known
+radius and rate into a REAL OPERA cube (Mont Belvieu, 120 epochs, real
+atmosphere/noise/coherence gaps), run the ACTUAL detect_anomalies() with
+pipeline defaults, count recovery within 2 radii. 8 trials per cell.
+
+**FIRST ATTEMPT RETRACTED.** v1 injected at uniformly random positions and
+produced a non-monotonic table (150 m: 0.33 at 3 cm/yr but 0.00 at 8 cm/yr).
+That non-monotonicity was the tell. Diagnosis: **the Mont Belvieu cube is 82.8%
+fully masked** (wet, vegetated Gulf Coast -> coherence collapse); only ~20% of
+random injection sites landed on usable ground. v1 measured COVERAGE, not
+recall. A direct check confirmed the detector recovers an injected 150 m /
+8 cm/yr bowl at 0 m offset (vel -7.8 vs -8.0 injected, 28 px) — the detector
+was never the problem.
+
+**v2 (injections restricted to pixels with >80% finite epochs, 11,264 valid
+sites) — recall, monotonic in both axes as physics requires:**
+
+  radius |  0.5 |  1.0 |  2.0 |  3.0 |  5.0 |  8.0  cm/yr
+   45 m  | 0.00 | 0.00 | 0.00 | 0.00 | 0.12 | 0.12
+   90 m  | 0.00 | 0.12 | 0.38 | 1.00 | 1.00 | 1.00
+  150 m  | 0.00 | 0.12 | 0.88 | 1.00 | 1.00 | 1.00
+
+**Detection envelope:**
+- **Hard size floor ~45 m radius (~90 m across).** Recall <=0.12 at ANY rate —
+  set by min_pixels=6 at 30 m posting. Smaller voids are invisible, full stop.
+- **Rate floor ~2-3 cm/yr.** Full recall at >=3 cm/yr for >=90 m radius;
+  0.38-0.88 at 2 cm/yr; essentially blind below 1 cm/yr.
+
+**What this does to the desert-sweep null.** "No new voids" must now be stated
+as: *no voids larger than ~90 m across subsiding faster than ~2-3 cm/yr.* A
+small or slow void would have been missed. This converts an ambiguous negative
+into a bounded one — the point of the exercise.
+
+**Where the Mojave lead sits:** ~90 m at -2.5 cm/yr accelerating — right ON the
+sensitivity boundary (90 m/2 cm = 0.38 recall, 90 m/3 cm = 1.00). It was
+detected near the edge of what the pipeline can see, which implies comparable
+or weaker features elsewhere were likely missed.
+
+**Caveat (conservative bound):** measured on a WET Gulf-Coast cube with 83%
+masking. Arid desert cubes have far better coherence, so true desert recall is
+likely BETTER than this table. Treat these as a pessimistic floor, and note
+separately that for wet/vegetated sites COVERAGE, not sensitivity, is the
+binding constraint.
