@@ -25,7 +25,7 @@ what would fix it.
 | 2.1 | Tampa depths contradict FL karst physics | **FIXED** — depths **withdrawn** from the brief with an explanation; observables retained |
 | 2.2 | Mogi fits underdetermined at 8–9 px | **FIXED in the brief** (no depth/volume claimed); the detector still reports them internally |
 | 2.3 | Ring registration ≈ feature size | OPEN — rings 9/25/28 remain provisional |
-| 2.4 | Ring 32 unblinded reading | OPEN |
+| 2.4 | Ring 32 unblinded reading | **RUN — result is a CAUTION.** Blind on 2023 S2: I scored all 5 rings top-tier (mean 2.6 vs controls 1.25), so the reads aren't pure bias — BUT the KILLED-modern ring 34 also scored 3, i.e. modern imagery cannot separate ring 32 from a modern enclosure. The promotion rests ENTIRELY on the CORONA-1967 read, which this test did NOT blind. See 2.4 detail |
 | 2.5 | "Not in catalog" ≠ unknown | **FIXED** — wording corrected in the write-ups |
 | 2.6 | Mojave filter circularity | OPEN |
 | 3.1 | Most analyses not reproducible from repo | PARTIAL — agriculture + closure are tested modules; others still gitignored |

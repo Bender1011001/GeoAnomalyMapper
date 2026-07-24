@@ -1664,3 +1664,31 @@ uniformly on free data — the good Tampa result came from a good frame, and tha
 remains the honest state. The throughput fixes stand; the binding constraint in
 wet regions is coverage/archive depth, not speed (consistent with every prior
 wet-region finding: Cahokia 0%, Mont Belvieu 83% masked).
+
+### Ring 32 blind test (CRITIQUE 2.4): a caution, not a confirmation (2026-07-24)
+
+Mixed the 5 ring candidates with 12 random-steppe controls (intended 12 known
+catalog tells too, but ALL tell chips failed the <5% cloud filter — a design
+flaw; the tell-vs-control AUC could not be computed). Chips shuffled to blind
+IDs, scored cold 0-3 for "tell/mound/ring-like", then unblinded.
+
+Blind scores (unblinded):
+  ring9=3  ring32=3  ring34=3  ring28=2  ring25=2   (ring mean 2.6)
+  controls: 0-2, mean 1.25
+Two findings, one reassuring, one sobering:
+1. Reassuring: rings scored clearly above random steppe (2.6 vs 1.25), so the
+   visual reads are NOT pure confirmation bias — I can spot ring-like features
+   blind.
+2. **Sobering: ring 34 — which we KILLED as a modern livestock enclosure using
+   CORONA 1967 — also scored 3, tying ring 32.** On modern S2 alone the
+   promoted candidate and the known-modern feature are indistinguishable.
+   Therefore ring 32's promotion rests ENTIRELY on the CORONA-1967 temporal
+   read, which was single-analyst and was NOT blind-tested here.
+
+Honest consequence: ring 32 stays a candidate, but its confidence is now
+explicitly conditioned on one un-blinded CORONA interpretation. The right
+follow-up (not yet done) is a BLIND CORONA test — mix ring 32's 1967 chip with
+1967 chips of known tells and known modern villages, and see if the
+1967-vs-2023 discrimination survives blind. Until then, ring 32 is "promising,
+pending a blind CORONA check", a notch below where the earlier write-up put it.
+The blind-test design also needs fixing (tell positives failed to render).
