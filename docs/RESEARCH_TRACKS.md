@@ -1692,3 +1692,36 @@ follow-up (not yet done) is a BLIND CORONA test — mix ring 32's 1967 chip with
 1967-vs-2023 discrimination survives blind. Until then, ring 32 is "promising,
 pending a blind CORONA check", a notch below where the earlier write-up put it.
 The blind-test design also needs fixing (tell positives failed to render).
+
+### PRE-REGISTRATION: arid US basin systematic sweep (2026-07-25)
+
+Registered before launch. First real deployment of the sped-up granule-major
+pipeline at scale, targeting the terrain where the deformation detector is
+VALIDATED and coherence is good (not blanket coverage — the Florida lesson).
+
+REGIONS (bbox lon0,lat0,lon1,lat1), 24 km tiles, ~457 tiles / 263,000 km2:
+  Permian TX/NM      -104.2 31.2 -102.0 33.2   (~90)
+  Mojave (full)      -117.5 34.0 -114.5 35.8   (~108)
+  Sonoran AZ         -114.5 32.0 -111.5 33.8   (~108)
+  Great Basin NV     -119.5 38.5 -116.5 40.8   (~121)
+  Delaware Basin     -104.6 31.3 -103.4 32.4   (~30, PILOT FIRST)
+
+DETECTOR: deformation_intel.sweep.run_region_sweep defaults (validated 2x on
+Wink), context screening ON (is_cultivated_confound + osm_infra).
+
+PRE-REGISTERED CANDIDATE RULE (frozen from prior lessons, no post-hoc tuning):
+a candidate is worth human review iff ALL of:
+  - is_localized AND accelerating AND rate_reliable
+  - area < 0.10 km2, void_likelihood >= 0.9
+  - NOT is_cultivated_confound(naip_agriculture, slope_deg)
+  - NOT within 12 km of a geothermal/gas plant (OSM power=plant) -> Carson Sink lesson
+  - NOT part of a cluster of >=5 bowls within 15 km (regional process, not a void)
+INTERPRETATION FRAME (frozen): any survivor is a LEAD needing ground follow-up,
+held to the measured detection floor (~90 m, ~2-3 cm/yr); "no survivors" means
+"no void above that floor", not "no void". Coordinates are US public land, no
+redaction.
+
+PILOT GATE: run Delaware Basin (30 tiles) first; proceed to the full 457 only
+if it completes without the wet-region hang and yields sensible per-tile cubes
+(>= 40 usable epochs typical, coherent). If Permian coherence is thin like
+Florida, STOP and report — do not burn 1.6 days on coverage-limited data.
