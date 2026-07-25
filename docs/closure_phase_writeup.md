@@ -168,11 +168,29 @@ sensing channel can be evaluated honestly.
 - Adversarial self-review incl. all open weaknesses: `docs/CRITIQUE.md`
 - Ground truth: Menze & Ur 2012, Harvard Dataverse doi:10.7910/DVN/7H8K3N
 
-## References (to be completed for any submission)
+## References
 
+Archaeological detection (prior art):
 - Menze, B. H. & Ur, J. A. (2012). Mapping patterns of long-term settlement in
   Northern Mesopotamia at a large scale. *PNAS* 109(14), E778–E787.
-- Orengo, H. A. et al. (2020). Automated detection of archaeological mounds
-  using machine-learning classification of multisensor and multitemporal
-  satellite data. *PNAS* 117(31), 18240–18250.
-- De Zan, F. et al. — InSAR closure phase / soil moisture (full citations TBD).
+- Orengo, H. A., Conesa, F. C., Garcia-Molsosa, A., et al. (2020). Automated
+  detection of archaeological mounds using machine-learning classification of
+  multisensor and multitemporal satellite data. *PNAS* 117(31), 18240–18250.
+
+Closure phase / soil moisture (the established use of the observable):
+- De Zan, F., Zonno, M., & López-Dekker, P. (2015). Phase inconsistencies and
+  multiple scattering in SAR interferometry. *IEEE TGRS* 53(12), 6608–6616.
+  [foundational: closure phase, soil-moisture-driven phase bias.]
+- De Zan, F. et al. (2014). A SAR interferometric model for soil moisture.
+  *IEEE TGRS* 52(1), 418–425.
+- Zwieback, S. et al. — "Vegetation and soil moisture inversion from SAR
+  closure phases" (Remote Sensing of Environment). [exact vol./pp. to confirm
+  before submission.]
+- Additional recent soil-moisture-from-closure-phase work (2023–2025):
+  "Modeling, prediction, and retrieval of surface soil moisture from InSAR
+  closure phase"; "Fine-Resolution Measurement of Soil Moisture From Cumulative
+  InSAR Closure Phase" (RSE / TechRxiv). [full citations to confirm.]
+
+*Note for submission:* the three "to confirm" entries above must be pinned to
+exact volume/page/DOI before this note is circulated; the De Zan 2015 and
+Menze & Ur / Orengo citations are verified.

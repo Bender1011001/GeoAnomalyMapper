@@ -1725,3 +1725,17 @@ PILOT GATE: run Delaware Basin (30 tiles) first; proceed to the full 457 only
 if it completes without the wet-region hang and yields sensible per-tile cubes
 (>= 40 usable epochs typical, coherent). If Permian coherence is thin like
 Florida, STOP and report — do not burn 1.6 days on coverage-limited data.
+
+### Doc sync + writeup references (2026-07-25)
+
+While the Permian pilot runs: brought the public-facing FINDINGS package into
+line with the critique-hardened state (LOCAL, data/ gitignored, zip regenerated
+3.84 MB) — ring 32 DOWNGRADED from "strongest lead" to "promising, pending a
+blind CORONA check" with the blind-test reason stated; closure section updated
+with the dry-season persistence + Bonferroni-survival results and pointers to
+docs/closure_phase_writeup.md and docs/CRITIQUE.md. Completed the writeup's
+prior-art references: De Zan et al. 2015 (IEEE TGRS 53(12), 6608-6616) is the
+verified foundational closure-phase/soil-moisture anchor; Menze&Ur 2012 and
+Orengo 2020 verified; three recent soil-moisture-from-closure titles flagged
+"confirm exact citation before submission". The publication-blocking prior-art
+gap (P2) is now closed with a real anchor, not a placeholder.
