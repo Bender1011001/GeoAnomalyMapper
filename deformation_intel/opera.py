@@ -703,6 +703,101 @@ def build_aoi_cube(
     }
 
 
+def assemble_from_cache(cache_dir, lat: float, lon: float, *,
+                        coherence_threshold: float = 0.6,
+                        min_epochs: int = 8,
+                        min_finite_fraction: float = 0.05) -> dict:
+    """Build a cube purely from a tile's cached windows — no network at all.
+
+    The cache holds one {frame}_{ref}_{sec}.npz per epoch, which is the complete
+    input to reference-era stitching. Deriving the epoch list from the FILENAMES
+    (rather than re-running a granule search) guarantees the assembly matches
+    what the prefetch actually wrote.
+
+    This fixes a real failure: build_frame_cubes prefetched frame F22664 while
+    per-tile assembly independently re-discovered F20698 for the same point and
+    then found no matching cache files ("No OPERA epochs overlapped"). Frame
+    assignment is per-point and not stable across the search, so assembly must
+    never re-derive it.
+    """
+    import numpy as np
+    from deformation_intel.timeseries import stitch_reference_eras
+
+    cache_dir = Path(cache_dir)
+    files = sorted(cache_dir.glob("*.npz"))
+    # A tile can be prefetched by SEVERAL overlapping frames, each with its own
+    # grid; and a frame whose edge clips this tile yields all-NaN windows.
+    # Group by frame and keep the frame with the most USABLE (finite) data.
+    by_frame: Dict[str, list] = {}
+    for f in files:
+        parts = f.stem.split("_")
+        if len(parts) < 3:
+            continue
+        by_frame.setdefault(parts[0], []).append((parts[-2], parts[-1], f))
+    if not by_frame:
+        raise RuntimeError("no cached windows")
+
+    def _score(items):
+        # usable = epochs x mean finite fraction, sampling EVENLY across the
+        # record (the first epochs of a frame are often sparse, so sampling
+        # items[:5] biased the choice toward short frames).
+        idx = np.unique(np.linspace(0, len(items) - 1, min(7, len(items))
+                                    ).astype(int))
+        fin = []
+        for i in idx:
+            try:
+                fin.append(float(np.isfinite(np.load(items[i][2])["disp"]).mean()))
+            except Exception:
+                fin.append(0.0)
+        return len(items) * (sum(fin) / max(len(fin), 1))
+
+    frame = max(by_frame, key=lambda k: _score(by_frame[k]))
+    cube: list = []
+    sec_dates: List[str] = []
+    ref_dates: List[str] = []
+    xcoord = ycoord = None
+    crs_wkt = None
+    ref_shape = None
+    skipped = 0
+    for rd, sd, f in sorted(by_frame[frame], key=lambda t: t[1]):
+        try:
+            z = np.load(f, allow_pickle=False)
+            disp, xs, ys, wkt = z["disp"], z["x"], z["y"], str(z["crs"])
+        except Exception:
+            skipped += 1
+            continue
+        if crs_wkt is None:
+            crs_wkt = wkt
+        if ref_shape is None:
+            ref_shape = disp.shape
+            xcoord, ycoord = xs, ys
+        elif disp.shape != ref_shape:
+            skipped += 1
+            continue
+        cube.append(disp)
+        sec_dates.append(sd)
+        ref_dates.append(rd)
+    if len(cube) < min_epochs:
+        raise RuntimeError(f"only {len(cube)} cached epochs (< {min_epochs})")
+    arr = np.stack(cube, axis=0)
+    stitched = stitch_reference_eras(arr, sec_dates, ref_dates)
+    # A tile clipped by a frame edge yields windows that are individually
+    # non-empty but share no common valid pixels across reference eras, so the
+    # stitched cube comes out all-NaN. Fail loudly -> the caller marks the tile
+    # unassigned instead of running the detector on a garbage cube.
+    finite_frac = float(np.isfinite(stitched).mean())
+    if finite_frac < min_finite_fraction:
+        raise RuntimeError(
+            f"stitched cube only {finite_frac:.1%} finite "
+            f"(< {min_finite_fraction:.0%}); frame {frame} likely clips this tile")
+    t = np.array([decimal_year(d) for d in sorted(sec_dates)])
+    return {"cube": stitched, "t": t, "sec_dates": sorted(sec_dates),
+            "ref_dates": ref_dates, "x": xcoord, "y": ycoord,
+            "crs_wkt": crs_wkt, "frame": frame,
+            "coherence_threshold": coherence_threshold,
+            "center_lat": lat, "center_lon": lon}
+
+
 def build_frame_cubes(
     tiles: Dict[str, Tuple[float, float]],
     *,
@@ -811,11 +906,9 @@ def build_frame_cubes(
             unassigned.append(key)
             continue
         try:
-            out[key] = build_aoi_cube(
-                lat, lon, half_width_km=half_width_km,
-                coherence_threshold=coherence_threshold, max_epochs=max_epochs,
-                cache_dir=tdir, allow_download=False, progress=False, workers=1,
-                cache_only=True)
+            out[key] = assemble_from_cache(
+                tdir, lat, lon, coherence_threshold=coherence_threshold,
+                min_epochs=min_epochs)
         except Exception as exc:
             logger.warning("assemble %s failed: %s", key, type(exc).__name__)
             unassigned.append(key)

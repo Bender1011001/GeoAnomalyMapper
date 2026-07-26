@@ -1756,3 +1756,29 @@ Coverage note (the pilot gate's real purpose): Delaware Basin tiles cached
 ~250 epochs each with ZERO coherence skips, versus Florida's 31 epochs and
 near-total skip rate. Arid Permian is exactly the right target; the gate is
 doing its job of distinguishing usable from coverage-limited terrain.
+
+### Sweep assembly rewritten: cache-derived, multi-frame aware (2026-07-26)
+
+The pilot relaunch exposed the deeper flaw behind the earlier hang: per-tile
+assembly re-derived the OPERA frame from the network, but frame assignment is
+per-point and NOT stable — the prefetch cached frame F22664 while assembly
+independently chose F20698 for the same tile, found no matching cache files,
+and raised. 19 of 25 tiles failed that way.
+
+Fix: new opera.assemble_from_cache() builds the cube from the CACHE ITSELF
+(epoch list parsed from {frame}_{ref}_{sec}.npz filenames), so assembly can
+never disagree with the prefetch, and needs no network at all. Three real
+sub-problems found and handled while validating it against the live cache:
+  1. a tile is often prefetched by SEVERAL overlapping frames -> group by frame
+     and keep the one with the most usable data;
+  2. scoring the first 5 windows biased toward short frames (early OPERA epochs
+     are sparse) -> sample evenly across the record;
+  3. a frame clipping a tile yields windows that are individually non-empty but
+     share no valid pixels across reference eras -> all-NaN stitched cube.
+     Now guarded (min_finite_fraction) so the tile is honestly SKIPPED instead
+     of feeding the detector a garbage cube.
+
+Verified on the full pilot cache: **22/25 tiles assemble, most with 254 epochs
+over 9.3 yr at 83-99% finite**; 3 honest frame-edge skips. Previously 6/25.
+This is the Delaware Basin pilot gate passing on data quality — deep, coherent,
+decade-long Permian archives, exactly the terrain the sweep was scoped for.
