@@ -767,14 +767,26 @@ def build_frame_cubes(
     cache_root = Path(cache_root)
     half = half_width_km * 1000.0
 
-    # one process-pool task per granule; each serves ALL tiles
+    # one process-pool task per granule; each serves ALL tiles.
+    # RESUME: skip any granule whose window is already cached for EVERY tile —
+    # a killed run leaves a full cache, and re-walking 254 granules through the
+    # pool just to re-confirm them wastes the whole prefetch cost again.
     tasks = []
+    n_skipped = 0
     for g in granules:
         rd, sd = _dt(g)
         u = _granule_nc_url(g)
-        if u:
-            tasks.append((u, dict(tiles), half, coherence_threshold,
-                          str(cache_root), frame, rd, sd))
+        if not u:
+            continue
+        fname = f"{frame}_{rd}_{sd}.npz"
+        if all((cache_root / str(k) / fname).exists() for k in tiles):
+            n_skipped += 1
+            continue
+        tasks.append((u, dict(tiles), half, coherence_threshold,
+                      str(cache_root), frame, rd, sd))
+    if n_skipped:
+        logger.info("resume: %d/%d granules already cached for all tiles, "
+                    "%d to fetch", n_skipped, len(granules), len(tasks))
 
     from concurrent.futures import ProcessPoolExecutor, as_completed
     done = 0

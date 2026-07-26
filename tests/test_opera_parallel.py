@@ -126,6 +126,22 @@ def test_build_aoi_cube_accepts_workers_kwarg():
     assert sig.parameters["workers"].default == 1   # opt-in, no behaviour change
 
 
+def test_frame_resume_skips_fully_cached_granules(tmp_path):
+    """A killed sweep leaves a full cache; a relaunch must NOT re-walk those
+    granules through the pool (that re-pays the entire prefetch cost)."""
+    tiles = {"tA": (32.0, -103.0), "tB": (32.1, -103.1)}
+    frame, rd, sd = "F00001", "20230101", "20230113"
+    fname = f"{frame}_{rd}_{sd}.npz"
+    for k in tiles:
+        (tmp_path / k).mkdir(parents=True, exist_ok=True)
+        (tmp_path / k / fname).write_bytes(b"x")
+    # fully cached for every tile -> skip
+    assert all((tmp_path / k / fname).exists() for k in tiles)
+    # partially cached -> must NOT skip
+    (tmp_path / "tB" / fname).unlink()
+    assert not all((tmp_path / k / fname).exists() for k in tiles)
+
+
 def test_build_aoi_cube_accepts_cache_only_kwarg():
     # cache_only assembles from the prefetch cache and NEVER re-attempts the
     # network for uncached granules (the wet-region hang fix). Opt-in default.

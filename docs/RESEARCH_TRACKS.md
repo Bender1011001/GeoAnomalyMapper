@@ -1739,3 +1739,20 @@ verified foundational closure-phase/soil-moisture anchor; Menze&Ur 2012 and
 Orengo 2020 verified; three recent soil-moisture-from-closure titles flagged
 "confirm exact citation before submission". The publication-blocking prior-art
 gap (P2) is now closed with a real anchor, not a placeholder.
+
+### Sweep resume bug found + fixed by a real interrupted run (2026-07-26)
+
+The Delaware pilot was killed at 250/254 granules when the previous session's
+process exited — cache fully intact (25 tile dirs x ~250 epochs each), but 0
+tiles assembled. Relaunching exposed a real design flaw: build_frame_cubes
+re-walked ALL 254 granules through the process pool even though every window
+was already cached, re-paying the entire (multi-hour) prefetch cost to
+re-confirm files on disk. Fix: skip any granule whose window exists for EVERY
+tile. Verified on the live relaunch — "resume: 245/254 granules already cached
+for all tiles, 9 to fetch". Regression test added. This makes long sweeps
+genuinely restart-safe, which matters at 457 tiles.
+
+Coverage note (the pilot gate's real purpose): Delaware Basin tiles cached
+~250 epochs each with ZERO coherence skips, versus Florida's 31 epochs and
+near-total skip rate. Arid Permian is exactly the right target; the gate is
+doing its job of distinguishing usable from coverage-limited terrain.
