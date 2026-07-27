@@ -904,38 +904,45 @@ def build_frame_cubes(
     if len(ready) == len(tiles):
         tasks = []
 
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-    from concurrent.futures import TimeoutError as _FTimeout
+    from concurrent.futures import ProcessPoolExecutor, FIRST_COMPLETED, wait
     done = 0
-    # HARD DEADLINE. A hung remote read blocks as_completed forever (observed:
-    # 7.5 h stalled at 250/269 with zero network activity). Bound the whole
-    # prefetch and proceed with whatever landed — assembly works on partials.
-    deadline = max(600.0, granule_timeout_s * len(tasks) / max(workers, 1))
+    # STALL DETECTION, not a fixed deadline. A hung remote read blocks forever
+    # (observed: 7.5 h stalled at 250/269, zero network activity), but a legit
+    # granule-major task serving ~80 tiles legitimately takes ~20 min — so a
+    # global deadline truncates good work. Abort only when NOTHING completes
+    # for stall_timeout_s; assembly works fine on a partial cache.
+    stall_timeout_s = max(granule_timeout_s * 20.0, 1800.0)
     if tasks:
         with ProcessPoolExecutor(max_workers=workers,
                                  initializer=_pool_init) as ex:
-            futs = [ex.submit(_pool_cache_many, t) for t in tasks]
-            try:
-                for fut in as_completed(futs, timeout=deadline):
-                    try:
-                        fut.result()
-                    except Exception:
-                        pass
-                    done += 1
-                    if progress and done % 25 == 0:
+            pending = {ex.submit(_pool_cache_many, t) for t in tasks}
+            last = time.time()
+            while pending:
+                finished, pending = wait(pending, timeout=120,
+                                         return_when=FIRST_COMPLETED)
+                if finished:
+                    last = time.time()
+                    for fut in finished:
+                        try:
+                            fut.result()
+                        except Exception:
+                            pass
+                        done += 1
+                    if progress:
                         logger.info("  granule-major read %d/%d granules",
                                     done, len(tasks))
-            except _FTimeout:
-                logger.warning("prefetch deadline %.0fs hit at %d/%d granules — "
-                               "proceeding with what is cached", deadline,
-                               done, len(tasks))
-                for f in futs:
-                    f.cancel()
-                for p in list(getattr(ex, "_processes", {}).values()):
-                    try:
-                        p.terminate()
-                    except Exception:
-                        pass
+                elif time.time() - last > stall_timeout_s:
+                    logger.warning("prefetch STALLED %.0f s at %d/%d granules — "
+                                   "aborting, proceeding with cached data",
+                                   time.time() - last, done, len(tasks))
+                    for f in pending:
+                        f.cancel()
+                    for p in list(getattr(ex, "_processes", {}).values()):
+                        try:
+                            p.terminate()
+                        except Exception:
+                            pass
+                    break
 
     # assemble each tile from its cache using the proven single-AOI path
     out: Dict[str, dict] = {}
