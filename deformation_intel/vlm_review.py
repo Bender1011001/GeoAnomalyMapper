@@ -73,6 +73,71 @@ def encode_png(path) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode("ascii")
 
 
+# Model choices, priced from OpenRouter's live API 2026-07-27 ($/M tokens
+# in/out). Cost to review 274 chips individually is in the third column.
+MODELS = {
+    # best OPEN-WEIGHT vision model available on OpenRouter; benchmarks rival
+    # Gemini-2.5-Pro / GPT-5 class. InternVL3 is NOT served on OpenRouter.
+    "open-best": ("qwen/qwen3-vl-235b-a22b-instruct", 0.21, 1.90),   # ~$0.15
+    "open-reasoning": ("qwen/qwen3-vl-235b-a22b-thinking", 0.26, 2.60),  # ~$0.20
+    "open-cheap": ("qwen/qwen3-vl-32b-instruct", 0.104, 0.42),       # ~$0.05
+    "premium": ("anthropic/claude-opus-5", 5.00, 25.00),             # ~$2.47
+    "premium-alt": ("google/gemini-3.1-pro-preview", 2.00, 12.00),   # ~$1.10
+}
+DEFAULT_MODEL = MODELS["open-best"][0]
+
+
+def openrouter_caller(model: str = DEFAULT_MODEL, *, api_key: Optional[str] = None,
+                      max_tokens: int = 1500, timeout: int = 180,
+                      detail_note: str = "") -> Callable[[dict], str]:
+    """Build a call_model(payload)->text function backed by OpenRouter.
+
+    Reads OPENROUTER_API_KEY from the environment if api_key is not given.
+    Kept as a factory so run_review stays vendor-agnostic and offline-testable.
+
+    NOTE on overhead imagery: general VLMs are documented to be weak at scale
+    and orientation on remote-sensing images (see VRSBench / GeoGround
+    literature), so every request prepends the ground width and north-up
+    convention. Pass detail_note to add per-batch context (e.g. tile size).
+    """
+    import os
+    import urllib.request
+
+    key = api_key or os.environ.get("OPENROUTER_API_KEY")
+
+    def call(payload: dict) -> str:
+        if not key:
+            raise RuntimeError("OPENROUTER_API_KEY not set")
+        img = encode_png(payload["image_path"])
+        prompt = payload["prompt"]
+        if detail_note:
+            prompt = f"{detail_note}\n\n{prompt}"
+        body = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url",
+                     "image_url": {"url": f"data:image/png;base64,{img}"}},
+                ],
+            }],
+        }
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json",
+                     "X-Title": "GeoAnomalyMapper"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read())
+        return data["choices"][0]["message"]["content"]
+
+    return call
+
+
 def build_wide_batches(sheet_paths: Sequence, prompt: str = WIDE_PROMPT
                        ) -> List[dict]:
     """One request payload per contact sheet (100 sites each)."""

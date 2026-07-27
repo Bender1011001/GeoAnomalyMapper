@@ -62,3 +62,59 @@ def test_run_review_survives_model_errors(tmp_path):
 
     s = run_review(["s1.png"], broken, tmp_path)
     assert s["notable"] == 0
+
+
+def test_model_catalog_has_open_and_premium():
+    from deformation_intel.vlm_review import MODELS, DEFAULT_MODEL
+    assert "open-best" in MODELS and "premium" in MODELS
+    # default must be the open-weight flagship, not a paid model
+    assert DEFAULT_MODEL == MODELS["open-best"][0]
+    assert "qwen" in DEFAULT_MODEL
+
+
+def test_openrouter_caller_requires_key(monkeypatch):
+    import pytest
+    from deformation_intel.vlm_review import openrouter_caller
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    call = openrouter_caller()
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        call({"image_path": "x.png", "prompt": "p"})
+
+
+def test_openrouter_caller_builds_request(monkeypatch, tmp_path):
+    import json as _json
+    from deformation_intel import vlm_review as vr
+
+    png = tmp_path / "a.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\nFAKE")
+    captured = {}
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return _json.dumps(
+                {"choices": [{"message": {"content": "1 | x | y | 2"}}]}
+            ).encode()
+
+    def fake_urlopen(req, timeout=0):
+        captured["body"] = _json.loads(req.data)
+        captured["auth"] = req.headers.get("Authorization")
+        return _Resp()
+
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    call = vr.openrouter_caller(model="test/model", api_key="KEY123",
+                                detail_note="NOTE")
+    out = call({"image_path": str(png), "prompt": "PROMPT"})
+    assert out == "1 | x | y | 2"
+    assert captured["auth"] == "Bearer KEY123"
+    assert captured["body"]["model"] == "test/model"
+    content = captured["body"]["messages"][0]["content"]
+    assert content[0]["text"].startswith("NOTE")
+    assert "PROMPT" in content[0]["text"]
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")

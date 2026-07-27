@@ -1919,3 +1919,37 @@ uses Google/commercial basemaps. Sources are NAIP (~1 m USDA aerial), Sentinel-2
 commercial map products is applied by those providers, not present in these
 primary products — though NAIP is US-only and some sensitive US sites are simply
 absent from public tiles, and 10 m Sentinel-2 is too coarse for fine detail.
+
+### VLM model selection: researched, priced, wired (2026-07-27)
+
+Queried OpenRouter's live API (340 models, 182 vision-capable) rather than
+relying on blog rankings.
+
+BEST OPEN-WEIGHT: **qwen/qwen3-vl-235b-a22b-instruct** — $0.21/M in, $1.90/M
+out, 262k ctx. Current open flagship; reported to rival Gemini-2.5-Pro / GPT-5
+class on multimodal benchmarks. **InternVL3 is NOT served on OpenRouter** despite
+its strong MMMU score (72.2) — self-host only, so not an option here.
+
+COST to review all 274 chips individually (800 tok in / 200 out per chip):
+  qwen3-vl-32b-instruct        $0.046
+  gemini-2.5-flash-lite        $0.044
+  qwen3-vl-235b-instruct       $0.150   <- recommended default
+  qwen3-vl-235b-thinking       $0.199
+  gemini-3.1-pro-preview       $1.096
+  claude-sonnet-4.6            $1.480
+  claude-opus-5                $2.466
+Whole premium range is < $3, so price should NOT drive this choice.
+
+RECOMMENDED: tiered — qwen3-vl-235b over all 274 ($0.15), then claude-opus-5 on
+the top ~30 flagged ($0.42) = **$0.57 total** for flagship judgement where it
+matters.
+
+Wired: vlm_review.openrouter_caller(model=...) factory (key from
+OPENROUTER_API_KEY), MODELS catalog with the priced tiers, DEFAULT_MODEL = the
+open flagship (never a paid model by default). Kept behind the injected
+call_model interface so the module stays vendor-agnostic and offline-testable.
+10 tests.
+
+CAVEAT recorded: general VLMs are documented-weak on overhead imagery scale and
+orientation (VRSBench / GeoGround literature). Mitigation is prompt-level — every
+request states ground width in metres and north-up convention via detail_note.
