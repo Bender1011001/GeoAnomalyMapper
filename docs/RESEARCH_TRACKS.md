@@ -1889,3 +1889,33 @@ directly on an oil/gas well pad and was only caught by eye. Two things built:
 Net: the whole projected backlog becomes ~2 contact sheets, and the ranking puts
 genuinely unexplained isolated bowls at the top. Remaining gap: an injection-well
 proximity veto (NM OCD ArcGIS endpoints 404'd; needs a working data source).
+
+### Open-ended VLM review: cheap, and deliberately NOT looking for voids (2026-07-27)
+
+Every detector here asks a narrow question ("is this a subsidence void?") and
+therefore discards anything that doesn't match. Since the imagery is free and
+primary-source, an open-ended vision pass is nearly free and can surface things
+no detector was written to find.
+
+COST (measured by estimate_cost): 3 contact sheets (~274 sites) + 40 full-res
+follow-ups = **$0.13** two-pass, ~$1.02 even reviewing every chip individually.
+The two-pass design (wide pass over 100-site contact sheets to triage, focused
+pass only on flagged cells) is 7.9x cheaper than per-chip review.
+
+deformation_intel/vlm_review.py: WIDE_PROMPT / FOCUS_PROMPT, batch builders,
+parse_wide_response, select_for_focus, run_review(call_model injected so it is
+vendor-agnostic and offline-testable). 7 unit tests.
+
+Prompt design decisions worth keeping: the prompt lists categories the
+deformation pipeline is BLIND to (geometric ground patterns, excavations,
+unusual installations, craters, tone anomalies, ruins, "simply looks wrong"),
+and it REQUIRES a mundane explanation before any interest score, so the model
+doesn't manufacture mysteries. Interest scale 0-3; only >=1 reported; explicit
+instruction to describe what is visible rather than speculate.
+
+IMAGERY PROVENANCE (relevant to what such a pass can see): this project never
+uses Google/commercial basemaps. Sources are NAIP (~1 m USDA aerial), Sentinel-2
+(10 m ESA), and declassified CORONA (~2 m, 1960s). Redaction/blurring on
+commercial map products is applied by those providers, not present in these
+primary products — though NAIP is US-only and some sensitive US sites are simply
+absent from public tiles, and 10 m Sentinel-2 is too coarse for fine detail.
