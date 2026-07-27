@@ -144,3 +144,43 @@ def test_cultivated_confound_requires_flat_and_high_ag():
     # unknown slope must NOT veto on agriculture alone (mountain risk)
     assert is_cultivated_confound(1.0, float("nan")) is False
     assert is_cultivated_confound(float("nan"), 0.5) is False
+
+
+def _synthetic_pad(size=200, pad=70):
+    """A bright rectangular clearing centred in darker desert — a well pad."""
+    img = np.full((size, size), 0.35, "float32")
+    rng = np.random.default_rng(3)
+    img += rng.normal(0, 0.05, img.shape)
+    c = size // 2
+    h = pad // 2
+    img[c - h:c + h, c - h:c + h] = 0.85
+    return np.clip(img, 0, 1)
+
+
+def _synthetic_dark_hollow(size=200):
+    """A dark depression — the opposite of a pad."""
+    img = np.full((size, size), 0.6, "float32")
+    rng = np.random.default_rng(4)
+    img += rng.normal(0, 0.05, img.shape)
+    yy, xx = np.mgrid[0:size, 0:size]
+    r = np.hypot(yy - size / 2, xx - size / 2)
+    img[r < size * 0.18] = 0.35
+    return np.clip(img, 0, 1)
+
+
+def test_industrial_pad_detected():
+    from deformation_intel.context import industrial_pad_score, is_industrial_confound
+    s = industrial_pad_score(_synthetic_pad())
+    assert s > 0.35 and is_industrial_confound(s)
+
+
+def test_dark_hollow_is_not_industrial():
+    from deformation_intel.context import industrial_pad_score, is_industrial_confound
+    s = industrial_pad_score(_synthetic_dark_hollow())
+    assert not is_industrial_confound(s)
+
+
+def test_industrial_pad_safe_on_empty():
+    from deformation_intel.context import industrial_pad_score
+    assert industrial_pad_score(np.zeros((0, 0))) == 0.0
+    assert industrial_pad_score(np.full((50, 50), np.nan)) == 0.0

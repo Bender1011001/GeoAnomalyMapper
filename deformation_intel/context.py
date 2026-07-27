@@ -172,6 +172,56 @@ def naip_agriculture_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
     return sampler
 
 
+def industrial_pad_score(gray: np.ndarray) -> float:
+    """Detect a well pad / industrial pad under the centre of an imagery chip.
+
+    In arid basins the dominant confound for "localized accelerating
+    subsidence" is oil/gas activity, and a well pad is visually unmistakable:
+    a BRIGHT (scraped caliche), RECTANGULAR, LOW-TEXTURE clearing, typically
+    100-250 m across, against darker vegetated desert. Agriculture is a grid of
+    lines; a pad is a filled bright blob with straight edges.
+
+    Returns [0,1]. Measured on real survivors (2026-07-27): a Delaware-Basin
+    survivor sitting on a pad scores high, a natural collapse depression
+    scores low. Pure/offline — feed it a normalised chip.
+    """
+    g = np.asarray(gray, dtype="float32")
+    if g.size == 0 or not np.isfinite(g).any():
+        return 0.0
+    lo, hi = np.nanpercentile(g, [2, 98])
+    g = np.clip((g - lo) / (hi - lo + 1e-6), 0, 1)
+    g = np.nan_to_num(g, nan=float(np.nanmedian(g)))
+    h, w = g.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    r = np.hypot(yy - h / 2.0, xx - w / 2.0) / (0.5 * min(h, w))
+    # A pad is a scraped clearing centred ON the anomaly: the middle is much
+    # BRIGHTER than the surrounding desert. Connected-component rectangularity
+    # fails here because equipment/shadows/tracks fragment the pad into dozens
+    # of pieces (measured: 83 components on a real pad), so compare the central
+    # disc against an outer annulus instead — robust to that fragmentation.
+    core = r < 0.30
+    ring = (r > 0.55) & (r < 0.95)
+    if core.sum() < 16 or ring.sum() < 16:
+        return 0.0
+    c_bright = float(np.mean(g[core]))
+    s_bright = float(np.mean(g[ring]))
+    spread = float(np.std(g[ring])) + 1e-6
+    excess = (c_bright - s_bright) / spread          # in surround-sigma units
+    # bright fraction of the core: a pad is broadly bright, not a few specks
+    hi_thr = s_bright + 1.5 * spread
+    frac = float(np.mean(g[core] > hi_thr))
+    score = np.clip(excess / 3.0, 0, 1) * np.clip(frac / 0.5, 0, 1)
+    return float(np.clip(score, 0, 1))
+
+
+PAD_THRESHOLD = 0.35
+
+
+def is_industrial_confound(pad_score: float) -> bool:
+    """True when the anomaly sits on a well pad / industrial clearing."""
+    return bool(np.isfinite(pad_score) and pad_score >= PAD_THRESHOLD)
+
+
 def slope_sampler(read_grid_fn: Callable, stac_search_fn: Callable,
                   half_deg: float = 0.006, px: int = 44):
     """Build a (lat, lon) -> mean terrain slope (degrees) sampler from the

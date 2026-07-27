@@ -1855,3 +1855,37 @@ cost amortizes. Region-1 prefetch estimate drops ~12.7 h -> ~2.8 h.
 Worker count also re-tuned: with download as the cost, optimal concurrency is
 set by bandwidth (~300 Mbps / ~41 Mbps per stream ~= 7-8 concurrent), not cores.
 Using 12 (overlaps extraction with download without thrashing disk/RAM).
+
+### The 60,000-backlog problem: a measured triage funnel (2026-07-27)
+
+Question: how do you get ~51k-60k raw detections down to something a person can
+review in a day? Answer, from MEASURED rates (pilot: 153 localized -> 2
+survivors; 94 anomalies/tile; 41% localized):
+
+  stage                        sites    manual review time
+  raw anomalies               51,136    35 work-days   -- hopeless
+  localized only              20,926    14 work-days   -- hopeless
+  + frozen screening rule        274     1.5 h         -- FEASIBLE
+  + industrial imagery veto     ~150     <1 h
+  + CONTACT SHEETS            2 pages    ~5 min        -- trivial
+
+So the screening rule ALREADY solves the volume problem (51k -> 274). The real
+residual problem is QUALITY of the shortlist: in the pilot, 1 of 2 survivors sat
+directly on an oil/gas well pad and was only caught by eye. Two things built:
+
+1. **context.industrial_pad_score** — well-pad detector. First attempt used
+   connected-component rectangularity and FAILED (returned 0.00 on a real pad):
+   equipment/shadows/tracks fragment a pad into ~83 components. Rebuilt as
+   centre-disc vs outer-annulus BRIGHTNESS EXCESS, which is robust to that
+   fragmentation. Validated 6/6 on real chips: well-pad survivor 0.58,
+   natural depression 0.00, barren Mojave 0.00, Gila Bend agriculture 0.00,
+   Mojave Preserve fan 0.05, Cabeza mountain 0.00. Unit tests added.
+2. **deformation_intel/review.py** — rank_for_review (signal strength x how
+   UNEXPLAINED, penalising clusters), contact_sheet (labelled 10x10 grid of
+   crosshaired thumbnails; ~2 min/sheet vs ~20 s/site opened individually =
+   ~6x), build_review_package (chip -> auto-veto industrial -> sheets +
+   review_list.json). 8 unit tests, injectable chip_fn so the core is offline.
+
+Net: the whole projected backlog becomes ~2 contact sheets, and the ranking puts
+genuinely unexplained isolated bowls at the top. Remaining gap: an injection-well
+proximity veto (NM OCD ArcGIS endpoints 404'd; needs a working data source).
