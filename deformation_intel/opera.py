@@ -347,13 +347,18 @@ def _pool_read_many(task):
 
 
 def _pool_cache_many(task):
-    """Granule-major CACHING worker: open one granule, write each tile's window
-    to that tile's own cache dir as {frame}_{rd}_{sd}.npz, return {key: bool}.
+    """Granule-major CACHING worker: DOWNLOAD one granule, then extract every
+    tile's window LOCALLY and write it to that tile's cache dir.
 
-    Streaming to disk (not returning arrays) keeps memory O(1) in the number of
-    tiles and makes the sweep crash-resumable — a re-launch skips cached tiles.
-    Assembly is then delegated to build_aoi_cube reading from these caches, so
-    the proven reference-era stitching is reused unchanged.
+    Why download instead of lazy remote reads (measured 2026-07-27):
+      remote open .................. 76 s
+      remote read of ONE 733x733 window (4 masked arrays) .... 62-146 s
+      full granule download (407 MB) ......................... 80 s
+    Serving ~80 tiles per granule remotely therefore costs ~2 HOURS of tiny
+    latency-bound HTTP range requests, while downloading the whole file costs
+    ~80 s and makes all subsequent window extraction local and instant — an
+    ~80x win, and it finally uses the bandwidth instead of the round-trip
+    budget. Bounded disk: one granule at a time per worker, deleted after.
     """
     import numpy as np
     url, aois, half, coh, cache_root, frame, rd, sd = task
@@ -361,33 +366,45 @@ def _pool_cache_many(task):
     if _WORKER_FS is None:
         _pool_init()
     from pathlib import Path as _P
+    import shutil
+    import tempfile
+    import xarray as xr
     root = _P(cache_root)
+    tmpd = _P(tempfile.mkdtemp(prefix="opera_g_"))
+    local = tmpd / "g.nc"
+    out = {k: False for k in aois}
     try:
-        ds = _open_authenticated(url, _WORKER_FS)
-    except Exception:
-        return {k: False for k in aois}
-    out = {}
-    try:
-        for key, (lat, lon) in aois.items():
-            try:
-                r = _extract_window(ds, lon, lat, half, coh)
-                if r is None:
-                    out[key] = False
-                    continue
-                d = root / str(key)
-                d.mkdir(parents=True, exist_ok=True)
-                np.savez_compressed(d / f"{frame}_{rd}_{sd}.npz",
-                                    disp=r[0], x=r[1], y=r[2],
-                                    crs=np.str_(r[3]))
-                out[key] = True
-            except Exception:
-                out[key] = False
-        return out
-    finally:
         try:
-            ds.close()
+            with _WORKER_FS.open(url) as src, open(local, "wb") as dst:
+                shutil.copyfileobj(src, dst, length=8 * 1024 * 1024)
         except Exception:
-            pass
+            return out
+        try:
+            ds = xr.open_dataset(local, engine="h5netcdf")
+        except Exception:
+            return out
+        try:
+            for key, (lat, lon) in aois.items():
+                try:
+                    r = _extract_window(ds, lon, lat, half, coh)
+                    if r is None:
+                        continue
+                    d = root / str(key)
+                    d.mkdir(parents=True, exist_ok=True)
+                    np.savez_compressed(d / f"{frame}_{rd}_{sd}.npz",
+                                        disp=r[0], x=r[1], y=r[2],
+                                        crs=np.str_(r[3]))
+                    out[key] = True
+                except Exception:
+                    continue
+            return out
+        finally:
+            try:
+                ds.close()
+            except Exception:
+                pass
+    finally:
+        shutil.rmtree(tmpd, ignore_errors=True)
 
 
 def read_windows_parallel(urls, lon, lat, half, coherence_threshold,

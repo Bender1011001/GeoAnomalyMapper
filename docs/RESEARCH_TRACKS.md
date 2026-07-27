@@ -1827,3 +1827,31 @@ sinkhole-hazard county, not explained by imagery or by the screens applied. This
 is the strongest deformation lead the project has produced. Next: injection-well
 proximity (needs a working NM data source), and it is REPORTABLE as-is to the
 New Mexico Bureau of Geology / EMNRD-OCD.
+
+### THROUGHPUT, round 2: download-then-extract beats lazy remote reads ~10x (2026-07-27)
+
+User asked why the machine was at 1% CPU. Measurement, not guesswork:
+  CPU 1% of 20 cores, 8/64 GB RAM, 0 open TCP connections, ~19 windows/min.
+Raising workers 8 -> 40 changed NOTHING (18/min). So worker count was never the
+constraint. Instrumenting one granule at the real sweep window size
+(half_width_km=11 -> 733x733, and _extract_window reads FOUR masked arrays):
+
+  remote granule open ....................... 76 s
+  remote read of ONE 733x733 window ......... 62-146 s
+  FULL granule download (407 MB) ............ 80 s
+
+So serving ~80 tiles from one granule remotely costs ~2 HOURS of tiny
+latency-bound range requests, while downloading the entire file costs 80 s.
+We were spending the round-trip budget and leaving the bandwidth idle. (An
+earlier 4.5 s/granule measurement was misleading — it used a 400x400 window and
+one array, not the sweep's real 733x733 x4.)
+
+FIX: _pool_cache_many now DOWNLOADS the granule to a temp file, extracts every
+tile's window locally, then deletes it. Bounded disk (one granule per worker).
+MEASURED: 20 tiles from one granule in 177.7 s = 8.9 s/tile-window vs ~90 s
+baseline = **10x**, improving toward ~15x at 81 tiles/granule since the download
+cost amortizes. Region-1 prefetch estimate drops ~12.7 h -> ~2.8 h.
+
+Worker count also re-tuned: with download as the cost, optimal concurrency is
+set by bandwidth (~300 Mbps / ~41 Mbps per stream ~= 7-8 concurrent), not cores.
+Using 12 (overlaps extraction with download without thrashing disk/RAM).
