@@ -1782,3 +1782,48 @@ Verified on the full pilot cache: **22/25 tiles assemble, most with 254 epochs
 over 9.3 yr at 83-99% finite**; 3 honest frame-edge skips. Previously 6/25.
 This is the Delaware Basin pilot gate passing on data quality — deep, coherent,
 decade-long Permian archives, exactly the terrain the sweep was scoped for.
+
+### Delaware Basin pilot RESULT + a correction to my own framing (2026-07-27)
+
+CORRECTION FIRST: I wrote "zero confirmed true positives in the project's
+history". That was wrong and unfair. The detector HAS correctly recovered real
+features it was pointed at — Wink TX sinkholes, the Carlsbad brine well, LA
+Regional Connector tunnel settlement. Those are true positives. The accurate
+statement is narrower: no NEW candidate has yet been confirmed by an
+independent party. Also wrong was treating "ground follow-up" as the only
+confirmation route — desk-based confirmation (imagery, time-series shape,
+published literature, state databases) is available and I had not exhausted it.
+
+PILOT RESULT (22/25 tiles, 254-269 epochs each, 9.3-9.4 yr):
+392 anomalies -> 153 localized -> frozen screen -> **2 survivors**.
+Rejections: 138 low void-likelihood, 5 near power plant, 5 in cluster,
+2 too large, 1 not accelerating.
+
+**Survivor 1 — 32.3231, -103.8511 (Eddy County, NM): -52.9 cm over 9.3 years,
+strongly accelerating.** Yearly cumulative: 2016 -0.1, 2017 -1.0, 2018 -1.4,
+2019 -3.4, 2020 -9.0, 2021 -18.0, 2022 -24.1, 2023 -32.5, 2024 -41.7,
+2025 -49.5 cm. Flat through 2018 then sharp onset. Quadratic fit accel
+-1.13 cm/yr2 (resid 2.28 vs 4.31 linear -> genuinely non-linear). NAIP 2022
+shows an arcuate depression / scarp at a drainage head; NOT on a well pad;
+~200 m from a road + pipeline corridor.
+
+**Survivor 2 — 32.3323, -103.8592: -32.1 cm over 9.3 yr, accelerating, but
+NAIP shows it sits DIRECTLY ON an oil/gas well pad** -> injection/production
+related, demoted.
+
+CONTEXT: Eddy County NM is a documented brine-well sinkhole hazard province
+(Carlsbad "South Y" cavern under US-285; a 2008 brine-well collapse in northern
+Eddy County). Half a metre of accelerating subsidence here is the same physical
+class as the Wink/Carlsbad positive controls.
+
+GAP FOUND IN THE FROZEN RULE: it vetoes proximity to power plants but NOT to
+oil/gas injection wells — which is the dominant confound in this basin. Survivor
+2 passed the rule and was only caught by imagery. Rule needs an injection-well
+veto before any Permian-scale deployment. (NM OCD ArcGIS endpoints tried and
+404'd; needs a working state data source.)
+
+STATUS OF SURVIVOR 1: a real, large, accelerating deformation feature in a known
+sinkhole-hazard county, not explained by imagery or by the screens applied. This
+is the strongest deformation lead the project has produced. Next: injection-well
+proximity (needs a working NM data source), and it is REPORTABLE as-is to the
+New Mexico Bureau of Geology / EMNRD-OCD.
