@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -91,7 +92,16 @@ class ReleaseHardeningHealthTests(unittest.TestCase):
         self.assertIn('"numpy>=1.24.0"', pyproject)
         self.assertIn('"earthaccess>=', pyproject)
         self.assertIn('"json_utils"', pyproject)
-        self.assertIn('packages = ["deformation_intel"]', pyproject)
+        # Every importable package in the tree must be declared for install.
+        # Parse rather than string-match so adding a package cannot silently
+        # pass while leaving the package undistributed.
+        declared = tomllib.loads(pyproject)["tool"]["setuptools"]["packages"]
+        on_disk = sorted(
+            p.parent.name
+            for p in Path(".").glob("*/__init__.py")
+            if not p.parent.name.startswith((".", "tests"))
+        )
+        self.assertEqual(sorted(declared), on_disk)
         self.assertIn("prune data", manifest)
         self.assertIn("prune results_extracted", manifest)
         self.assertIn("global-exclude .env", manifest)

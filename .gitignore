@@ -102,3 +102,7 @@ biondi_results_new.zip
 # Large local result artifacts (exceed/approach GitHub limits; regenerable)
 results_archive.zip
 results_extracted/
+
+# agent scaffold
+CONTEXT.md
+.roomodes

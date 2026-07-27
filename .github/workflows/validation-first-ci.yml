@@ -32,10 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -e .
+          python -m pip install pytest
 
       - name: Compile validation-first sources
         run: |
-          python -m compileall -q blind_validation.py geoanomaly.py json_utils.py slc_data_fetcher.py project_paths.py deformation_intel tests
+          python -m compileall -q blind_validation.py geoanomaly.py json_utils.py slc_data_fetcher.py project_paths.py deformation_intel archaeo_intel tests
 
       - name: Run no-download release health check
         run: |
@@ -46,5 +47,7 @@ jobs:
           geoanomaly commands
 
       - name: Run unit tests
+        # pytest, not `unittest discover`: most test modules use bare
+        # `def test_*` functions, which unittest silently does not collect.
         run: |
-          python -m unittest discover -s tests
+          python -m pytest tests -q

@@ -19,7 +19,22 @@ DEFAULT_NPZ = Path(__file__).resolve().parent.parent / "data" / "archaeo" / \
 
 
 def load_menze_ur(npz_path: Path = DEFAULT_NPZ):
-    """Load the cached catalog -> (lat, lon) arrays (EPSG:4326)."""
+    """Load the cached catalog -> (lat, lon) arrays (EPSG:4326).
+
+    The cache ships in the repository at ``data/archaeo/`` and is resolved
+    relative to this file, so it is found in a source checkout or an editable
+    install. A non-editable ``pip install`` does not copy ``data/``; in that
+    case pass ``npz_path`` explicitly or rebuild the cache with
+    :func:`build_menze_ur_npz` from the Dataverse CSV.
+    """
+    npz_path = Path(npz_path)
+    if not npz_path.exists():
+        raise FileNotFoundError(
+            f"Menze & Ur catalog cache not found at {npz_path}. "
+            "Run from a source checkout (or editable install), pass npz_path "
+            "explicitly, or rebuild it with build_menze_ur_npz() using the CSV "
+            f"from {DATAVERSE_FILE_URL}."
+        )
     d = np.load(npz_path)
     return d["lat"], d["lon"]
 

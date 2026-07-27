@@ -114,7 +114,7 @@ documentation index.
 ## Quickstart
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"   # omit [dev] if you don't need the test suite
 # Earthdata credentials (free account: https://urs.earthdata.nasa.gov)
 cp .env.example .env   # fill EARTHDATA_USERNAME / EARTHDATA_PASSWORD
 
