@@ -808,6 +808,7 @@ def build_frame_cubes(
     min_epochs: int = 8,
     cache_root: Optional[Path] = None,
     progress: bool = True,
+    granule_timeout_s: float = 90.0,
 ) -> Tuple[Dict[str, dict], List[str]]:
     """GRANULE-MAJOR sweep: build cubes for MANY AOIs sharing one OPERA frame,
     opening each granule ONCE for all tiles instead of once PER tile.
@@ -883,18 +884,58 @@ def build_frame_cubes(
         logger.info("resume: %d/%d granules already cached for all tiles, "
                     "%d to fetch", n_skipped, len(granules), len(tasks))
 
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-    done = 0
-    with ProcessPoolExecutor(max_workers=workers, initializer=_pool_init) as ex:
-        futs = [ex.submit(_pool_cache_many, t) for t in tasks]
-        for fut in as_completed(futs):
+    # Skip tiles that already assemble from cache — a resumed/overlapping run
+    # must not re-fetch a frame whose data is already on disk (observed: the
+    # driver spent hours fetching a 2nd deep frame for tiles that were ready).
+    ready = set()
+    for key, (la, lo) in tiles.items():
+        td = cache_root / str(key)
+        if td.exists():
             try:
-                fut.result()
+                assemble_from_cache(td, la, lo,
+                                    coherence_threshold=coherence_threshold,
+                                    min_epochs=min_epochs)
+                ready.add(key)
             except Exception:
                 pass
-            done += 1
-            if progress and done % 25 == 0:
-                logger.info("  granule-major read %d/%d granules", done, len(tasks))
+    if ready:
+        logger.info("  %d/%d tiles already assemble from cache; prefetching for %d",
+                    len(ready), len(tiles), len(tiles) - len(ready))
+    if len(ready) == len(tiles):
+        tasks = []
+
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    from concurrent.futures import TimeoutError as _FTimeout
+    done = 0
+    # HARD DEADLINE. A hung remote read blocks as_completed forever (observed:
+    # 7.5 h stalled at 250/269 with zero network activity). Bound the whole
+    # prefetch and proceed with whatever landed — assembly works on partials.
+    deadline = max(600.0, granule_timeout_s * len(tasks) / max(workers, 1))
+    if tasks:
+        with ProcessPoolExecutor(max_workers=workers,
+                                 initializer=_pool_init) as ex:
+            futs = [ex.submit(_pool_cache_many, t) for t in tasks]
+            try:
+                for fut in as_completed(futs, timeout=deadline):
+                    try:
+                        fut.result()
+                    except Exception:
+                        pass
+                    done += 1
+                    if progress and done % 25 == 0:
+                        logger.info("  granule-major read %d/%d granules",
+                                    done, len(tasks))
+            except _FTimeout:
+                logger.warning("prefetch deadline %.0fs hit at %d/%d granules — "
+                               "proceeding with what is cached", deadline,
+                               done, len(tasks))
+                for f in futs:
+                    f.cancel()
+                for p in list(getattr(ex, "_processes", {}).values()):
+                    try:
+                        p.terminate()
+                    except Exception:
+                        pass
 
     # assemble each tile from its cache using the proven single-AOI path
     out: Dict[str, dict] = {}
