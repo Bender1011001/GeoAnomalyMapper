@@ -182,7 +182,7 @@ def test_funnel_end_to_end_offline(tmp_path, monkeypatch):
     report = pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128,
                            workers=4, max_stage2=50, n_background=20,
                            use_vlm=False, use_change=False,
-                           log=lambda m: None)
+                           filter_sheets=False, log=lambda m: None)
     art = out / "artifacts"
     ranked = json.loads((art / "stage2_ranked.json").read_text())
     assert (art / "stage1_candidates.json").exists()
@@ -202,7 +202,7 @@ def test_funnel_resumes_without_refetching(tmp_path, monkeypatch):
     out = tmp_path / "run"
     pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128, workers=4,
                   max_stage2=50, n_background=20, use_vlm=False,
-                  use_change=False, log=lambda m: None)
+                  use_change=False, filter_sheets=False, log=lambda m: None)
 
     def boom(*a):
         raise AssertionError("resume must not refetch chips")
@@ -211,9 +211,55 @@ def test_funnel_resumes_without_refetching(tmp_path, monkeypatch):
     report = pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128,
                            workers=4, max_stage2=50, n_background=20,
                            use_vlm=False, use_change=False,
-                           log=lambda m: None)
+                           filter_sheets=False, log=lambda m: None)
     assert (out / "report.md").exists()
     assert report["stages"]["stage2"]["scored"] > 0
+
+
+def test_compose_panel_offline():
+    """Pure panel composition: handles present, missing, and all-missing
+    tiles without network or errors."""
+    from interesting_intel.filters import compose_panel
+
+    rng = np.random.default_rng(0)
+    good = rng.uniform(0, 1, (64, 64, 3)).astype("float32")
+    img = compose_panel([("a", good), ("b", None), ("c", good)],
+                        tile_px=100, cols=2, title="t")
+    assert img.width == 200 and img.height > 200
+    img2 = compose_panel([("only", None)], tile_px=80)
+    assert img2.width == 80
+
+
+def test_funnel_filter_sheets_offline(tmp_path, monkeypatch):
+    """Stage 5 writes one dossier per queue entry via the (mocked) gatherer,
+    and a resumed run does not regenerate existing sheets."""
+    import interesting_intel.filters as fl
+
+    _patch_world(monkeypatch)
+    calls = []
+
+    def fake_gather(lat, lon, **k):
+        calls.append((lat, lon))
+        rng = np.random.default_rng(1)
+        return {k2: rng.uniform(0, 1, (32, 32, 3)).astype("float32")
+                for k2, _ in fl.TILE_ORDER}
+
+    monkeypatch.setattr(fl, "gather_views", fake_gather)
+    out = tmp_path / "run"
+    report = pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128,
+                           workers=4, max_stage2=30, n_background=20,
+                           use_vlm=False, use_change=False,
+                           filter_sheets=True, log=lambda m: None)
+    sheets = list((out / "filters").glob("rank_*_filters.png"))
+    assert len(sheets) == report["stages"]["stage5"]["queue"]
+    assert len(calls) == len(sheets)
+    n_first = len(calls)
+    monkeypatch.setattr(pl, "fetch_chip_s2",
+                        lambda *a: (_ for _ in ()).throw(AssertionError()))
+    pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128, workers=4,
+                  max_stage2=30, n_background=20, use_vlm=False,
+                  use_change=False, filter_sheets=True, log=lambda m: None)
+    assert len(calls) == n_first          # resume reused existing sheets
 
 
 def test_funnel_seeds_enter_pool(tmp_path, monkeypatch):
@@ -222,7 +268,8 @@ def test_funnel_seeds_enter_pool(tmp_path, monkeypatch):
     seed = {"lat": 10.03, "lon": 30.03, "name": "control"}
     pl.run_funnel(BBOX, out, source="s2", half_m=300, px=128, workers=4,
                   max_stage2=50, n_background=20, use_vlm=False,
-                  use_change=False, seeds=[seed], log=lambda m: None)
+                  use_change=False, filter_sheets=False, seeds=[seed],
+                  log=lambda m: None)
     cands = json.loads(
         (out / "artifacts" / "stage1_candidates.json").read_text())
     assert any(c.get("seed_name") == "control" for c in cands)

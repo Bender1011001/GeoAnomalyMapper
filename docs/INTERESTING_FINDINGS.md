@@ -13,6 +13,14 @@ Sentinel-2 spectral outliers, change-over-years) -> parallel cached chip fetch
 contact sheet and this report. Nothing is hard-vetoed; definitive confounds
 (cultivated flat land, industrial pads) only demote rank.
 
+Every site in the final queue also gets a six-view multi-filter dossier
+(`<out>/filters/rank_XXXX_filters.png`): NAIP false-colour IR (~0.6 m),
+Sentinel-2 true colour, SWIR geology composite (B12-B11-B04), iron-oxide
+ratio (B04/B02), clay/hydroxyl ratio (B11/B12), and GLO-30 hillshade. Added
+after the rank-123 review below — the iron-oxide filter is what confirmed
+that site as an alteration zone, and it should not require hand-work per
+site. Ratio maps in steep terrain are qualitative (shadow contamination).
+
 ## Positive / negative controls — honest history
 
 Round 1 (first real run, 2026-07-27 morning): **1/5 positives surfaced.**

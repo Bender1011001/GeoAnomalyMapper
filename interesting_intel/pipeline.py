@@ -455,6 +455,7 @@ def run_funnel(bbox, out_dir, *, source: str = "auto", half_m: float = 500.0,
                max_focus: int = 120, use_vlm: bool = True,
                use_osm: bool = False, max_osm: int = 120,
                use_change: bool = True, use_grid: bool = False,
+               filter_sheets: bool = True,
                seeds: Sequence[dict] = (), force: bool = False,
                rng_seed: int = 7, log=None) -> dict:
     """Run the full funnel over bbox and write everything under out_dir.
@@ -690,6 +691,32 @@ def run_funnel(bbox, out_dir, *, source: str = "auto", half_m: float = 500.0,
                           f"{e['lat']:.4f},{e['lon']:.4f}")
         contact_sheet(chips, labels, out / "final_queue.png", cols=10,
                       thumb=200, title="FINAL QUEUE — worth a glance?")
+    # multi-filter dossier per queue site (NAIP false-IR, S2 true/SWIR,
+    # iron-oxide + clay ratios, hillshade) — skipped when already on disk,
+    # so a resumed run only fills gaps
+    fpaths: Dict[int, str] = {}
+    if filter_sheets and queue:
+        from interesting_intel.filters import filter_sheet
+
+        def one_sheet(e):
+            p = out / "filters" / f"rank_{e['rank']:04d}_filters.png"
+            if p.exists():
+                return e["rank"], str(p)
+            try:
+                got = filter_sheet(e["lat"], e["lon"], p,
+                                   title=f"rank {e['rank']}  "
+                                         f"{e['lat']:.4f}, {e['lon']:.4f}")
+                return e["rank"], (str(got) if got else None)
+            except Exception as exc:
+                log(f"stage5: filter sheet failed rank {e['rank']}: {exc}")
+                return e["rank"], None
+
+        with ThreadPoolExecutor(max_workers=max(workers // 3, 2)) as ex:
+            for rank, p in ex.map(one_sheet, queue):
+                if p:
+                    fpaths[rank] = p
+        log(f"stage5: {len(fpaths)}/{len(queue)} filter sheets")
+
     lines = ["# interesting_intel run report", "",
              f"bbox: {list(bbox)}", "",
              f"funnel: {len(cands)} candidates -> {len(ranked)} scored -> "
@@ -704,12 +731,14 @@ def run_funnel(bbox, out_dir, *, source: str = "auto", half_m: float = 500.0,
                   f"{r.get('novelty')}  geometry {r.get('geometry')}"
                   f"  demoted_for: {r.get('demoted_for', [])}",
                   f"- wide pass: {e.get('wide_description', '')}",
-                  f"- chip: {e.get('png', '')}", ""]
+                  f"- chip: {e.get('png', '')}",
+                  f"- filters: {fpaths.get(e['rank'], 'n/a')}", ""]
         if e.get("focus_text"):
             lines += ["```", e["focus_text"].strip(), "```", ""]
     (out / "report.md").write_text("\n".join(lines), encoding="utf-8")
     report["stages"]["stage5"] = {"sec": round(time.time() - t, 1),
-                                  "queue": len(queue)}
+                                  "queue": len(queue),
+                                  "filter_sheets": len(fpaths)}
     report["total_sec"] = round(time.time() - t_all, 1)
     report["vlm"]["usd"] = round(report["vlm"]["usd"], 4)
     _save(art / "run_report.json", report)

@@ -52,6 +52,8 @@ def main(argv=None) -> int:
                          "polite-rate; adjusts rank only)")
     ap.add_argument("--no-change", action="store_true",
                     help="skip the S2 change-over-time prior")
+    ap.add_argument("--no-filter-sheets", action="store_true",
+                    help="skip the per-site multi-filter dossier panels")
     ap.add_argument("--grid", action="store_true",
                     help="add unbiased grid candidates (coverage floor)")
     ap.add_argument("--grid-m", type=float, default=500.0)
@@ -76,6 +78,7 @@ def main(argv=None) -> int:
         vlm_model=args.vlm_model, focus_model=args.focus_model,
         min_interest=args.min_interest, use_vlm=not args.no_vlm,
         use_osm=args.osm, use_change=not args.no_change, use_grid=args.grid,
+        filter_sheets=not args.no_filter_sheets,
         seeds=seeds, force=args.force, log=lambda m: print(m, flush=True))
     print(f"VLM cost ${report['vlm']['usd']}, "
           f"total {report['total_sec']}s")

@@ -21,6 +21,9 @@ cheap VLM over 25-chip contact sheets                     pipeline.py
 strong VLM over full-res colour chips
   v
 human reviews final_queue.png + report.md
+  + per-site multi-filter dossier (filters.py): NAIP false-colour IR,
+    S2 true colour + SWIR geology, iron-oxide & clay ratios, hillshade
+    -> <out>/filters/rank_XXXX_filters.png   (--no-filter-sheets to skip)
 ```
 
 ## Run it
