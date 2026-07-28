@@ -287,16 +287,55 @@ def _extract_window(ds, lon, lat, half, coherence_threshold):
 # only 1.4x on 8 threads. Processes do: 3.5x on 8 workers. Hence a process
 # pool with a one-time auth per worker.
 _WORKER_FS = None
+_WORKER_ASF = None
 
 
 def _pool_init():
-    global _WORKER_FS
+    global _WORKER_FS, _WORKER_ASF
+    import os
     import earthaccess
     earthaccess.login(strategy="environment")
     try:
         _WORKER_FS = earthaccess.get_fsspec_https_session()
     except Exception:
         _WORKER_FS = None
+    # Some frames are served ONLY from the ASF datapool, which needs the URS
+    # redirect that plain fsspec does not follow (it raises FileNotFoundError /
+    # 401). Measured: an entire Mojave frame failed this way in ~3 s per
+    # granule, silently producing zero windows. ASFSession handles the redirect.
+    try:
+        import asf_search as asf
+        user = os.environ.get("EARTHDATA_USERNAME")
+        pwd = os.environ.get("EARTHDATA_PASSWORD")
+        _WORKER_ASF = (asf.ASFSession().auth_with_creds(user, pwd)
+                       if user and pwd else None)
+    except Exception:
+        _WORKER_ASF = None
+
+
+def _worker_download(url, dest) -> bool:
+    """Fetch a granule to `dest`, trying fsspec then the ASF datapool."""
+    import shutil
+    from pathlib import Path as _P
+    dest = _P(dest)
+    global _WORKER_FS, _WORKER_ASF
+    if _WORKER_FS is not None:
+        try:
+            with _WORKER_FS.open(url) as src, open(dest, "wb") as dst:
+                shutil.copyfileobj(src, dst, length=8 * 1024 * 1024)
+            if dest.stat().st_size > 1_000_000:
+                return True
+        except Exception:
+            pass
+    if _WORKER_ASF is not None:
+        try:
+            import asf_search as asf
+            asf.download_url(url=url, path=str(dest.parent),
+                             filename=dest.name, session=_WORKER_ASF)
+            return dest.exists() and dest.stat().st_size > 1_000_000
+        except Exception:
+            return False
+    return False
 
 
 def _pool_read(task):
@@ -374,10 +413,7 @@ def _pool_cache_many(task):
     local = tmpd / "g.nc"
     out = {k: False for k in aois}
     try:
-        try:
-            with _WORKER_FS.open(url) as src, open(local, "wb") as dst:
-                shutil.copyfileobj(src, dst, length=8 * 1024 * 1024)
-        except Exception:
+        if not _worker_download(url, local):
             return out
         try:
             ds = xr.open_dataset(local, engine="h5netcdf")

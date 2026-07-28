@@ -1953,3 +1953,26 @@ call_model interface so the module stays vendor-agnostic and offline-testable.
 CAVEAT recorded: general VLMs are documented-weak on overhead imagery scale and
 orientation (VRSBench / GeoGround literature). Mitigation is prompt-level — every
 request states ground width in metres and north-up convention via detail_note.
+
+### Region 1 COMPLETE + two sweep bugs found by watching it run (2026-07-27)
+
+**PERMIAN TX/NM DONE: 81/81 tiles.** First full region of the arid sweep.
+
+Bug 1 — diminishing-returns tail. A frame costs ~254 granules (~100 GB, 1.5-2 h)
+regardless of how many tiles it serves. Region 1's frames served 41, 22, 3, then
+1 tile: the last 4 tiles ate ~3.5 h of a 7.5 h region. Added
+min_tiles_per_frame=5 — below that, leave the tiles unassigned (honest coverage
+gap) rather than fetch a whole frame for one tile. Saves ~14 h over four regions.
+
+Bug 2 — SILENT total failure on ASF-datapool frames. Mojave frame F46289's 344
+granules all "completed" in milliseconds and wrote ZERO windows. Cause: those
+granules are served only from datapool.asf.alaska.edu, which needs the URS
+redirect that plain fsspec does not follow (raises FileNotFoundError). The
+original build_aoi_cube had an asf_search fallback for exactly this; the new
+download worker did not. Added _worker_download (fsspec, then ASFSession
+fallback) + ASF session in _pool_init. Verified: the same granule now downloads
+and writes windows in 24.3 s vs failing in 3.4 s.
+
+Worth noting how this was caught: the log looked HEALTHY (granule counter racing
+up) while producing nothing. The tell was that the cached-window count did not
+move. Counter progress is not proof of work — check the artifacts.
