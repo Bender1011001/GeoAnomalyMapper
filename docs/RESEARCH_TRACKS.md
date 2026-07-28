@@ -2016,3 +2016,17 @@ assembled from real 17th-c ingredients. Search consequence: the vessel class is
 12-20 m — below the NAIP floor — so there is no hull search; the defensible
 product is the DEM-derived Cahuilla +12 m shoreline band (438.8 km2, 1,093
 chips) now running through the interesting_intel funnel (~$0.25).
+
+### Cahuilla shoreline sweep — NULL (2026-07-28)
+
+The DEM-derived Lake Cahuilla highstand band (438.8 km2, +12 m +/- 3 m,
+hydrologically constrained to the Salton Sink) ran through the full
+interesting_intel funnel: 1,093 shoreline chips -> 1,033 scored (62 NAIP fetch
+failures at band edges) -> 400 sheeted -> 11 focused. Total VLM $0.042, 40 min.
+Result: NOTHING unexplained (max 1/3 on one engineered-pond complex); no
+elongated 20-60 m anomalies on or near the paleo-shoreline. As predicted from
+the Cardona source analysis, the "ship" is not findable in free imagery — and
+now the geology-derived search band has actually been looked at, so the claim
+is measured, not assumed. The shoreline mask itself
+(data/research/cahuilla/shoreline_band.tif) is a reusable product for any
+future Salton Sink work.
