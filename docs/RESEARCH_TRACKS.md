@@ -1976,3 +1976,43 @@ and writes windows in 24.3 s vs failing in 3.4 s.
 Worth noting how this was caught: the log looked HEALTHY (granule counter racing
 up) while producing nothing. The tell was that the cached-window count did not
 move. Counter progress is not proof of work — check the artifacts.
+
+### Permian review v2 + first cross-validated backlog find (2026-07-28)
+
+The 4,258 localized candidates were re-triaged after the plausibility-gate fix:
+1,067 physically plausible -> top 300 ranked -> 297 NAIP chips in 81 s (12
+threads) -> 3 industrial-vetoed -> 294 sites on 3 contact sheets -> VLM two-pass
+(wide over sheets, then full-res focus on 8 flags). Whole review: ~$0.03.
+
+**Site #105 (32.3998, -103.9298; Lea Co., NM, ~15 km S of Nash Draw): the first
+candidate confirmed by two independent modalities + time series.** InSAR
+cumulative -31.8 cm; the VLM (blind to magnitude) independently described a
+"dark circular feature interrupting erosion patterns... slightly depressed...
+possibly a collapsed sinkhole over a dissolution feature"; NAIP 2011-2022
+mosaics show white brine/evaporite lobes spreading across the site and breaching
+berm structures by 2020-22. Setting is documented dissolution karst (Nash Draw,
+Sinkhole Conf. 2020; 2008 brine-well collapse precedent in district). Reading:
+active near-surface dissolution + brine discharge + subsidence, plausibly
+potash/brine-management related — operator/regulator-relevant. Desk follow-up
+needed: NM OCD well/permit lookup (scripted access blocked; user action).
+
+Two-pass design validated again in the other direction: wide-pass flagged a
+"crater" at #91 that the full-res pass correctly dissolved into a road/wash
+crossing (thumbnail artifact). Sheet impressions are hypotheses, not findings.
+
+### Cardona codex read end-to-end; Lost Ship question settled at the source (2026-07-28)
+
+Read all 181 pages of BNE Mss/2468 (Cardona 1632) supplied by the user. Full
+assessment in data/reports/lost_ship_cardona_source_note.md. Short version: the
+1615 Gulf voyage is real and first-person (the "Puerto de Santa Clara" toponym
+survives at El Golfo de Santa Clara and the 4-fathom anchorage going DRY nails
+the Colorado-delta tides); ships were left wintering in Sinaloa when the Dutch
+took the flagship — the exact setup for Iturbe's 1616 voyage of the legend; a
+support tartana went missing two months and RETURNED; the expedition's only
+documented ship loss is a frigate at Tehuantepec (f.108, Oaxaca). No vessel
+entered any inland water; "no hallamos agua" at the Gulf head. The
+Iturbe-in-Lake-Cahuilla story remains a 1933 literary construction (Nordhoff)
+assembled from real 17th-c ingredients. Search consequence: the vessel class is
+12-20 m — below the NAIP floor — so there is no hull search; the defensible
+product is the DEM-derived Cahuilla +12 m shoreline band (438.8 km2, 1,093
+chips) now running through the interesting_intel funnel (~$0.25).
