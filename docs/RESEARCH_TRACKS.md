@@ -2030,3 +2030,19 @@ now the geology-derived search band has actually been looked at, so the claim
 is measured, not assumed. The shoreline mask itself
 (data/research/cahuilla/shoreline_band.tif) is a reusable product for any
 future Salton Sink work.
+
+### Mojave region reviewed same-night; warehouse-subsidence lead (2026-07-28)
+
+Mojave sweep finished (88 tiles, 59 built, 29 honest no-coverage gaps in the
+east; 8,420 anomalies, 2,293 localized, 12.1 h) and went through the
+generalized triage (data/research/scripts/regional_review.py: documented gate
+|vel|<=50, |cum|>=8, sign-consistent -> 1,996; top 300 -> 3 sheets -> VLM
+two-pass, 37 full-res reviews, ~$0.06). Result: ZERO unexplained — every site
+resolved to mines, impoundments, solar, landfill, or urban fringe. The finding
+that matters is commercial, not mysterious: a cluster of 8-20 cm cumulative
+subsidence under Inland Empire logistics warehouses (Fontana/Rialto/San
+Bernardino basin margin, ~20 of top 100 sites), plus -41.2 cm at the Rialto
+Mid-Valley landfill. That is the deformation-risk product's customer profile
+detected in the wild. Caveat recorded: the cluster sits on the sweep bbox edge;
+a dedicated Inland Empire bbox (33.8-34.2, -117.8 - -117.0) is the right next
+sweep if pursued. Sonoran region now running; Great Basin queued.
