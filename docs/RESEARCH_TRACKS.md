@@ -2046,3 +2046,14 @@ Mid-Valley landfill. That is the deformation-risk product's customer profile
 detected in the wild. Caveat recorded: the cluster sits on the sweep bbox edge;
 a dedicated Inland Empire bbox (33.8-34.2, -117.8 - -117.0) is the right next
 sweep if pursued. Sonoran region now running; Great Basin queued.
+
+### Sonoran region complete + reviewed (2026-07-28)
+
+96/96 tiles (full coverage), 3.96 h (prior desert-sweep cache paid off),
+3,812 anomalies, 1,172 localized, only 121 past the gate — Sonoran's localized
+bowls are mostly <8 cm and the big Eloy/Picacho basin signals are correctly
+demoted to regional by the discriminator. VLM review: 4 focus sites, all
+interest 0 (East Valley / west Phoenix suburb-and-farmland subsidence, 11-13 cm
+— AZGS already maps this exposure via its earth-fissure program). Zero
+mysteries, detector behaving as designed. Great Basin NV now running — last
+region of the pre-registered arid sweep.
