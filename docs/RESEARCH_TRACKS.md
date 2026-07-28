@@ -2057,3 +2057,28 @@ interest 0 (East Valley / west Phoenix suburb-and-farmland subsidence, 11-13 cm
 — AZGS already maps this exposure via its earth-fissure program). Zero
 mysteries, detector behaving as designed. Great Basin NV now running — last
 region of the pre-registered arid sweep.
+
+### ARID SWEEP COMPLETE — all four regions scanned and reviewed (2026-07-28)
+
+The pre-registered arid US basin sweep (2026-07-25) finished and every region
+was triaged the same day it landed:
+
+| region | tiles | anomalies | localized | gate | focus | unexplained |
+|---|---|---|---|---|---|---|
+| Permian TX/NM | 81/81 | 11,705 | 4,258 | 1,067 | 8 | 1 (site #105) |
+| Mojave CA | 59/88* | 8,420 | 2,293 | 1,996 | 37 | 0 |
+| Sonoran AZ | 96/96 | 3,812 | 1,172 | 121 | 4 | 0 |
+| Great Basin NV | 121/121 | 9,521 | 3,415 | 1,570 | 41 | 0 |
+| TOTAL | 357/386 | 33,458 | 11,138 | 4,754 | 90 | 1 |
+
+*29 Mojave tiles = honest no-OPERA-coverage gaps (eastern desert).
+
+Total VLM review cost ~$0.25. Human review load: 11 contact sheets (~25 min).
+The one candidate that survived every filter, two VLM passes, and a decade of
+change imagery is Permian #105 (Nash Draw dissolution + brine discharge +
+-31.8 cm). Two commercial leads emerged as side-products: Inland Empire
+warehouse subsidence (CA) and the standing sinkhole-risk product line. The
+detector's negative behavior validated everywhere: known basin subsidence
+(Phoenix AZ, San Bernardino CA) surfaces and is correctly explained; big
+aquifer signals are demoted to regional; playas/mines/geothermal resolve
+mundane. "Scan everything we can" for the free-data arid US: DONE.
