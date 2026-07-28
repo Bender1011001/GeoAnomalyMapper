@@ -826,6 +826,7 @@ def build_frame_cubes(
     cache_root: Optional[Path] = None,
     progress: bool = True,
     granule_timeout_s: float = 90.0,
+    min_tiles_per_frame: int = 5,
 ) -> Tuple[Dict[str, dict], List[str]]:
     """GRANULE-MAJOR sweep: build cubes for MANY AOIs sharing one OPERA frame,
     opening each granule ONCE for all tiles instead of once PER tile.
@@ -920,6 +921,28 @@ def build_frame_cubes(
                     len(ready), len(tiles), len(tiles) - len(ready))
     if len(ready) == len(tiles):
         tasks = []
+    # DIMINISHING-RETURNS GUARD. A frame costs ~254 granules (~100 GB, 1.5-2 h)
+    # regardless of how many tiles it serves. Measured on the Permian region:
+    # the first two frames served 41 and 22 tiles (good), then one served 3 and
+    # the next served 1 — the last 4 tiles consumed ~3.5 h of a 7.5 h region.
+    # Below the threshold, return those tiles unassigned instead: an honest
+    # coverage gap is a far better trade than ~14 h across a four-region sweep.
+    need = len(tiles) - len(ready)
+    if tasks and 0 < need < min_tiles_per_frame:
+        logger.warning("frame %s would serve only %d tile(s) (< %d) — skipping "
+                       "the ~%d-granule fetch; leaving them unassigned",
+                       frame, need, min_tiles_per_frame, len(tasks))
+        out_ready: Dict[str, dict] = {}
+        for key in ready:
+            la, lo = tiles[key]
+            try:
+                out_ready[key] = assemble_from_cache(
+                    cache_root / str(key), la, lo,
+                    coherence_threshold=coherence_threshold,
+                    min_epochs=min_epochs)
+            except Exception:
+                pass
+        return out_ready, [k for k in tiles if k not in out_ready]
 
     from concurrent.futures import ProcessPoolExecutor, FIRST_COMPLETED, wait
     done = 0

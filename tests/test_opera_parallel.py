@@ -150,3 +150,13 @@ def test_build_aoi_cube_accepts_cache_only_kwarg():
     sig = inspect.signature(build_aoi_cube)
     assert "cache_only" in sig.parameters
     assert sig.parameters["cache_only"].default is False
+
+
+def test_build_frame_cubes_has_diminishing_returns_guard():
+    # A frame costs ~254 granules regardless of tiles served; below the
+    # threshold we must skip the fetch rather than burn ~2 h on 1 tile.
+    import inspect
+    from deformation_intel.opera import build_frame_cubes
+    sig = inspect.signature(build_frame_cubes)
+    assert "min_tiles_per_frame" in sig.parameters
+    assert sig.parameters["min_tiles_per_frame"].default == 5
