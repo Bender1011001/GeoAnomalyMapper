@@ -10,7 +10,7 @@ anything out of place for its surroundings).
     contact sheets  ->  strong VLM on full-res chips  ->  human contact sheet
 
 The output is a queue, not a label. Success is measured as "of the top 100,
-how many made a human say huh" — see docs/INTERESTING_FINDINGS.md.
+how many made a human say huh" — see docs/notebook/INTERESTING_FINDINGS.md.
 """
 from interesting_intel import features, priors  # noqa: F401
 

@@ -57,7 +57,7 @@ negative control to stay dull. Results land in
 accepted in this repo.
 
 Measured results and the honest precision number live in
-`docs/INTERESTING_FINDINGS.md`.
+`docs/notebook/INTERESTING_FINDINGS.md`.
 
 ## Rules this module lives by (project failure history)
 

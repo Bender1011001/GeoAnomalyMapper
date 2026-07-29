@@ -144,7 +144,7 @@ These are all real failures from this project. Take them seriously.
    - `cli.py` — `python -m interesting_intel --bbox ... --out DIR`
 2. Tests in `tests/`, following existing style. **Every scorer needs at least one
    real-imagery test**, not only synthetic.
-3. `docs/INTERESTING_FINDINGS.md` — ranked output with thumbnails and, for each,
+3. `docs/notebook/INTERESTING_FINDINGS.md` — ranked output with thumbnails and, for each,
    the mundane explanation + what doesn't fit.
 4. Cost + runtime report: actual $ and hours for the region you ran.
 
