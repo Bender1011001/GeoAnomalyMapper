@@ -4,6 +4,7 @@ e.g. Landsat C2L2 thermal).
 
 All reads are lazy windowed /vsicurl range-reads — no bulk downloads.
 """
+import calendar
 import os
 import time
 from urllib.parse import quote
@@ -48,6 +49,17 @@ def stac_search(collection: str, bbox, datetime: str | None = None,
     return r.json().get("features", [])
 
 
+def parse_expiry_utc(s: str) -> float:
+    """Epoch seconds for an MPC 'msft:expiry' UTC timestamp.
+
+    Must be timegm, NOT time.mktime: mktime interprets the struct as LOCAL
+    time, which on a UTC-negative machine made tokens look valid hours after
+    they expired — long runs then drowned in 403s once the real ~1 h token
+    lifetime passed (bug found 2026-07-27 during an interesting_intel sweep).
+    """
+    return float(calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ")))
+
+
 def mpc_sign(href: str) -> str:
     """Append a Planetary Computer SAS token (cached per container)."""
     account = href.split("//", 1)[1].split(".", 1)[0]
@@ -58,8 +70,7 @@ def mpc_sign(href: str) -> str:
         r = requests.get(f"{MPC_SIGN}/{account}/{container}", timeout=60)
         r.raise_for_status()
         j = r.json()
-        expiry = time.mktime(time.strptime(j["msft:expiry"], "%Y-%m-%dT%H:%M:%SZ"))
-        _mpc_tokens[key] = (j["token"], expiry)
+        _mpc_tokens[key] = (j["token"], parse_expiry_utc(j["msft:expiry"]))
     return href + "?" + _mpc_tokens[key][0]
 
 

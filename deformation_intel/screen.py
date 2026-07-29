@@ -8,7 +8,7 @@ place, the confound lessons this project paid for:
   - detection-floor context                    -> size/rate stated, not implied
 
 This is the exact rule pre-registered for the arid-basin sweep
-(docs/RESEARCH_TRACKS.md 2026-07-25). Promoting it from scratchpad to a tested
+(docs/notebook/RESEARCH_TRACKS.md 2026-07-25). Promoting it from scratchpad to a tested
 module makes the sweep's verdict reproducible (CRITIQUE 3.1). Pure functions;
 network confound lookups are injected so the core is unit-testable offline.
 """

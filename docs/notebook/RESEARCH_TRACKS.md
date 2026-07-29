@@ -1976,3 +1976,221 @@ and writes windows in 24.3 s vs failing in 3.4 s.
 Worth noting how this was caught: the log looked HEALTHY (granule counter racing
 up) while producing nothing. The tell was that the cached-window count did not
 move. Counter progress is not proof of work — check the artifacts.
+
+### Permian review v2 + first cross-validated backlog find (2026-07-28)
+
+The 4,258 localized candidates were re-triaged after the plausibility-gate fix:
+1,067 physically plausible -> top 300 ranked -> 297 NAIP chips in 81 s (12
+threads) -> 3 industrial-vetoed -> 294 sites on 3 contact sheets -> VLM two-pass
+(wide over sheets, then full-res focus on 8 flags). Whole review: ~$0.03.
+
+**Site #105 (32.3998, -103.9298; Lea Co., NM, ~15 km S of Nash Draw): the first
+candidate confirmed by two independent modalities + time series.** InSAR
+cumulative -31.8 cm; the VLM (blind to magnitude) independently described a
+"dark circular feature interrupting erosion patterns... slightly depressed...
+possibly a collapsed sinkhole over a dissolution feature"; NAIP 2011-2022
+mosaics show white brine/evaporite lobes spreading across the site and breaching
+berm structures by 2020-22. Setting is documented dissolution karst (Nash Draw,
+Sinkhole Conf. 2020; 2008 brine-well collapse precedent in district). Reading:
+active near-surface dissolution + brine discharge + subsidence, plausibly
+potash/brine-management related — operator/regulator-relevant. Desk follow-up
+needed: NM OCD well/permit lookup (scripted access blocked; user action).
+
+Two-pass design validated again in the other direction: wide-pass flagged a
+"crater" at #91 that the full-res pass correctly dissolved into a road/wash
+crossing (thumbnail artifact). Sheet impressions are hypotheses, not findings.
+
+### Cardona codex read end-to-end; Lost Ship question settled at the source (2026-07-28)
+
+Read all 181 pages of BNE Mss/2468 (Cardona 1632) supplied by the user. Full
+assessment in data/reports/lost_ship_cardona_source_note.md. Short version: the
+1615 Gulf voyage is real and first-person (the "Puerto de Santa Clara" toponym
+survives at El Golfo de Santa Clara and the 4-fathom anchorage going DRY nails
+the Colorado-delta tides); ships were left wintering in Sinaloa when the Dutch
+took the flagship — the exact setup for Iturbe's 1616 voyage of the legend; a
+support tartana went missing two months and RETURNED; the expedition's only
+documented ship loss is a frigate at Tehuantepec (f.108, Oaxaca). No vessel
+entered any inland water; "no hallamos agua" at the Gulf head. The
+Iturbe-in-Lake-Cahuilla story remains a 1933 literary construction (Nordhoff)
+assembled from real 17th-c ingredients. Search consequence: the vessel class is
+12-20 m — below the NAIP floor — so there is no hull search; the defensible
+product is the DEM-derived Cahuilla +12 m shoreline band (438.8 km2, 1,093
+chips) now running through the interesting_intel funnel (~$0.25).
+
+### Cahuilla shoreline sweep — NULL (2026-07-28)
+
+The DEM-derived Lake Cahuilla highstand band (438.8 km2, +12 m +/- 3 m,
+hydrologically constrained to the Salton Sink) ran through the full
+interesting_intel funnel: 1,093 shoreline chips -> 1,033 scored (62 NAIP fetch
+failures at band edges) -> 400 sheeted -> 11 focused. Total VLM $0.042, 40 min.
+Result: NOTHING unexplained (max 1/3 on one engineered-pond complex); no
+elongated 20-60 m anomalies on or near the paleo-shoreline. As predicted from
+the Cardona source analysis, the "ship" is not findable in free imagery — and
+now the geology-derived search band has actually been looked at, so the claim
+is measured, not assumed. The shoreline mask itself
+(data/research/cahuilla/shoreline_band.tif) is a reusable product for any
+future Salton Sink work.
+
+### Mojave region reviewed same-night; warehouse-subsidence lead (2026-07-28)
+
+Mojave sweep finished (88 tiles, 59 built, 29 honest no-coverage gaps in the
+east; 8,420 anomalies, 2,293 localized, 12.1 h) and went through the
+generalized triage (data/research/scripts/regional_review.py: documented gate
+|vel|<=50, |cum|>=8, sign-consistent -> 1,996; top 300 -> 3 sheets -> VLM
+two-pass, 37 full-res reviews, ~$0.06). Result: ZERO unexplained — every site
+resolved to mines, impoundments, solar, landfill, or urban fringe. The finding
+that matters is commercial, not mysterious: a cluster of 8-20 cm cumulative
+subsidence under Inland Empire logistics warehouses (Fontana/Rialto/San
+Bernardino basin margin, ~20 of top 100 sites), plus -41.2 cm at the Rialto
+Mid-Valley landfill. That is the deformation-risk product's customer profile
+detected in the wild. Caveat recorded: the cluster sits on the sweep bbox edge;
+a dedicated Inland Empire bbox (33.8-34.2, -117.8 - -117.0) is the right next
+sweep if pursued. Sonoran region now running; Great Basin queued.
+
+### Sonoran region complete + reviewed (2026-07-28)
+
+96/96 tiles (full coverage), 3.96 h (prior desert-sweep cache paid off),
+3,812 anomalies, 1,172 localized, only 121 past the gate — Sonoran's localized
+bowls are mostly <8 cm and the big Eloy/Picacho basin signals are correctly
+demoted to regional by the discriminator. VLM review: 4 focus sites, all
+interest 0 (East Valley / west Phoenix suburb-and-farmland subsidence, 11-13 cm
+— AZGS already maps this exposure via its earth-fissure program). Zero
+mysteries, detector behaving as designed. Great Basin NV now running — last
+region of the pre-registered arid sweep.
+
+### ARID SWEEP COMPLETE — all four regions scanned and reviewed (2026-07-28)
+
+The pre-registered arid US basin sweep (2026-07-25) finished and every region
+was triaged the same day it landed:
+
+| region | tiles | anomalies | localized | gate | focus | unexplained |
+|---|---|---|---|---|---|---|
+| Permian TX/NM | 81/81 | 11,705 | 4,258 | 1,067 | 8 | 1 (site #105) |
+| Mojave CA | 59/88* | 8,420 | 2,293 | 1,996 | 37 | 0 |
+| Sonoran AZ | 96/96 | 3,812 | 1,172 | 121 | 4 | 0 |
+| Great Basin NV | 121/121 | 9,521 | 3,415 | 1,570 | 41 | 0 |
+| TOTAL | 357/386 | 33,458 | 11,138 | 4,754 | 90 | 0 (see below) |
+
+*29 Mojave tiles = honest no-OPERA-coverage gaps (eastern desert).
+
+Total VLM review cost ~$0.25. Human review load: 11 contact sheets (~25 min).
+The one candidate that survived every filter, two VLM passes, and a decade of
+change imagery is Permian #105 (Nash Draw dissolution + brine discharge +
+-31.8 cm). Two commercial leads emerged as side-products: Inland Empire
+warehouse subsidence (CA) and the standing sinkhole-risk product line. The
+detector's negative behavior validated everywhere: known basin subsidence
+(Phoenix AZ, San Bernardino CA) surfaces and is correctly explained; big
+aquifer signals are demoted to regional; playas/mines/geothermal resolve
+mundane. "Scan everything we can" for the free-data arid US: DONE.
+
+### Permian #105 RESOLVED — sweep closes with zero unexplained (2026-07-28)
+
+The last open candidate was closed the same day by querying NM OCD's public
+ArcGIS well service directly (no manual search needed): 275 wells within 10 km,
+but ZERO within 2 km of the bowl; nearest active well 2.47 km (XTO horizontals),
+nearest salt-water disposal 4.80 km injecting at 16,525 ft — far below the
+Rustler/Salado evaporites that govern near-surface collapse. Not attributable
+to any wellbore. Geological setting pinned: 5.2 km SE of Nash Draw centre,
+13.1 km W of WIPP, sitting 9.5 m below local median elevation. Nash Draw is a
+partially closed evaporite-dissolution basin with documented ACTIVE near-surface
+gypsum dissolution and numerous collapse sinks (Bachman 1987 SAND86-7078).
+
+VERDICT: #105 is an active evaporite-karst collapse feature in the one valley in
+North America where that is the expected process. Explained. The arid sweep
+therefore ends with 33,458 anomalies and ZERO unexplained survivors — which is
+the correct and healthy outcome for a detector that is working: everything it
+found has a cause, and the causes are the ones physics predicts.
+
+What is still worth keeping from #105 (not a discovery claim): we measured it
+blind from free data (-2.8 cm/yr, -31.8 cm cumulative) where the literature is
+mostly qualitative; it is not operator-attributable; and it is 13 km from WIPP,
+where Nash Draw subsidence bears on repository groundwater-flow assessment.
+Minor gap left open: potash operations are regulated by NM Mining and Minerals
+Division, not OCD, so a MMD lease check would settle natural-vs-process-enhanced.
+
+### Survivor 1 revisited — onset year matches two new deep SWD spuds (2026-07-28)
+
+Ran the same OCD ArcGIS proximity query against the Permian pilot's Survivor 1
+(the -52.9 cm / 9.3 yr accelerating bowl, NOT on a well pad). Result is the most
+operationally interesting thing the sweep produced, and it is a HYPOTHESIS, not
+a finding:
+
+Proximity: 0 wells within 1 km, 2 within 2 km, 543 within 6 km. Site is 7.6 km
+from WIPP and 16 km from Nash Draw (so NOT the Nash Draw karst story that
+explains #105). Nearest disposal: HUDSON FEDERAL SWD 2.00 km (plugged, 1993,
+14,325 ft) — a legacy wellbore.
+
+THE CORRELATION: the InSAR series is flat through 2018 (2016 -0.1, 2017 -1.0,
+2018 -1.4 cm) then breaks sharply (2019 -3.4, 2020 -9.0, 2021 -18.0, 2022
+-24.1 ... 2025 -49.5). Two NEW deep salt-water disposal wells were spudded in
+2019 within 3.5 km:
+  - JAMES RANCH UNIT 6 TORINO SWD   3.00 km  spud 2019  16,675 ft
+  - JRU 36 RAMBLER STATE SWD        3.47 km  spud 2019  16,510 ft
+
+Mechanism that would fit (documented in the Delaware Basin): deep injection ->
+pressure migration -> upward communication via legacy/plugged wellbores into the
+Salado/Rustler evaporites -> salt dissolution -> surface subsidence. A plugged
+1993 SWD sits 2.0 km away as a candidate conduit.
+
+HONEST CAVEATS — do not state this as causation:
+  - Onset-year vs spud-year is ONE temporal coincidence.
+  - General drilling ramped up area-wide in 2019-21 (2 oil wells 2019, 3 in
+    2020, 2 in 2021 within 4 km), so the correlation is not clean.
+  - 3 km is far for 16,500-ft disposal to produce a LOCALIZED surface bowl.
+  - We have not seen injection VOLUME data — only spud dates. Volumes are the
+    actual test and are available in OCD C-115 filings.
+
+NEXT TEST (highest-value remaining desk work in the whole project): pull monthly
+injection volumes for the two 2019 SWD wells from OCD and cross-correlate with
+the InSAR time series. If volume ramp leads subsidence onset, the hypothesis
+strengthens enormously; if injection started well after the break, it dies.
+That is a clean, falsifiable test on free public data.
+
+STATUS: Survivor 1 remains the one candidate in the project with a plausible
+ANTHROPOGENIC mechanism and a matching onset date. Unlike #105 (explained by
+Nash Draw karst), this one is genuinely open. Precise coordinates therefore stay
+regulator-first per standing policy; do not post publicly pending the volume test.
+
+### Survivor 1 SWD hypothesis FALSIFIED — onset precedes the drilling (2026-07-28)
+
+Ran the falsifiable test registered earlier the same day. The hypothesis was that
+two deep salt-water disposal wells spudded in 2019 within 3.5 km triggered the
+-52.9 cm accelerating bowl. It does not survive contact with the dates.
+
+EXACT SPUD DATES (OCD, ms epoch decoded):
+  JAMES RANCH UNIT 6 TORINO FEE SWD #001  API 30-015-46432  spud 2019-12-16
+  JRU 36 RAMBLER STATE SWD #001           API 30-015-45691  spud 2019-11-21
+
+SUBSIDENCE ANNUAL INCREMENTS (cm):
+  2016 -0.1 | 2017 -0.9 | 2018 -0.4 | 2019 -2.0 | 2020 -5.6 | 2021 -9.0
+  2022 -6.1 | 2023 -8.4 | 2024 -9.2 | 2025 -7.8
+
+The acceleration break is IN 2019: the annual increment goes -0.4 -> -2.0, a 5x
+jump. But both wells were spudded in the final six weeks of that year. A 16,500
+ft Devonian well takes months to drill and complete; injection could not have
+begun before mid-2020 at the earliest. The ground was already accelerating
+before the rigs arrived. Cause cannot follow effect.
+
+THREE INDEPENDENT STRIKES:
+  1. Timing inverted — onset precedes spud, as above.
+  2. Both wells are STILL status "New", no PUNs, true_vertical_depth = 0, seven
+     years later. Consistent with never having been completed for injection at
+     all. (Caveat: OCD status fields can be stale; absence of a PUN is not proof
+     of zero injection, and we never obtained actual C-115 volumes.)
+  3. Target pool is [96101] SWD, DEVONIAN at ~16,500 ft — far below the
+     Rustler/Salado evaporites that govern near-surface collapse here.
+
+VERDICT: hypothesis dead. Recorded because a killed hypothesis is worth exactly
+as much as a confirmed one, and because the earlier entry the same day stated
+the correlation prominently — it would be dishonest to leave that standing
+without this directly beneath it.
+
+WHAT THIS LEAVES: the bowl is real, still accelerating (-7.8 cm/yr in 2025,
+-49.5 cm cumulative), sits 7.6 km from WIPP, has NO well within 1 km, and now
+has NO identified anthropogenic trigger. It returns to genuinely unexplained —
+which is a weaker claim than "probably caused by disposal" but a more honest
+one. Next candidate mechanisms, in order of cheapness to test: natural
+evaporite dissolution along the Capitan reef margin; the general 2019-21
+area-wide production ramp (543 wells within 6 km) acting through pressure
+rather than any single well; a legacy plugged wellbore acting as a conduit
+(HUDSON FEDERAL SWD, plugged 1993, 2.0 km).

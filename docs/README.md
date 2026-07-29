@@ -1,47 +1,38 @@
-# docs/ — index
+# Documentation index
 
-## Living documents (maintained)
+Start with the [project README](../README.md) — what the system is, the
+ground-truth validation, and the quickstart.
 
-- **[RESEARCH_TRACKS.md](RESEARCH_TRACKS.md)** — the research program lab
-  notebook: charter, pre-registrations, append-only verdict ledger, and a
-  maintained **status summary at the top** (read that first). Every hunt,
-  track, and sweep verdict since 2026-07-15 is recorded here.
-- **[DISCOVERY_SOP.md](DISCOVERY_SOP.md)** — binding governance for every
-  detection capability: triage budgets, auto-explain before human review,
-  provenance requirements, ethics/coordinate redaction, and the N=3
-  pre-registered kill switch.
-- **[CORONA.md](CORONA.md)** — tutorial for `archaeo_intel/corona.py`:
-  free 1960s ~2 m CORONA imagery, from quicklook to georeferenced GeoTIFF.
-- **[VALIDATION_FIRST_WORKFLOW.md](VALIDATION_FIRST_WORKFLOW.md)** — design
-  of the blind validation harness (`blind_validation.py` + `geoanomaly.py`):
-  blind candidate generation separated from withheld-label scoring.
+## Read these to understand the system
 
-Package documentation lives beside the code:
-[../README.md](../README.md) (project),
-[../CONTEXT.md](../CONTEXT.md) (current state + trap diary),
-[../deformation_intel/README.md](../deformation_intel/README.md),
-[../archaeo_intel/README.md](../archaeo_intel/README.md),
-[../tools/insar_prototype/README.md](../tools/insar_prototype/README.md).
+| Doc | What it's for |
+|---|---|
+| **[CRITIQUE.md](CRITIQUE.md)** | Adversarial self-review: every known weakness in the project, with fix status, plus the publication-safety checklist (what may and may not be claimed). Read this before trusting anything else. |
+| **[DISCOVERY_SOP.md](DISCOVERY_SOP.md)** | Binding governance for every detection capability: triage budgets, auto-explain before human review, provenance requirements, coordinate-redaction ethics, and the N=3 pre-registered kill switch. |
+| **[VALIDATION_FIRST_WORKFLOW.md](VALIDATION_FIRST_WORKFLOW.md)** | Design of the blind-validation harness (`blind_validation.py` + `geoanomaly.py`): blind candidate generation kept separate from withheld-label scoring. |
 
-## Dated reports (historical records — do not edit)
+## Read these to use a specific capability
 
-- **[NATIONAL_SCAN_REPORT.md](NATIONAL_SCAN_REPORT.md)** (2026-07-11) —
-  12-AOI full-archive OPERA deformation scan with detector v5.
-- **[WESTHUNT_BALIKH_REPORT.md](WESTHUNT_BALIKH_REPORT.md)** (2026-07-13) —
-  Balikh-Khabur steppe survey: 35 verified candidates, 5 ring structures
-  (coordinates redacted to ~11 km).
-- **[RESCAN_V2_REPORT.md](RESCAN_V2_REPORT.md)** (2026-07-14) — 33-tile
-  rescan after the two recall-bug fixes: 118 hits vs 15, 25/25
-  catalog-validated (coordinates redacted).
-- `westhunt_verified.json`, `rescan_v2_results.json` — machine-readable
-  (redacted) results behind those reports.
-- **experiment_records/** — raw JSON verdicts, including the
-  failed-approach control runs (vibrometry Carlsbad/plains controls) and the
-  Wink OPERA validation; these files are why the README's claims table can
-  say "backed by a ground-truth experiment".
+| Doc | What it's for |
+|---|---|
+| **[CORONA.md](CORONA.md)** | Tutorial for `archaeo_intel/corona.py` — free 1960s ~2 m CORONA imagery, from quicklook to georeferenced GeoTIFF. The most reusable standalone module here. |
+| **[SPEC_interesting_classifier.md](SPEC_interesting_classifier.md)** | Build spec for the general "worth a glance" ranker, including eight hard-won failure lessons worth reading even if you never run the code. |
 
-## Where the rest of the evidence lives (local-only, gitignored)
+## The evidence
 
-`data/research/` holds candidate lists (`*_LOCAL.json`, coordinate-redaction
-rule), per-tile sweep outputs, and `scripts/` — 149 preserved
-experiment scripts referenced by name in the RESEARCH_TRACKS ledger.
+**[notebook/](notebook/)** — the lab notebook. Append-only research record with
+every experiment, including the dead ends, the retractions, and the null
+results. This is where the README's "validated" and "failed, removed" claims
+are cashed out.
+
+## Package documentation (lives beside the code)
+
+- [deformation_intel/](../deformation_intel/README.md) — the validated core
+- [archaeo_intel/](../archaeo_intel/README.md) — archaeology surface-proxy channel
+- [interesting_intel/](../interesting_intel/README.md) — general imagery ranker
+- [tools/insar_prototype/](../tools/insar_prototype/README.md) — HyP3 fast-deformation channel
+
+## Figures
+
+`img/` holds the figures embedded in the project README. Regenerate them from
+source data with `python tools/make_readme_figures.py`.

@@ -10,7 +10,7 @@ measured against real ground truth — the Menze & Ur 2012 Upper Khabur catalog
 Governance lives in [docs/DISCOVERY_SOP.md](../docs/DISCOVERY_SOP.md)
 (triage budgets, auto-explain before human review, provenance, the N=3 kill
 switch). Experiment-by-experiment verdicts live in
-[docs/RESEARCH_TRACKS.md](../docs/RESEARCH_TRACKS.md).
+[docs/notebook/RESEARCH_TRACKS.md](../docs/notebook/RESEARCH_TRACKS.md).
 
 ## Modules
 

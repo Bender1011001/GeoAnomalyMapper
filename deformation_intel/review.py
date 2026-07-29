@@ -55,10 +55,10 @@ def contact_sheet(chips: Sequence[np.ndarray], labels: Sequence[str],
                   title: str = "") -> Path:
     """Write a labelled grid of thumbnails — the unit of fast human review.
 
-    chips: 2-D grayscale arrays (any size, rescaled). labels: short captions.
-    A 10x10 sheet holds 100 sites; a reviewer can triage a sheet in ~2 minutes,
-    versus ~20 s per site opened individually (a 6x speedup, and far less
-    context-switching).
+    chips: 2-D grayscale arrays (any size, rescaled) or H x W x 3 colour
+    arrays (uint8 or float). labels: short captions. A 10x10 sheet holds 100
+    sites; a reviewer can triage a sheet in ~2 minutes, versus ~20 s per site
+    opened individually (a 6x speedup, and far less context-switching).
     """
     from PIL import Image, ImageDraw
 

@@ -69,7 +69,7 @@ py-modules = [
   "project_paths",
   "slc_data_fetcher",
 ]
-packages = ["deformation_intel", "archaeo_intel"]
+packages = ["deformation_intel", "archaeo_intel", "interesting_intel"]
 
 [tool.setuptools.exclude-package-data]
 "*" = [".env", ".env.*", "data/*", "results_extracted/*", "downloads/*", "outputs/*", "results/*"]

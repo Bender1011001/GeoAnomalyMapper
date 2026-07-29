@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """
-SLC (Single Look Complex) Data Fetcher for SAR Vibrometry
-==========================================================
+SLC (Single Look Complex) Data Fetcher
+======================================
 
-This module fetches raw Sentinel-1 SLC data products required for the
-Biondi SAR Doppler Tomography pipeline. Unlike standard InSAR workflows
-that use pre-processed coherence or unwrapped phase maps, this pipeline
-requires the RAW phase and amplitude information before Doppler bands
-are finalized.
+Search and fetch raw Sentinel-1 SLC granules from the Alaska Satellite
+Facility. SLC is the unprocessed product — full phase and amplitude, before
+multi-looking — which is what you need when you intend to run your own
+interferometric processing rather than consume a pre-made product.
 
-Why SLC?
---------
-Standard InSAR averages out high-frequency Doppler content during
-multi-looking and interferometric processing. The Biondi methodology
-requires the full azimuth bandwidth to perform sub-aperture
-   decomposition - splitting the synthetic aperture into temporal slices
-to track sub-millimeter surface vibrations caused by subsurface
-resonance.
+In this repository SLC feeds the HyP3 short-pair channel
+(`tools/insar_prototype/`), where on-demand interferograms catch fast
+deformation that OPERA's quality masking removes. It is also the entry point
+for any custom processing.
+
+HISTORICAL NOTE: this module was originally written to feed a single-pass SAR
+Doppler "vibrometry" pipeline (the Biondi sub-aperture method). That pipeline
+FAILED its ground-truth test — Carlsbad Caverns and a barren-plains control
+both scored ~97% "void", i.e. the output was independent of what was under the
+ground — and was removed from the repository on 2026-07-09. See the README
+claims table and `docs/notebook/experiment_records/` for the control runs. The
+fetcher survived because fetching SLC is useful on its own; nothing here
+depends on the retracted method.
 
 Supported data sources:
   - Sentinel-1 C-band SLC (free, via Alaska Satellite Facility / asf_search)
@@ -24,8 +28,8 @@ Supported data sources:
   - Umbra SAR X-band SLC (commercial, highest resolution)
 
 Usage:
-    python slc_data_fetcher.py --lat 29.9792 --lon 31.1342 --buffer 0.5
-    python slc_data_fetcher.py --bbox 30.8 29.5 31.5 30.5 --max-results 10
+    python slc_data_fetcher.py --lat 31.7694 --lon -103.1018 --buffer 0.5
+    python slc_data_fetcher.py --bbox -103.5 31.5 -102.9 32.0 --max-results 10
 """
 
 import os
