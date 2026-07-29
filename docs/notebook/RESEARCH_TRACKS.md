@@ -2150,3 +2150,47 @@ STATUS: Survivor 1 remains the one candidate in the project with a plausible
 ANTHROPOGENIC mechanism and a matching onset date. Unlike #105 (explained by
 Nash Draw karst), this one is genuinely open. Precise coordinates therefore stay
 regulator-first per standing policy; do not post publicly pending the volume test.
+
+### Survivor 1 SWD hypothesis FALSIFIED — onset precedes the drilling (2026-07-28)
+
+Ran the falsifiable test registered earlier the same day. The hypothesis was that
+two deep salt-water disposal wells spudded in 2019 within 3.5 km triggered the
+-52.9 cm accelerating bowl. It does not survive contact with the dates.
+
+EXACT SPUD DATES (OCD, ms epoch decoded):
+  JAMES RANCH UNIT 6 TORINO FEE SWD #001  API 30-015-46432  spud 2019-12-16
+  JRU 36 RAMBLER STATE SWD #001           API 30-015-45691  spud 2019-11-21
+
+SUBSIDENCE ANNUAL INCREMENTS (cm):
+  2016 -0.1 | 2017 -0.9 | 2018 -0.4 | 2019 -2.0 | 2020 -5.6 | 2021 -9.0
+  2022 -6.1 | 2023 -8.4 | 2024 -9.2 | 2025 -7.8
+
+The acceleration break is IN 2019: the annual increment goes -0.4 -> -2.0, a 5x
+jump. But both wells were spudded in the final six weeks of that year. A 16,500
+ft Devonian well takes months to drill and complete; injection could not have
+begun before mid-2020 at the earliest. The ground was already accelerating
+before the rigs arrived. Cause cannot follow effect.
+
+THREE INDEPENDENT STRIKES:
+  1. Timing inverted — onset precedes spud, as above.
+  2. Both wells are STILL status "New", no PUNs, true_vertical_depth = 0, seven
+     years later. Consistent with never having been completed for injection at
+     all. (Caveat: OCD status fields can be stale; absence of a PUN is not proof
+     of zero injection, and we never obtained actual C-115 volumes.)
+  3. Target pool is [96101] SWD, DEVONIAN at ~16,500 ft — far below the
+     Rustler/Salado evaporites that govern near-surface collapse here.
+
+VERDICT: hypothesis dead. Recorded because a killed hypothesis is worth exactly
+as much as a confirmed one, and because the earlier entry the same day stated
+the correlation prominently — it would be dishonest to leave that standing
+without this directly beneath it.
+
+WHAT THIS LEAVES: the bowl is real, still accelerating (-7.8 cm/yr in 2025,
+-49.5 cm cumulative), sits 7.6 km from WIPP, has NO well within 1 km, and now
+has NO identified anthropogenic trigger. It returns to genuinely unexplained —
+which is a weaker claim than "probably caused by disposal" but a more honest
+one. Next candidate mechanisms, in order of cheapness to test: natural
+evaporite dissolution along the Capitan reef margin; the general 2019-21
+area-wide production ramp (543 wells within 6 km) acting through pressure
+rather than any single well; a legacy plugged wellbore acting as a conduit
+(HUDSON FEDERAL SWD, plugged 1993, 2.0 km).
