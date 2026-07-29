@@ -2069,7 +2069,7 @@ was triaged the same day it landed:
 | Mojave CA | 59/88* | 8,420 | 2,293 | 1,996 | 37 | 0 |
 | Sonoran AZ | 96/96 | 3,812 | 1,172 | 121 | 4 | 0 |
 | Great Basin NV | 121/121 | 9,521 | 3,415 | 1,570 | 41 | 0 |
-| TOTAL | 357/386 | 33,458 | 11,138 | 4,754 | 90 | 1 |
+| TOTAL | 357/386 | 33,458 | 11,138 | 4,754 | 90 | 0 (see below) |
 
 *29 Mojave tiles = honest no-OPERA-coverage gaps (eastern desert).
 
@@ -2082,3 +2082,28 @@ detector's negative behavior validated everywhere: known basin subsidence
 (Phoenix AZ, San Bernardino CA) surfaces and is correctly explained; big
 aquifer signals are demoted to regional; playas/mines/geothermal resolve
 mundane. "Scan everything we can" for the free-data arid US: DONE.
+
+### Permian #105 RESOLVED — sweep closes with zero unexplained (2026-07-28)
+
+The last open candidate was closed the same day by querying NM OCD's public
+ArcGIS well service directly (no manual search needed): 275 wells within 10 km,
+but ZERO within 2 km of the bowl; nearest active well 2.47 km (XTO horizontals),
+nearest salt-water disposal 4.80 km injecting at 16,525 ft — far below the
+Rustler/Salado evaporites that govern near-surface collapse. Not attributable
+to any wellbore. Geological setting pinned: 5.2 km SE of Nash Draw centre,
+13.1 km W of WIPP, sitting 9.5 m below local median elevation. Nash Draw is a
+partially closed evaporite-dissolution basin with documented ACTIVE near-surface
+gypsum dissolution and numerous collapse sinks (Bachman 1987 SAND86-7078).
+
+VERDICT: #105 is an active evaporite-karst collapse feature in the one valley in
+North America where that is the expected process. Explained. The arid sweep
+therefore ends with 33,458 anomalies and ZERO unexplained survivors — which is
+the correct and healthy outcome for a detector that is working: everything it
+found has a cause, and the causes are the ones physics predicts.
+
+What is still worth keeping from #105 (not a discovery claim): we measured it
+blind from free data (-2.8 cm/yr, -31.8 cm cumulative) where the literature is
+mostly qualitative; it is not operator-attributable; and it is 13 km from WIPP,
+where Nash Draw subsidence bears on repository groundwater-flow assessment.
+Minor gap left open: potash operations are regulated by NM Mining and Minerals
+Division, not OCD, so a MMD lease check would settle natural-vs-process-enhanced.
