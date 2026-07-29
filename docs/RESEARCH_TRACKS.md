@@ -2107,3 +2107,46 @@ mostly qualitative; it is not operator-attributable; and it is 13 km from WIPP,
 where Nash Draw subsidence bears on repository groundwater-flow assessment.
 Minor gap left open: potash operations are regulated by NM Mining and Minerals
 Division, not OCD, so a MMD lease check would settle natural-vs-process-enhanced.
+
+### Survivor 1 revisited — onset year matches two new deep SWD spuds (2026-07-28)
+
+Ran the same OCD ArcGIS proximity query against the Permian pilot's Survivor 1
+(the -52.9 cm / 9.3 yr accelerating bowl, NOT on a well pad). Result is the most
+operationally interesting thing the sweep produced, and it is a HYPOTHESIS, not
+a finding:
+
+Proximity: 0 wells within 1 km, 2 within 2 km, 543 within 6 km. Site is 7.6 km
+from WIPP and 16 km from Nash Draw (so NOT the Nash Draw karst story that
+explains #105). Nearest disposal: HUDSON FEDERAL SWD 2.00 km (plugged, 1993,
+14,325 ft) — a legacy wellbore.
+
+THE CORRELATION: the InSAR series is flat through 2018 (2016 -0.1, 2017 -1.0,
+2018 -1.4 cm) then breaks sharply (2019 -3.4, 2020 -9.0, 2021 -18.0, 2022
+-24.1 ... 2025 -49.5). Two NEW deep salt-water disposal wells were spudded in
+2019 within 3.5 km:
+  - JAMES RANCH UNIT 6 TORINO SWD   3.00 km  spud 2019  16,675 ft
+  - JRU 36 RAMBLER STATE SWD        3.47 km  spud 2019  16,510 ft
+
+Mechanism that would fit (documented in the Delaware Basin): deep injection ->
+pressure migration -> upward communication via legacy/plugged wellbores into the
+Salado/Rustler evaporites -> salt dissolution -> surface subsidence. A plugged
+1993 SWD sits 2.0 km away as a candidate conduit.
+
+HONEST CAVEATS — do not state this as causation:
+  - Onset-year vs spud-year is ONE temporal coincidence.
+  - General drilling ramped up area-wide in 2019-21 (2 oil wells 2019, 3 in
+    2020, 2 in 2021 within 4 km), so the correlation is not clean.
+  - 3 km is far for 16,500-ft disposal to produce a LOCALIZED surface bowl.
+  - We have not seen injection VOLUME data — only spud dates. Volumes are the
+    actual test and are available in OCD C-115 filings.
+
+NEXT TEST (highest-value remaining desk work in the whole project): pull monthly
+injection volumes for the two 2019 SWD wells from OCD and cross-correlate with
+the InSAR time series. If volume ramp leads subsidence onset, the hypothesis
+strengthens enormously; if injection started well after the break, it dies.
+That is a clean, falsifiable test on free public data.
+
+STATUS: Survivor 1 remains the one candidate in the project with a plausible
+ANTHROPOGENIC mechanism and a matching onset date. Unlike #105 (explained by
+Nash Draw karst), this one is genuinely open. Precise coordinates therefore stay
+regulator-first per standing policy; do not post publicly pending the volume test.
