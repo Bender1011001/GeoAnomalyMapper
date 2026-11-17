@@ -1,15 +1,16 @@
 # GeoAnomalyMapper
 
-**Ground-deformation intelligence from free satellite radar.** Detects, classifies,
-and forecasts active subsurface processes — growing sinkholes, dissolving salt,
-settling mine workings, induced subsidence — by mining NASA's InSAR archives with
-a validated, test-covered analytics engine.
+**Experimental ground-deformation analysis from free satellite radar.**
+Processes NASA InSAR archives to identify and characterize surface-motion
+candidates. Retrospective case studies and synthetic tests are documented
+below. They do not establish prospective sinkhole prediction, a validated
+collapse-warning system, or the physical cause of an individual anomaly.
 
 ## What this system actually does (and doesn't)
 
-Every capability claim below is backed by a ground-truth experiment. This project
-previously explored other detection approaches; where they failed validation they
-were removed, and where claims were never verified they are labeled as such. The
+The table below distinguishes case-study evidence, failed approaches, and
+unverified claims. This project previously explored other detection approaches;
+where they failed validation they were removed. The
 history is documented because it defines what the surviving system can honestly
 claim.
 
@@ -86,8 +87,10 @@ published (public artifacts round to ~11 km).
 Since 2026-07-15 a pre-registered research program
 ([docs/RESEARCH_TRACKS.md](docs/RESEARCH_TRACKS.md), governed by
 [docs/DISCOVERY_SOP.md](docs/DISCOVERY_SOP.md)) has mined signal that
-standard pipelines discard. Validated so far: a closure-phase disturbance
-detector with a ~6-week early-warning lead, SAR asc/desc anisotropy as the
+standard pipelines discard. Reported results include a retrospective Eldorado
+site-work case where closure-phase onset preceded the coherence channel by
+about six weeks; this is not a demonstrated lead time before a collapse or
+other hazard. Other experiments include SAR asc/desc anisotropy as the
 best single archaeology ranking feature (replicated), TDA persistence as a
 ring-form feature, and CORONA human-GCP georeferencing. Dead ends are
 recorded with the same care as wins — see the status summary at the top of
